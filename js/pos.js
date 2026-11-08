@@ -69,7 +69,7 @@ ACT.lowStock=()=>{Object.assign(App.ui.sf,{avail:"low",cat:""});location.hash="s
 App.pos={cart:[],phone:"",name:"",discPct:0,discSum:0,tiDev:"",tiAmt:0,tiImei:"",whId:null,manualPct:false};
 const P=App.pos;
 App.pointWhOpts=()=>{const p=App.point();const ws=App.whs().filter(w=>p&&w.pointId===p.id);return (ws.length?ws:App.whs()).map(w=>[w.id,w.name])};
-const posWh=()=>P.whId&&App.pointWhOpts().some(o=>o[0]===P.whId)?P.whId:App.cashWh();
+const posWh=()=>App.cashWh(); // продажа всегда со склада кассы текущей точки
 function posTotals(){
   const sub=P.cart.reduce((a,i)=>a+num(i.qty)*num(i.price)-num(i.disc),0);
   const disc=Math.round(sub*num(P.discPct)/100)+num(P.discSum);
@@ -92,7 +92,7 @@ VIEWS.pos={
     <div class="pos">
       <section class="card">
         <div class="row-f"><div class="fld grow"><label for="posQ">Товар или сканер</label><input id="posQ" type="search" autocomplete="off" placeholder="Название, артикул, штрихкод, IMEI / S/N"><div class="pick" id="posPick" hidden></div></div>
-        ${App.fld("posWh","Склад продажи",App.sel("posWh",App.pointWhOpts(),wh,'data-pos="whId"'))}</div>
+</div>
         <div class="chips" style="margin:12px 0"><button class="chip ${!App.ui.posCat?"on":""}" data-act="posCat" data-id="">Все</button>${cats.map(cg=>`<button class="chip ${App.ui.posCat===cg.id?"on":""}" data-act="posCat" data-id="${esc(cg.id)}">${esc(cg.name)}</button>`).join("")}</div>
         <div class="tilegrid">${quick.map(p=>`<button class="ptile" data-act="posAdd" data-id="${esc(p.id)}"><span>${esc(p.name)}</span><small>${esc(p.condition||"")} · ${App.qtyIn(p,wh)} шт</small><b>${money(p.price)}</b></button>`).join("")||'<div class="empty">На этом складе нет товаров в наличии</div>'}</div>
       </section>
