@@ -39,7 +39,8 @@ const PERMS = {
 App.can = a => (PERMS[a]||[]).includes(App.me.role);
 
 App.DEFAULTS = {shopName:"iCase", city:"", address:"", phone:"", inn:"", deviceWarrantyMonths:0,
-  repairWarrantyDays:90, requireShift:true, storageDays:30, deadDays:60, receiptFooter:"Спасибо за покупку!"};
+  repairWarrantyDays:90, requireShift:true, storageDays:30, deadDays:60, receiptFooter:"Спасибо за покупку!",legalName:"",ogrnip:"",siteUrl:"",reviewUrl:"",
+  receiptAck:"Устройство осмотрено, проверено, претензий к внешнему виду и комплектации не имею."};
 
 /* ---------- состояние ---------- */
 App.COLS = ["settings","points","warehouses","categories","suppliers","services","products","customers","sales","returns","docs","movements","shifts","cashops","staff","staffreq","log","repairs"];

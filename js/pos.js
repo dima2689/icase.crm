@@ -187,7 +187,7 @@ ACT.posConfirm=async(_,btn)=>{
       p_tradein_device:P.tiDev||null,p_tradein_amount:num(P.tiAmt),p_tradein_imei:P.tiImei||null},["sales","stock","stock_movements","cash_ops","products","audit_log"]);
     ACT.posClear();App.closeModal();App.toast("Продажа проведена");
     await App.reload(["sales","products","cashops"]);
-    const sale=App.byId("sales",id);if(sale)App.textModal("Товарный чек "+sale.num,App.saleText(sale));
+    if(App.byId("sales",id))ACT.openSale(id);
   }catch(e){btn.disabled=false;btn.textContent="Провести продажу";App.toast(e.message||"Ошибка продажи")}
 };
 App.saleText=function(s){
@@ -327,7 +327,7 @@ ACT.openSale=id=>{
     </tbody></table></div>
     <div class="sumlines"><span>Скидка на чек</span><span>${money(s.discount)}</span><span><b>Итого</b></span><span><b>${money(s.total)}</b></span>${App.can("cost")?`<span>Прибыль</span><span>${money(App.saleProfit(s))}</span>`:""}</div>
     ${rets.length?`<h3 class="sub-h">Возвраты</h3><div class="hist">${rets.map(r=>`<span>${esc(r.num)} · ${App.dtt(r.createdAt)} · ${esc((r.items||[]).map(i=>i.name+" ×"+i.qty).join(", "))} · ${money(r.amount)} · ${esc(r.reason)}</span>`).join("")}</div>`:""}
-    <div class="acts"><button class="btn" data-act="saleReceipt" data-id="${esc(id)}">Чек</button>${canRet?`<button class="btn danger" data-act="returnDlg" data-id="${esc(id)}">Возврат</button>`:""}</div>`);
+    <div class="acts"><button class="btn pri" data-act="printReceipt" data-id="${esc(id)}|a4">Товарный чек A4</button><button class="btn" data-act="printReceipt" data-id="${esc(id)}|80">Чек 80 мм</button><button class="btn" data-act="saleReceipt" data-id="${esc(id)}">Текст</button>${canRet?`<button class="btn danger" data-act="returnDlg" data-id="${esc(id)}">Возврат</button>`:""}</div>`);
   };
   App.openModal("",{wide:true,refresh:draw});draw();
 };

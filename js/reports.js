@@ -86,7 +86,7 @@ ACT.exportGo=async k=>{const [l,fn]=EXPORTS[k];const d=new Date().toISOString().
 
 /* ======================= ИМПОРТ ======================= */
 const PFIELDS=[["name","Название",["наименование","название","товар","name","title"]],["category","Категория",["группы","группа","категория","category","раздел"]],["brand","Бренд",["бренд","производитель","brand"]],
-  ["condition","Состояние",["состояние","condition"]],["sku","Артикул",["артикул","sku"]],["barcode","Штрихкод",["штрихкод ean13","штрихкод","штрих-код","barcode","ean"]],["serial","IMEI",["imei","серийный номер","серийный","serial","s/n"]],
+  ["condition","Состояние",["состояние","condition"]],["model","Модель",["модель","model"]],["memory","Память",["память","объём памяти","объем памяти","memory"]],["color","Цвет",["цвет","color"]],["sku","Артикул",["артикул","sku"]],["barcode","Штрихкод",["штрихкод ean13","штрихкод","штрих-код","barcode","ean"]],["serial","IMEI",["imei","серийный номер","серийный","serial","s/n"]],
   ["cost","Закупка",["закупочная цена","закупка","себестоимость","cost"]],["price","Цена",["цена: цена продажи","цена продажи","розничная цена","розница","price","цена"]],["qty","Количество",["остаток","количество","кол-во","qty","stock"]],["minQty","Мин. остаток",["неснижаемый остаток","минимальный остаток","мин. остаток"]]];
 const CFIELDS=[["name","Имя",["имя","фио","клиент","name"]],["phone","Телефон",["телефон","phone","тел","мобильный"]],["email","Email",["email","почта","e-mail"]],["birthday","День рождения",["день рождения","дата рождения","birthday"]],["note","Заметка",["заметка","комментарий","note","примечание"]],["discount","Скидка %",["скидка","discount"]]];
 ACT.importDlg=kind=>{
@@ -142,7 +142,7 @@ ACT.importGo=async(kind,btn)=>{
       Object.values(keys).forEach(v=>v&&usedKeys.add(v.toLowerCase()));
       const ex=S.products.find(p=>!p.archived&&Object.entries(keys).some(([k,v])=>v&&String(p[k]||"").toLowerCase()===v.toLowerCase()));
       const cond=App.CONDS.find(c=>c.toLowerCase()===g(r,"condition").toLowerCase());
-      const data={name,category_id:await catId(g(r,"category")),brand:g(r,"brand")||null,sku:keys.sku||null,barcode:keys.barcode||null,serial:keys.serial||null};
+      const data={name,category_id:await catId(g(r,"category")),brand:g(r,"brand")||null,model:g(r,"model")||null,memory:g(r,"memory")||null,color:g(r,"color")||null,sku:keys.sku||null,barcode:keys.barcode||null,serial:keys.serial||null};
       if(cond)data.condition=cond;
       if(col.price>=0)data.price=num(g(r,"price"));if(col.cost>=0&&App.can("cost"))data.cost=num(g(r,"cost"));if(col.minQty>=0)data.min_qty=num(g(r,"minQty"));
       const q=num(g(r,"qty"));

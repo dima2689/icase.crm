@@ -21,16 +21,17 @@ function shop(){
   return `<section class="card"><div class="card-h"><h2>Магазин и правила</h2></div><div class="form">
     ${App.fld("sName","Название",App.inp("sName",s.shopName))}${App.fld("sCity","Город",App.inp("sCity",s.city))}
     ${App.fld("sAddr","Адрес (по умолчанию для чеков)",App.inp("sAddr",s.address))}${App.fld("sPhone","Телефон",App.inp("sPhone",s.phone))}
-    ${App.fld("sInn","ИНН ИП (для чеков)",App.inp("sInn",s.inn))}
+    ${App.fld("sLegal","Продавец для документов",App.inp("sLegal",s.legalName,"text","ИП Фамилия Имя Отчество"))}${App.fld("sInn","ИНН",App.inp("sInn",s.inn))}${App.fld("sOgrn","ОГРНИП",App.inp("sOgrn",s.ogrnip))}
+    ${App.fld("sSite","Сайт (QR в чеке)",App.inp("sSite",s.siteUrl,"url","https://…"))}${App.fld("sRev","Ссылка на отзывы (QR в чеке)",App.inp("sRev",s.reviewUrl,"url","Яндекс Карты, 2ГИС, Авито"))}
     ${App.fld("sWarr","Гарантия на устройства, мес.",App.inp("sWarr",s.deviceWarrantyMonths,"number"))}${App.fld("sRw","Гарантия на ремонт, дней",App.inp("sRw",s.repairWarrantyDays,"number"))}
     ${App.fld("sStore","Бесплатное хранение готовых ремонтов, дней",App.inp("sStore",s.storageDays,"number"))}${App.fld("sDead","Товар «залежался» через, дней",App.inp("sDead",s.deadDays,"number"))}
-    ${App.fld("sFoot","Подпись в чеке",App.inp("sFoot",s.receiptFooter),"full")}
+    ${App.fld("sAck","Отметка покупателя в товарном чеке",App.inp("sAck",s.receiptAck),"full")}${App.fld("sFoot","Подпись в чеке",App.inp("sFoot",s.receiptFooter),"full")}
     <div class="fld full">${App.chk("sShift","Продажи только при открытой кассовой смене",s.requireShift)}</div>
   </div><div class="acts">${ed?'<button class="btn pri" data-act="saveSettings">Сохранить</button>':'<span class="muted">Изменять может управляющий или владелец</span>'}</div></section>`;
 }
 ACT.saveSettings=(_,btn)=>run(btn,async()=>{
   const V=App.val;
-  await App.api.update("settings",1,{shop_name:V("sName")||"iCase",city:V("sCity"),address:V("sAddr")||null,phone:V("sPhone")||null,inn:V("sInn")||null,
+  await App.api.update("settings",1,{shop_name:V("sName")||"iCase",city:V("sCity"),address:V("sAddr")||null,phone:V("sPhone")||null,inn:V("sInn")||null,legal_name:V("sLegal")||null,ogrnip:V("sOgrn")||null,site_url:V("sSite")||null,review_url:V("sRev")||null,receipt_ack:V("sAck")||App.DEFAULTS.receiptAck,
     device_warranty_months:num(V("sWarr")),repair_warranty_days:num(V("sRw")),storage_days:num(V("sStore"))||30,dead_days:num(V("sDead"))||60,receipt_footer:V("sFoot")||null,require_shift:App.checked("sShift")});
   await App.api.audit("Настройки изменены","","");App.toast("Настройки сохранены");
 });

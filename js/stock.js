@@ -59,6 +59,9 @@ function productForm(id){
     ${App.fld("pName","Название",App.inp("pName",p.name,"text","iPhone 15 Pro 256 ГБ, натуральный титан",edit?"":"disabled"),"full")}
     ${App.fld("pCat","Категория",App.sel("pCat",App.catOpts(),p.categoryId||"",edit?"":"disabled"))}
     ${App.fld("pCond","Состояние",App.sel("pCond",App.CONDS,p.condition,edit?"":"disabled"))}
+    ${App.fld("pModel","Модель",App.inp("pModel",p.model,"text","iPhone 15 Pro",edit?"":"disabled"))}
+    ${App.fld("pMem","Память",App.inp("pMem",p.memory,"text","256 ГБ",edit?"":"disabled"))}
+    ${App.fld("pColor","Цвет",App.inp("pColor",p.color,"text","натуральный титан",edit?"":"disabled"))}
     ${App.fld("pBrand","Бренд",App.inp("pBrand",p.brand,"text","Apple",edit?"":"disabled"))}
     ${App.fld("pSku","Артикул",App.inp("pSku",p.sku,"text","",edit?"":"disabled"))}
     ${App.fld("pBar","Штрихкод",App.inp("pBar",p.barcode,"text","отсканируйте",edit?"":"disabled"))}
@@ -92,7 +95,7 @@ ACT.saveProduct=async(id,btn)=>{
   const old=id?App.byId("products",id):null;
   const n=v=>v===""?null:num(v);
   const data={name:V("pName"),category_id:V("pCat")||null,condition:V("pCond"),brand:V("pBrand")||null,sku:V("pSku")||null,barcode:V("pBar")||null,serial:V("pSerial")||null,
-    price:num(V("pPrice")),min_qty:num(V("pMin")),warranty_months:num(V("pWarr")),battery_health:n(V("pBatt")),diagnostics:V("pDiag")||null,kit:V("pKit")||null,
+    price:num(V("pPrice")),min_qty:num(V("pMin")),warranty_months:num(V("pWarr")),battery_health:n(V("pBatt")),diagnostics:V("pDiag")||null,kit:V("pKit")||null,model:V("pModel")||null,memory:V("pMem")||null,color:V("pColor")||null,
     avito_price:n(V("pAvito")),on_site:App.checked("pSite"),on_avito:App.checked("pOnAvito"),description:V("pNote")||null};
   if(data.battery_health!=null&&(data.battery_health<0||data.battery_health>100))return App.toast("Ёмкость АКБ — от 0 до 100%");
   if(App.can("cost")&&document.getElementById("pCost"))data.cost=num(V("pCost"));

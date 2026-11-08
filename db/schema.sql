@@ -636,3 +636,27 @@ begin
 end $$;
 revoke execute on function merge_customers(uuid, uuid) from public, anon;
 grant execute on function merge_customers(uuid, uuid) to authenticated;
+
+-- icase_v3_receipt_fields: реквизиты для документов, модель/память/цвет, снимок характеристик в строке продажи
+alter table settings
+  add column legal_name text,            -- «ИП Фамилия Имя Отчество»
+  add column ogrnip text,
+  add column site_url text,
+  add column review_url text,
+  add column receipt_ack text not null default 'Устройство осмотрено, проверено, претензий к внешнему виду и комплектации не имею.';
+alter table products add column model text, add column memory text, add column color text;
+alter table sale_items
+  add column model text, add column memory text, add column color text,
+  add column condition text, add column battery_health int, add column kit text;
+create function snapshot_sale_item() returns trigger language plpgsql security definer set search_path = public as $$
+declare p products;
+begin
+  if new.product_id is not null then
+    select * into p from products where id = new.product_id;
+    new.model := coalesce(new.model, p.model); new.memory := coalesce(new.memory, p.memory); new.color := coalesce(new.color, p.color);
+    new.condition := coalesce(new.condition, p.condition); new.battery_health := coalesce(new.battery_health, p.battery_health); new.kit := coalesce(new.kit, p.kit);
+  end if;
+  return new;
+end $$;
+create trigger trg_sale_item_snapshot before insert on sale_items for each row execute function snapshot_sale_item();
+revoke execute on function snapshot_sale_item() from public, anon, authenticated;
