@@ -20,15 +20,15 @@ VIEWS.clients={
       .map(c=>Object.assign({c},stat(c)));
     rows.sort((a,b)=>u.clientSort==="spent"?b.spent-a.spent:u.clientSort==="name"?String(a.c.name).localeCompare(b.c.name):String(b.last).localeCompare(String(a.last)));
     const dup=dupGroups().length;
-    return `<div class="row-f"><input id="clientQ" type="search" placeholder="Имя, телефон, email" value="${esc(u.clientQ)}" data-filter="clientQ" aria-label="Поиск клиента" style="flex:1 1 260px">
+    return `<div class="cfilt"><input id="clientQ" type="search" placeholder="Имя, телефон, email" value="${esc(u.clientQ)}" data-filter="clientQ" aria-label="Поиск клиента">
       ${App.sel("clientTag",[["","Все клиенты"],["__black","Чёрный список"],...tags.map(t=>[t,"Метка: "+t])],u.clientTag,'data-filter-sel="clientTag" aria-label="Фильтр"')}
       ${App.sel("clientSort",[["last","Сначала недавние"],["spent","По сумме покупок"],["name","По имени"]],u.clientSort,'data-filter-sel="clientSort" aria-label="Сортировка"')}</div>
     ${dup?`<div class="banner info">Похоже на дубликаты: ${dup} ${dup===1?"группа":"группы"} клиентов с одинаковым именем. <button class="btn sm" data-act="showDups">Посмотреть</button></div>`:""}
-    <section class="card"><div class="tbl-wrap"><table><thead><tr><th>Клиент</th><th>Метки</th><th class="n">Покупок</th><th class="n">Ремонтов</th><th class="n">Сумма</th><th>Последний визит</th></tr></thead><tbody>
-    ${rows.slice(0,300).map(({c,s,r,spent,last})=>`<tr class="rowlink" data-act="openClient" data-id="${esc(c.id)}"><td><b>${esc(c.name)}</b>${c.blacklisted?' <span class="pill bad">ЧС</span>':""}<span class="sub">${esc(c.phone)}${c.source?" · "+esc(c.source):""}</span></td>
-      <td><div class="chips">${num(c.discount)?`<span class="pill ok">−${num(c.discount)}%</span>`:""}${(c.tags||[]).map(t=>`<span class="pill">${esc(t)}</span>`).join("")}</div></td>
-      <td class="n">${s.length}</td><td class="n">${r.length}</td><td class="n"><b>${money(spent)}</b></td><td>${App.dt(last)}</td></tr>`).join("")||'<tr><td colspan="6" class="empty">Клиенты не найдены</td></tr>'}
-    </tbody></table></div></section>`;
+    <section class="card crow-list">${rows.slice(0,300).map(({c,spent})=>{const ini=String(c.name||"").replace(/\([^)]*\)/g," ").split(/\s+/).map(w=>w.replace(/[^A-Za-zА-Яа-яЁё0-9]/g,"")).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase()||"?";
+      return `<button type="button" class="crow" data-act="openClient" data-id="${esc(c.id)}"><span class="cav ${c.blacklisted?"bad":""}">${esc(ini)}</span>
+        <span class="cnm"><b>${esc(c.name)}${c.blacklisted?' <span class="pill bad">ЧС</span>':""}</b><small>${esc(c.phone)}</small></span>
+        <span class="csum">${money(spent)}</span></button>`}).join("")||'<div class="empty">Клиенты не найдены</div>'}
+    </section>`;
   }
 };
 function dupGroups(){const m={};S.customers.filter(c=>!c.mergedInto&&c.name&&c.name!=="Без имени").forEach(c=>{const k=c.name.trim().toLowerCase();(m[k]=m[k]||[]).push(c)});return Object.values(m).filter(g=>g.length>1)}
@@ -68,7 +68,7 @@ ACT.openClient=id=>{
     App.redrawModal(App.head(esc(c.name),(c.blacklisted?'<span class="pill bad">Чёрный список</span>':"")+`<button class="btn sm" data-act="editClient" data-id="${esc(id)}">Изменить</button>`)+`
     ${c.blacklisted?`<div class="banner err">${esc(c.blackReason||"Клиент в чёрном списке")}</div>`:""}
     <div class="tiles"><div class="tile"><span>Телефон</span><b class="mid">${esc(c.phone)}</b>${c.phone2?`<small>${esc(c.phone2)}</small>`:""}</div><div class="tile"><span>Сумма покупок</span><b>${money(spent)}</b><small>средний чек ${money(s.length?s.reduce((a,x)=>a+num(x.total),0)/s.length:0)}</small></div><div class="tile"><span>Покупок</span><b>${s.length}</b><small>возвратов ${ret.length}</small></div><div class="tile"><span>Ремонтов</span><b>${r.length}</b></div></div>
-    <dl class="kv"><dt>Откуда</dt><dd>${esc(c.source||"—")}</dd><dt>Email</dt><dd>${esc(c.email||"—")}</dd><dt>День рождения</dt><dd>${c.birthday?App.dt(c.birthday):"—"}</dd><dt>Скидка</dt><dd>${num(c.discount)?num(c.discount)+"%":"—"}</dd><dt>Метки</dt><dd>${esc((c.tags||[]).join(", ")||"—")}</dd><dt>В базе с</dt><dd>${App.dt(c.createdAt)}</dd><dt>Заметка</dt><dd>${esc(c.note||"—")}</dd></dl>
+    <dl class="kv"><dt>Откуда</dt><dd>${esc(c.source||"—")}</dd><dt>Email</dt><dd>${esc(c.email||"—")}</dd><dt>День рождения</dt><dd>${c.birthday?App.dt(c.birthday):"—"}</dd><dt>Скидка</dt><dd>${num(c.discount)?num(c.discount)+"%":"—"}</dd><dt>Метки</dt><dd>${esc((c.tags||[]).join(", ")||"—")}</dd><dt>Последний визит</dt><dd>${App.dt(stat(c).last)}</dd><dt>В базе с</dt><dd>${App.dt(c.createdAt)}</dd><dt>Заметка</dt><dd>${esc(c.note||"—")}</dd></dl>
     <section><h3 class="sub-h">Ремонты</h3><div class="list-mini">${App.sortDesc(r).map(x=>`<button data-act="openRepair" data-id="${esc(x.id)}"><span>${esc(x.num)} · ${esc(x.device)}<small>${App.dt(x.createdAt)} · ${esc(x.problem)}</small></span>${App.statusPill(x.status)}</button>`).join("")||'<div class="hist">Нет</div>'}</div></section>
     <section><h3 class="sub-h">Покупки</h3><div class="list-mini">${App.sortDesc(s).map(App.saleMini).join("")||'<div class="hist">Нет</div>'}</div></section>
     <div class="acts">${App.can("del")?`<button class="btn" data-act="mergeDlg" data-id="${esc(id)}">Объединить с…</button>`:""}${App.can("repair")?`<button class="btn" data-act="repairFor" data-id="${esc(id)}">Принять в ремонт</button>`:""}${App.can("sale")?`<button class="btn pri" data-act="saleFor" data-id="${esc(id)}">Продать</button>`:""}</div>`);

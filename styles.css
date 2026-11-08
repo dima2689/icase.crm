@@ -439,3 +439,16 @@ th.wh small{display:block;font-weight:500;opacity:.7;font-size:11px}
   .rail-dim.on{opacity:1;pointer-events:auto}
   body.menu-open{overflow:hidden}
 }
+/* клиенты: ровный список, подробности — в карточке */
+.cfilt{display:grid;grid-template-columns:minmax(0,1fr) 200px 200px;gap:10px}
+.cfilt>*{width:100%;min-width:0}
+.crow-list{padding:6px}
+.crow{display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:center;gap:14px;width:100%;border:0;background:none;font:inherit;color:inherit;text-align:left;padding:10px 12px;border-radius:12px;cursor:pointer}
+.crow+.crow{border-top:1px solid var(--line);border-radius:0}
+.crow:hover{background:var(--sage-soft);border-radius:12px}
+.crow:hover+.crow{border-top-color:transparent}
+.cav{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--sage-soft);color:var(--ink);font-weight:700;font-size:14px}
+.cav.bad{background:var(--bad-soft);color:var(--bad)}
+.cnm{display:flex;flex-direction:column;gap:2px;min-width:0}.cnm b{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cnm small{font-size:13px;color:var(--muted)}
+.csum{font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
+@media (max-width:760px){.cfilt{grid-template-columns:1fr 1fr}.cfilt>input{grid-column:1/-1}}
