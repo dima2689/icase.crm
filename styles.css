@@ -339,3 +339,14 @@ tr.grow td{background:var(--surface-2,#f1eee4);padding:8px 12px;font-size:14px}t
 .ubh{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted,#666);margin-bottom:8px}
 .dimmed{opacity:.45}
 .chips.usum{margin-top:4px;gap:4px}.chips.usum .pill{font-size:11px}
+
+/* ---------- стрелки выпадающих списков и раскрывающихся блоков ---------- */
+select{-webkit-appearance:none;-moz-appearance:none;appearance:none;padding-right:38px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2366685c' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 14px center;background-size:14px 14px;cursor:pointer}
+select:disabled{background-image:none;padding-right:11px;cursor:default}
+select[multiple]{background-image:none;padding-right:11px}
+.fsh{padding:10px 6px 10px 2px}
+.fsh .car{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;margin-right:4px;border-radius:8px;flex:none}
+.fsh:hover .car{background:var(--surface-2,#efece2)}
+details>summary{padding-right:8px}

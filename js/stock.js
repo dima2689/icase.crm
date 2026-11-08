@@ -53,7 +53,7 @@ function catChips(){
 }
 const secSum=(...a)=>a.filter(Boolean).join(", ");
 function fsec(key,title,summary,body){const open=!!(App.ui.sf.sec||{})[key];
-  return `<div class="fsec ${open?"open":""}"><button class="fsh" data-act="sfSec" data-id="${key}" aria-expanded="${open}"><span class="ft">${title}</span><span class="fsum">${esc(summary||"")}</span><span class="car">${open?"▴":"▾"}</span></button>${open?`<div class="fsb">${body}</div>`:""}</div>`}
+  return `<div class="fsec ${open?"open":""}"><button class="fsh" data-act="sfSec" data-id="${key}" aria-expanded="${open}"><span class="ft">${title}</span><span class="fsum">${esc(summary||"")}</span><span class="car"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform:rotate(${open?180:0}deg);transition:transform .15s"><path d="M6 9l6 6 6-6"/></svg></span></button>${open?`<div class="fsb">${body}</div>`:""}</div>`}
 VIEWS.stock={
   actions:()=>(App.can("stock")?'<button class="btn" data-act="catalogNew">Из каталога Apple</button>':"")+`<button class="btn" data-act="tagsFromPick">${App.ui.tagPick.size?"Ценники ("+App.ui.tagPick.size+")":"Ценники"}</button>`+(App.can("io")?'<button class="btn" data-act="exportDlg" data-id="products">Экспорт</button><button class="btn" data-act="importDlg">Импорт</button>':"")+(App.can("stock")?'<button class="btn pri" data-act="newProduct">+ Товар</button>':""),
   render(){
