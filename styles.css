@@ -289,3 +289,24 @@ table.cart table.units input{text-align:right}
 @media (max-width:700px){.rhead{grid-template-columns:1fr auto}.rprices{grid-column:1/-1}}
 .rhead .sub{display:block;font-size:12px;color:var(--muted,#666);margin-top:2px}
 .row-f.nowrap select{flex:1;min-width:0}
+
+/* ---------- товары: дерево категорий и фильтры ---------- */
+.stockwrap{display:grid;grid-template-columns:250px minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:1000px){.stockwrap{grid-template-columns:1fr}.sside{position:static!important}}
+.sside{position:sticky;top:0;max-height:calc(100vh - 120px);overflow:auto;padding:14px}
+.sside h2{font-size:16px;margin:0}.sside h3{font-size:13px;margin:14px 0 6px;color:var(--muted,#666);text-transform:uppercase;letter-spacing:.06em}
+.tree{display:flex;flex-direction:column;gap:2px;margin-top:6px}
+.tbtn{display:flex;align-items:center;gap:6px;width:100%;border:0;background:none;padding:7px 8px;border-radius:9px;font:inherit;text-align:left;cursor:pointer}
+.tbtn:hover{background:var(--surface-2,#efece2)}.tbtn.on{background:var(--ink,#111);color:#fff}.tbtn.on .tc{color:#fff;opacity:.8}
+.tnode.lvl1 .tbtn{padding-left:24px;font-size:14px}.tnode.lvl2 .tbtn{padding-left:40px;font-size:13px}
+.tw{width:14px;flex:none;color:var(--muted,#888);font-size:12px}.tn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tc{font-size:12px;color:var(--muted,#888)}
+.tadd{border:0;background:none;color:var(--muted,#777);font:inherit;font-size:12px;padding:2px 0 6px 30px;cursor:pointer;text-align:left}
+.chips.v{flex-direction:column;align-items:stretch}.chips.v .chip{justify-content:space-between}
+.chip b{margin-left:6px;font-weight:600;opacity:.6;font-size:.85em}
+.fpanel{border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin:10px 0;background:var(--surface,#fbfaf6);display:flex;flex-direction:column;gap:8px}
+.frow{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.fl{width:84px;flex:none;font-size:12px;color:var(--muted,#666);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.frow .seg button{padding:5px 11px}
+.activef{margin-bottom:8px}
+tr.grow td{background:var(--surface-2,#f1eee4);padding:8px 12px;font-size:14px}tr.grow td span{margin-left:10px;color:var(--muted,#666);font-size:12px}
+.smain table td:nth-child(2){min-width:240px}
+.chips.v .chip{display:flex;width:100%;justify-content:space-between}

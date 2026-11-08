@@ -63,7 +63,7 @@ App.barChart = function(days,vals){
     if(i%2===days.length%2||last)g+=`<text x="${x+(bw-6)/2}" y="${H-6}" text-anchor="middle">${d.getDate()}</text>`});
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Выручка по дням">${g}</svg>`;
 };
-ACT.lowStock=()=>{App.ui.stockLow=true;App.ui.stockCat="";location.hash="stock";App.render()};
+ACT.lowStock=()=>{Object.assign(App.ui.sf,{avail:"low",cat:""});location.hash="stock";App.render()};
 
 /* ======================= КАССА ======================= */
 App.pos={cart:[],phone:"",name:"",discPct:0,discSum:0,tiDev:"",tiAmt:0,tiImei:"",whId:null,manualPct:false};
