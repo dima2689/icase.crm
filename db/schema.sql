@@ -660,3 +660,8 @@ begin
 end $$;
 create trigger trg_sale_item_snapshot before insert on sale_items for each row execute function snapshot_sale_item();
 revoke execute on function snapshot_sale_item() from public, anon, authenticated;
+
+-- icase_v3_print_config: шаблон товарного чека и свои шаблоны ценников
+alter table settings
+  add column doc_config jsonb not null default '{}'::jsonb,
+  add column tag_templates jsonb not null default '[]'::jsonb;

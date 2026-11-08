@@ -16,6 +16,7 @@ App.NAV = [
   ["docs","Склад",'<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>',"stock"],
   ["clients","Клиенты",'<circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M16 4a4 4 0 0 1 0 8M19 15c2 .8 3 2.6 3 6"/>',"clients"],
   ["reports","Отчёты",'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',"reports"],
+  ["print","Печать",'<path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M6 14h12v7H6z"/><path d="M17 12h.01"/>',null],
   ["settings","Настройки",'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',"settings"]
 ];
 App.navAllowed = v=>{const n=App.NAV.find(x=>x[0]===v);return n&&App.VIEWS[v]&&(!n[3]||App.can(n[3]))};
@@ -190,7 +191,7 @@ document.addEventListener("click",e=>{
 document.addEventListener("input",e=>{
   const t=e.target;
   if(t.id==="gsearch")return gsearch();
-  if(t.id&&$("#view").contains(t)&&!t.dataset.filter&&!t.dataset.filterSel&&!t.dataset.pos&&!t.dataset.cart&&t.type!=="search")t.dataset.dirty="1";
+  if(t.id&&$("#view").contains(t)&&!t.dataset.filter&&!t.dataset.filterSel&&!t.dataset.pos&&!t.dataset.cart&&t.type!=="search"&&!t.closest("[data-nodirty]"))t.dataset.dirty="1";
   if(t.dataset&&t.dataset.filter){App.ui[t.dataset.filter]=t.value;App.render()}
 });
 document.addEventListener("change",e=>{const t=e.target;if(t.dataset&&t.dataset.filterSel){App.ui[t.dataset.filterSel]=t.type==="checkbox"?t.checked:t.value;App.render()}});

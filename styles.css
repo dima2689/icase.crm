@@ -239,3 +239,21 @@ pre.receipt{background:#fff;border:1px dashed var(--line);border-radius:10px;pad
 .login-card .brand{padding:0}
 .login-card p{margin:0}
 .who select{width:100%}
+
+/* ---------- печать: ценники и редактор чека ---------- */
+.pgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:16px;align-items:start}
+@media (max-width:1000px){.pgrid{grid-template-columns:1fr}}
+.prevbox{margin-top:10px;border:1px solid var(--line,#ddd);border-radius:12px;overflow:hidden;background:#e5e5e5;height:420px}
+.prevbox iframe{width:100%;height:100%;border:0;display:block;background:#e5e5e5}
+.prevbox.doc{height:640px;position:relative}
+.prevbox.doc iframe{width:794px;height:1123px;transform:scale(.56);transform-origin:0 0;position:absolute;left:calc(50% - 222px);top:8px;box-shadow:0 2px 12px rgba(0,0,0,.15);background:#fff}
+.prevbox.doc.tape iframe{width:302px;height:1100px;transform:scale(1);left:calc(50% - 151px)}
+th.pick,td.pick{width:34px;text-align:center}td.pick input,th.pick input{width:18px;height:18px;margin:0;cursor:pointer}
+.tplpick{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.tplbtn{border:1.5px solid var(--line,#ddd);background:#fff;border-radius:12px;padding:10px;font:inherit;font-weight:600;cursor:pointer;display:flex;flex-direction:column;gap:8px;align-items:center}
+.tplbtn.on{border-color:#111;box-shadow:0 0 0 2px #111 inset}
+.tplbtn span{width:100%;height:84px;border-radius:6px;border:1px solid #e3e3e3;background:#fff;display:block}
+.tpl-brand{background:linear-gradient(#111,#111) 10% 12%/40% 8px no-repeat,linear-gradient(#e5e5e5,#e5e5e5) 10% 32%/26% 18px no-repeat,linear-gradient(#e5e5e5,#e5e5e5) 50% 32%/26% 18px no-repeat,linear-gradient(#e5e5e5,#e5e5e5) 90% 32%/26% 18px no-repeat,linear-gradient(#111,#111) 50% 58%/82% 6px no-repeat,linear-gradient(#ededed,#ededed) 88% 86%/40% 16px no-repeat!important}
+.tpl-classic{background:linear-gradient(#111,#111) 50% 12%/60% 2px no-repeat,linear-gradient(#111,#111) 50% 22%/30% 5px no-repeat,repeating-linear-gradient(#fff 0 9px,#999 9px 10px) 50% 62%/82% 40px no-repeat!important}
+.tpl-minimal{background:linear-gradient(#111,#111) 12% 10%/22% 5px no-repeat,linear-gradient(#bbb,#bbb) 12% 30%/50% 10px no-repeat,repeating-linear-gradient(#fff 0 11px,#ddd 11px 12px) 50% 64%/82% 30px no-repeat,linear-gradient(#111,#111) 88% 90%/30% 8px no-repeat!important}
+.seg{display:inline-flex;border:1px solid var(--line,#ddd);border-radius:99px;overflow:hidden}.seg button{border:0;background:transparent;padding:5px 12px;font:inherit;font-size:13px;cursor:pointer}.seg button.on{background:#111;color:#fff}

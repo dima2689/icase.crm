@@ -9,7 +9,7 @@ Object.assign(App.ui,{stockQ:"",stockCat:"",stockWh:"",stockLow:false,stockArch:
 function lastMove(p){let m="";S.movements.forEach(x=>{if(x.productId===p.id&&x.at>m)m=x.at});return m||p.createdAt}
 App.isDead = p=>App.qtyTotal(p)>0&&App.days(lastMove(p))>App.settings().deadDays;
 VIEWS.stock={
-  actions:()=>(App.can("io")?'<button class="btn" data-act="exportDlg" data-id="products">Экспорт</button><button class="btn" data-act="importDlg">Импорт</button>':"")+(App.can("stock")?'<button class="btn pri" data-act="newProduct">+ Товар</button>':""),
+  actions:()=>`<button class="btn" data-act="tagsFromPick">${App.ui.tagPick.size?"Ценники ("+App.ui.tagPick.size+")":"Ценники"}</button>`+(App.can("io")?'<button class="btn" data-act="exportDlg" data-id="products">Экспорт</button><button class="btn" data-act="importDlg">Импорт</button>':"")+(App.can("stock")?'<button class="btn pri" data-act="newProduct">+ Товар</button>':""),
   render(){
     const u=App.ui,q=u.stockQ.trim().toLowerCase(),words=q?q.split(/\s+/):[];
     const whs=App.whs(),showCost=App.can("cost");
@@ -19,7 +19,7 @@ VIEWS.stock={
     list.sort((a,b)=>App.catName(a).localeCompare(App.catName(b))||String(a.name).localeCompare(b.name));
     const totCost=list.reduce((a,p)=>a+num(p.cost)*Math.max(0,qty(p)),0),totPrice=list.reduce((a,p)=>a+num(p.price)*Math.max(0,qty(p)),0),totQty=list.reduce((a,p)=>a+qty(p),0);
     const roots=App.catChildren("");
-    const shown=list.slice(0,u.stockLimit||200);
+    const shown=list.slice(0,u.stockLimit||200);App.ui.stockShown=shown.map(p=>p.id);
     return `<div class="row-f">
       <input id="stockQ" type="search" placeholder="Название, артикул, штрихкод, IMEI" value="${esc(u.stockQ)}" data-filter="stockQ" aria-label="Поиск товара" style="flex:1 1 260px">
       ${App.sel("stockWh",[["","Все склады"],...App.whOpts()],u.stockWh,'data-filter-sel="stockWh" aria-label="Склад"')}
@@ -32,13 +32,13 @@ VIEWS.stock={
       ${App.chk("fArch","Архив",u.stockArch).replace('id="fArch"','id="fArch" data-filter-sel="stockArch"')}
     </div>
     <div class="tiles"><div class="tile"><span>Позиций</span><b>${list.length}</b><small>${totQty} шт</small></div>${showCost?`<div class="tile"><span>В закупке</span><b>${money(totCost)}</b></div>`:""}<div class="tile"><span>В рознице</span><b>${money(totPrice)}</b></div>${showCost?`<div class="tile"><span>Потенциальная наценка</span><b>${money(totPrice-totCost)}</b></div>`:""}</div>
-    <section class="card"><div class="tbl-wrap"><table><thead><tr><th>Товар</th>${u.stockWh?"<th class=\"n\">Остаток</th>":whs.map(w=>`<th class="n">${esc(w.name)}</th>`).join("")+'<th class="n">Всего</th>'}${showCost?'<th class="n">Закупка</th>':""}<th class="n">Цена</th>${showCost?'<th class="n">Наценка</th>':""}<th>Каналы</th></tr></thead><tbody>
+    <section class="card"><div class="tbl-wrap"><table><thead><tr><th class="pick"><input type="checkbox" data-act="tagPickAll" aria-label="Выбрать все для ценников" ${shown.length&&shown.every(p=>App.ui.tagPick.has(p.id))?"checked":""}></th><th>Товар</th>${u.stockWh?"<th class=\"n\">Остаток</th>":whs.map(w=>`<th class="n">${esc(w.name)}</th>`).join("")+'<th class="n">Всего</th>'}${showCost?'<th class="n">Закупка</th>':""}<th class="n">Цена</th>${showCost?'<th class="n">Наценка</th>':""}<th>Каналы</th></tr></thead><tbody>
     ${shown.map(p=>{const mk=num(p.price)-num(p.cost);return `<tr class="rowlink" data-act="openProduct" data-id="${esc(p.id)}">
-      <td><b>${esc(p.name)}</b>${p.condition&&p.condition!=="Новый"?` <span class="pill">${esc(p.condition)}</span>`:""}<span class="sub">${esc(App.catName(p))}${p.sku?" · "+esc(p.sku):""}${p.serial?" · IMEI "+esc(p.serial):""}</span></td>
+      <td class="pick"><input type="checkbox" data-act="tagPick" data-id="${esc(p.id)}" aria-label="Ценник" ${App.ui.tagPick.has(p.id)?"checked":""}></td><td><b>${esc(p.name)}</b>${p.condition&&p.condition!=="Новый"?` <span class="pill">${esc(p.condition)}</span>`:""}<span class="sub">${esc(App.catName(p))}${p.sku?" · "+esc(p.sku):""}${p.serial?" · IMEI "+esc(p.serial):""}</span></td>
       ${u.stockWh?`<td class="n">${qtyCell(App.qtyIn(p,u.stockWh),p)}</td>`:whs.map(w=>`<td class="n">${App.qtyIn(p,w.id)||'<span class="muted">·</span>'}</td>`).join("")+`<td class="n">${qtyCell(App.qtyTotal(p),p)}</td>`}
       ${showCost?`<td class="n">${money(p.cost)}</td>`:""}<td class="n"><b>${money(p.price)}</b></td>
       ${showCost?`<td class="n">${mk<0?`<span class="pill bad">${money(mk)}</span>`:money(mk)}</td>`:""}
-      <td><div class="chips">${p.onSite?'<span class="pill info">Сайт</span>':""}${p.onAvito?'<span class="pill info">Авито</span>':""}</div></td></tr>`}).join("")||`<tr><td colspan="9" class="empty">Ничего не найдено${roots.length?"":". Сначала создайте категории в настройках"}</td></tr>`}
+      <td><div class="chips">${p.onSite?'<span class="pill info">Сайт</span>':""}${p.onAvito?'<span class="pill info">Авито</span>':""}</div></td></tr>`}).join("")||`<tr><td colspan="10" class="empty">Ничего не найдено${roots.length?"":". Сначала создайте категории в настройках"}</td></tr>`}
     </tbody></table></div>${list.length>shown.length?`<div class="acts" style="justify-content:center;margin-top:10px"><button class="btn" data-act="moreStock">Показать ещё (${list.length-shown.length})</button></div>`:""}</section>`;
   }
 };
@@ -82,6 +82,7 @@ function productForm(id){
   ${id?`<section><h3 class="sub-h">Движение</h3><div class="tbl-wrap"><table><tbody>${moves.map(m=>`<tr><td>${App.dtt(m.at)}</td><td>${esc(App.MOVE[m.type]||m.type)}</td><td>${esc(App.whName(m.whId))}</td><td class="n"><span class="pill ${num(m.qty)>0?"ok":"mute"}">${num(m.qty)>0?"+":""}${num(m.qty)}</span></td><td>${esc(m.ref)}${m.note?'<span class="sub">'+esc(m.note)+"</span>":""}</td></tr>`).join("")||'<tr><td class="empty">Движений нет</td></tr>'}</tbody></table></div></section>`:""}
   <div class="acts">
     ${id&&App.can("del")?`<button class="btn danger" data-act="delProduct" data-id="${esc(id)}">${moves.length?(p.archived?"Вернуть из архива":"В архив"):"Удалить"}</button>`:""}
+    ${id?`<button class="btn" data-act="tagOne" data-id="${esc(id)}">Ценник</button>`:""}
     ${id&&App.can("stock")?`<button class="btn" data-act="quickDoc" data-id="in|${esc(id)}">Приход</button><button class="btn" data-act="quickDoc" data-id="transfer|${esc(id)}">Переместить</button><button class="btn" data-act="quickDoc" data-id="writeoff|${esc(id)}">Списать</button>`:""}
     ${edit||price?`<button class="btn pri" data-act="saveProduct" data-id="${esc(id||"")}">Сохранить</button>`:""}
   </div>`,{wide:true});
