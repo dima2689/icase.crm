@@ -167,11 +167,10 @@ td .sub.bad{color:var(--bad)}td .sub.warn{color:var(--warn)}
 .shiftbar{padding:10px 14px;border-radius:12px;background:#ECE9DE;font-size:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .shiftbar.ok{background:var(--ok-soft);color:var(--ok)}
 .shiftbar.bad{background:var(--bad-soft);color:var(--bad)}
-.pos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:stretch}
-.pos>.card{min-height:calc(100vh - 190px)}
+.pos{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
 .cartcard{display:flex;flex-direction:column}.cartcard .clist{flex:1}
 .cartcard>.btn.big{margin-top:12px}
-.cartcard{position:sticky;top:0}
+.cartcard{position:static}
 .tilegrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;max-height:520px;overflow-y:auto}
 .ptile{display:flex;flex-direction:column;gap:3px;text-align:left;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;cursor:pointer;font:inherit;color:inherit}
 .ptile:hover{border-color:var(--sage);background:var(--sage-soft)}
@@ -216,7 +215,7 @@ pre.receipt{background:#fff;border:1px dashed var(--line);border-radius:10px;pad
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#F3F0E6;padding:10px 18px;border-radius:14px;font-weight:600;z-index:60;font-size:14px;max-width:calc(100% - 32px);text-align:center}
 .toast[hidden]{display:none}
 
-@media (max-width:760px){.pos{grid-template-columns:1fr}.pos>.card{min-height:0}.cartcard{position:static}}
+
 @media (max-width:900px){.g2,.g3{grid-template-columns:1fr}}
 @media (max-width:760px){
   .app{grid-template-columns:1fr}
@@ -388,3 +387,11 @@ th.wh small{display:block;font-weight:500;opacity:.7;font-size:11px}
   .cl-sum b{padding:0}
 }
 .pos .tilegrid{grid-template-columns:repeat(auto-fill,minmax(135px,1fr))}
+
+/* касса друг над другом: на всю ширину строка чека в одну линию */
+.pos .tilegrid{max-height:330px}
+@container (min-width:680px){
+  .cline{display:grid;grid-template-columns:minmax(0,1fr) minmax(330px,440px) auto;align-items:center;gap:14px}
+  .cl-top{display:contents}.cl-name{order:1}.cl-row{order:2}.cl-top>.btn{order:3}
+  .cartcard .form{grid-template-columns:repeat(2,minmax(0,280px))}
+}
