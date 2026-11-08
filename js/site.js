@@ -81,6 +81,7 @@ App.siteTab=()=>{
     </div>
     <div class="acts">${ed?'<button class="btn pri" data-act="siteSave">Сохранить</button>':""}</div></section>
 
+  ${App.siteFieldsCard()}
   <section class="card"><div class="card-h"><h2>Подключение WooCommerce</h2></div>
     <ol class="steps">
       <li>В админке сайта: <b>WooCommerce → Настройки → Дополнительно → REST API → Добавить ключ</b>, права «Чтение/Запись». Скопируйте Consumer key и Consumer secret сюда — они хранятся в защищённом хранилище базы и больше нигде не показываются.</li>
@@ -91,7 +92,8 @@ App.siteTab=()=>{
       ${App.fld("ssUrl","Адрес сайта",App.inp("ssUrl",s.siteUrl,"url","https://icase52.ru"),"full")}
       ${App.fld("ssKey","Consumer key",App.inp("ssKey","","password",st&&st.has_keys?"сохранён — введите, чтобы заменить":"ck_…",'autocomplete="off"'))}
       ${App.fld("ssSecret","Consumer secret",App.inp("ssSecret","","password",st&&st.has_keys?"сохранён — введите, чтобы заменить":"cs_…",'autocomplete="off"'))}
-    </div><div class="acts"><button class="btn pri" data-act="siteKeys">Сохранить подключение</button></div>
+    </div><div class="acts"><button class="btn" data-act="siteTest">Проверить подключение</button><button class="btn pri" data-act="siteKeys">Сохранить подключение</button></div>
+    ${App.ui.siteTest?`<div class="banner ${App.ui.siteTest.ok?"ok":"err"}">${App.ui.siteTest.ok?"Подключение работает."+(App.ui.siteTest.sample?" Сайт отвечает, пример товара: «"+esc(App.ui.siteTest.sample)+"».":"")+((App.ui.siteTest.global_attributes||[]).length?" Атрибуты сайта: "+esc(App.ui.siteTest.global_attributes.join(", "))+".":" Глобальных атрибутов на сайте нет — характеристики уйдут обычными."):"Не удалось подключиться: "+esc(App.ui.siteTest.error||"")}</div>`:""}
     <div class="kvcopy"><span>Адрес веб-хука заказов</span><code>${esc(hook)}</code><button class="btn sm" data-act="copyTxt" data-id="${esc(hook)}">Копировать</button></div>
     <div class="kvcopy"><span>Каталог для сайта (JSON)</span><code>${esc(feed)}</code><button class="btn sm" data-act="copyTxt" data-id="${esc(feed)}">Копировать</button></div>
     <div class="kvcopy"><span>Ключ API (секрет веб-хука)</span><code id="ssApiKey">${App.ui.siteKey?esc(App.ui.siteKey):"••••••••••••"}</code>${App.ui.siteKey?`<button class="btn sm" data-act="copyTxt" data-id="${esc(App.ui.siteKey)}">Копировать</button><button class="btn sm ghost" data-act="siteKeyNew">Новый ключ</button>`:'<button class="btn sm" data-act="siteKeyShow">Показать</button>'}</div>`
@@ -117,6 +119,41 @@ ACT.siteKeys=(_,btn)=>run(btn,async()=>{
   const url=App.val("ssUrl");if(url&&!/^https:\/\//.test(url))return App.toast("Адрес сайта должен начинаться с https://");
   await App.api.rpc("site_set_credentials",{p_url:url,p_key:App.val("ssKey"),p_secret:App.val("ssSecret")},["settings"]);
   App.ui.siteStatus=null;App.toast("Подключение сохранено");
+});
+/* что передавать на сайт */
+const SF_DEF={create:{categories:true,attributes:true,description:true,photos:true},
+  update:{price:true,stock:true,status:true,name:false,categories:false,attributes:false,description:false,photos:false},
+  attrs:{brand:true,model:true,memory:true,color:true,condition:true,warranty:true,battery:true,kit:true,used:true,extra:true},global_attrs:true};
+const sfNow=()=>{const f=App.settings().siteFields||{};return{create:{...SF_DEF.create,...(f.create||{})},update:{...SF_DEF.update,...(f.update||{})},attrs:{...SF_DEF.attrs,...(f.attrs||{})},global_attrs:f.global_attrs!==false}};
+const SF_LBL={
+  create:[["categories","Категория (создаётся на сайте, если её нет)"],["attributes","Характеристики"],["description","Описание (у б/у — состояние, АКБ, комплект, диагностика)"],["photos","Фото из карточки товара"]],
+  update:[["price","Цена"],["stock","Остаток"],["status","Прятать проданное, снятое с сайта и архив"],["name","Название"],["categories","Категория"],["attributes","Характеристики"],["description","Описание"],["photos","Фото"]],
+  attrs:[["brand","Бренд"],["model","Модель"],["memory","Память"],["color","Цвет"],["condition","Состояние"],["warranty","Гарантия"],["battery","Ёмкость АКБ (б/у)"],["kit","Комплект (б/у)"],["used","Параметры б/у: циклы, корпус, экран, ремонт, Face ID, True Tone, регион"],["extra","Доп. параметры из карточки: SIM, ОЗУ, размер и др."]]};
+App.siteFieldsCard=()=>{const f=sfNow(),ed=App.can("settings");
+  const box=(g,k,l)=>`<label class="chk sfchk"><input type="checkbox" data-sitef="${g}.${k}" ${f[g][k]?"checked":""} ${ed?"":"disabled"}> ${esc(l)}</label>`;
+  return `<section class="card"><div class="card-h"><h2>Что передавать на сайт</h2></div>
+    <div class="sfgrid">
+      <div><h3 class="sub-h">Новая карточка на сайте</h3><label class="chk sfchk"><input type="checkbox" checked disabled> Название, артикул, цена, остаток — всегда</label>${SF_LBL.create.map(([k,l])=>box("create",k,l)).join("")}</div>
+      <div><h3 class="sub-h">Обновление существующей</h3>${SF_LBL.update.map(([k,l])=>box("update",k,l)).join("")}
+        <small class="muted">Название, категорию, описание и фото лучше не включать, если вы правите их на сайте вручную — CRM их перезапишет.</small></div>
+      <div><h3 class="sub-h">Характеристики</h3>${SF_LBL.attrs.map(([k,l])=>box("attrs",k,l)).join("")}
+        <label class="chk sfchk"><input type="checkbox" data-sitef="global_attrs" ${f.global_attrs?"checked":""} ${ed?"":"disabled"}> Использовать атрибуты сайта с тем же названием (для фильтров каталога)</label></div>
+    </div>
+    ${ed?'<div class="acts"><button class="btn pri" data-act="siteFieldsSave">Сохранить</button></div>':""}
+    <p class="muted">После сохранения товары, уже связанные с сайтом, выгрузятся заново по новым правилам. Как конкретный товар уйдёт на сайт — кнопка «Как уйдёт на сайт» в карточке товара.</p></section>`};
+ACT.siteFieldsSave=(_,btn)=>run(btn,async()=>{const f=sfNow();
+  document.querySelectorAll("[data-sitef]").forEach(x=>{const [g,k]=x.dataset.sitef.split(".");if(k)f[g][k]=x.checked;else f[g]=x.checked});
+  await App.api.update("settings",1,{site_fields:f});App.toast("Сохранено")});
+ACT.siteTest=(_,btn)=>run(btn,async()=>{App.ui.siteTest=await App.api.invoke("site-sync",{test:true});App.render()});
+/* предпросмотр: как товар уйдёт на сайт */
+ACT.sitePreview=(id,btn)=>run(btn,async()=>{
+  const r=await App.api.invoke("site-sync",{preview:id});const p=App.byId("products",id)||{};
+  const show=v=>Array.isArray(v)?(v.length&&v[0]&&v[0].options?v.map(a=>`${esc(a.name||("атрибут сайта #"+a.id))}: <b>${esc(a.options.join(", "))}</b>`).join("<br>"):v.map(x=>esc(x.name||x.src||JSON.stringify(x))).join("<br>")):typeof v==="string"&&/^</.test(v)?`<div class="pvdesc">${v}</div>`:esc(String(v));
+  const HV={manage_stock:{true:"да",false:"нет"},stock_status:{instock:"в наличии",outofstock:"нет в наличии"},status:{draft:"черновик (не виден покупателям)",publish:"опубликован",private:"скрыт"}};
+  const L={name:"Название",sku:"Артикул",regular_price:"Цена",manage_stock:"Учёт остатка",stock_quantity:"Остаток",stock_status:"Наличие",status:"Статус",categories:"Категория",attributes:"Характеристики",description:"Описание",images:"Фото"};
+  const tbl=o=>{const ks=Object.keys(o).filter(k=>k!=="type");return ks.length?`<dl class="kv pv">${ks.map(k=>`<dt>${L[k]||k}</dt><dd>${HV[k]&&HV[k][String(o[k])]?HV[k][String(o[k])]:o[k]===""||(Array.isArray(o[k])&&!o[k].length)?'<span class="muted">—</span>':show(o[k])}</dd>`).join("")}</dl>`:'<p class="muted">Ничего не меняется</p>'};
+  App.openModal(App.head("Как уйдёт на сайт: "+esc(p.name||""))+((r.items||[]).map(it=>`<section class="pvbox"><h3 class="sub-h">${it.kind==="unit"?"Экземпляр "+esc(it.sku):"Товар "+esc(it.sku)} ${it.visible?'<span class="pill ok">на сайте</span>':'<span class="pill mute">скрыт</span>'}${it.woo_id?' <span class="pill info">связан, #'+it.woo_id+"</span>":""}</h3>
+    ${it.woo_id?`<p class="muted">Карточка уже есть на сайте — при изменениях уйдёт:</p>${tbl(it.update)}`:`<p class="muted">Карточки на сайте ещё нет — будет создана:</p>${tbl(it.create)}`}</section>`).join("")||'<p class="muted">Товар не отмечен «На сайте» или нет на складах сайта.</p>'),{wide:true});
 });
 ACT.siteKeyShow=(_,btn)=>run(btn,async()=>{App.ui.siteKey=await App.api.rpc("site_api_key",{p_regenerate:false});App.render()});
 ACT.siteKeyNew=(_,btn)=>{if(!App.confirm2(btn,"Нажмите ещё раз: старый ключ перестанет работать, его нужно будет заменить в веб-хуках сайта"))return;

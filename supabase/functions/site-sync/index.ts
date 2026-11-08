@@ -1,7 +1,7 @@
 // Edge-функция site-sync: запускается по расписанию (pg_cron, заголовок x-cron-token)
 // или вручную из CRM владельцем/управляющим (кнопка «Выгрузить сейчас»).
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { syncRun, wooClient } from "./sync.ts";
+import { preview, syncRun, testConnection, wooClient } from "./sync.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info, x-cron-token" };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
@@ -28,7 +28,16 @@ Deno.serve(async (req) => {
     }
   }
   if (!allowed) return json({ error: "Нет доступа" }, 401);
+  let body: any = {};
+  try { body = await req.json(); } catch { body = {}; }
   try {
+    if (body && body.preview) return json(await preview(rpc, String(body.preview)));
+    if (body && body.test) {
+      const cfg = await rpc("site_config");
+      if (!cfg.url || !cfg.woo_key || !cfg.woo_secret) return json({ ok: false, error: "Не заданы адрес сайта или ключи WooCommerce" });
+      try { return json(await testConnection(wooClient(cfg.url, cfg.woo_key, cfg.woo_secret))); }
+      catch (e) { return json({ ok: false, error: String((e as Error).message || e) }); }
+    }
     let total = { jobs: 0 } as Record<string, unknown>;
     for (let i = 0; i < 5; i++) {                       // до 500 заданий за запуск
       const r = await syncRun(rpc, (cfg) => cfg.url && cfg.woo_key && cfg.woo_secret ? wooClient(cfg.url, cfg.woo_key, cfg.woo_secret) : null, console.log);

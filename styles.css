@@ -491,3 +491,12 @@ label.chip{cursor:pointer}
 .supbar .row-f{gap:6px}
 .sphead{display:flex;justify-content:space-between;padding:6px 12px 4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
 .spsup{color:var(--ink);font-weight:600}
+.sfgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.sfgrid>div{display:flex;flex-direction:column;gap:6px}
+.sfchk{font-size:13.5px;align-items:flex-start;line-height:1.35}
+@media (max-width:900px){.sfgrid{grid-template-columns:1fr}}
+.pvbox+.pvbox{border-top:1px solid var(--line);margin-top:12px;padding-top:6px}
+.kv.pv dd{word-break:break-word}.pvdesc{font-size:13px;color:var(--muted)}.pvdesc ul{margin:4px 0;padding-left:18px}
+.banner.ok{background:var(--ok-soft);color:var(--ok)}
+.chk.sfchk{border:0;background:none;padding:3px 0;border-radius:0}
+.sfchk input{flex:none;width:18px;height:18px;margin-top:1px}

@@ -8,8 +8,27 @@ export type FeedItem = {
   kind: "product" | "unit"; crm_id: string; product_id: string; woo_id: number | null; sku: string; name: string;
   price: number; qty: number; visible: boolean; categories: string[]; brand?: string; model?: string; memory?: string;
   color?: string; condition?: string; battery?: number | null; kit?: string; used?: Record<string, unknown>;
-  attrs?: Record<string, unknown>; description?: string | null; photos?: string[];
+  attrs?: Record<string, unknown>; description?: string | null; photos?: string[]; warranty?: number | null;
 };
+
+/** Что передавать на сайт — настраивается в CRM («Настройки → Сайт → Что передавать»). */
+export type Fields = {
+  create: { categories: boolean; attributes: boolean; description: boolean; photos: boolean };
+  update: { price: boolean; stock: boolean; status: boolean; name: boolean; categories: boolean; attributes: boolean; description: boolean; photos: boolean };
+  attrs: { brand: boolean; model: boolean; memory: boolean; color: boolean; condition: boolean; warranty: boolean; battery: boolean; kit: boolean; used: boolean; extra: boolean };
+  global_attrs: boolean;
+};
+export const DEFAULT_FIELDS: Fields = {
+  create: { categories: true, attributes: true, description: true, photos: true },
+  update: { price: true, stock: true, status: true, name: false, categories: false, attributes: false, description: false, photos: false },
+  attrs: { brand: true, model: true, memory: true, color: true, condition: true, warranty: true, battery: true, kit: true, used: true, extra: true },
+  global_attrs: true,
+};
+export function fieldsOf(cfg: any): Fields {
+  const f = (cfg && cfg.fields) || {};
+  return { create: { ...DEFAULT_FIELDS.create, ...(f.create || {}) }, update: { ...DEFAULT_FIELDS.update, ...(f.update || {}) },
+    attrs: { ...DEFAULT_FIELDS.attrs, ...(f.attrs || {}) }, global_attrs: f.global_attrs !== false };
+}
 
 /** Basic-авторизация WooCommerce REST API (ключи создаются в WooCommerce → Настройки → Дополнительно → REST API). */
 export function wooClient(baseUrl: string, key: string, secret: string, fetcher: typeof fetch = fetch): Woo {
@@ -35,12 +54,28 @@ const USED_LABELS: Record<string, string> = {
 };
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 
-export function attributes(it: FeedItem) {
-  const a: { name: string; options: string[]; visible: boolean }[] = [];
-  const add = (name: string, v: unknown) => { if (v !== null && v !== undefined && String(v).trim() !== "") a.push({ name, options: [String(v)], visible: true }); };
-  add("Бренд", it.brand); add("Модель", it.model); add("Память", it.memory); add("Цвет", it.color); add("Состояние", it.condition);
-  if (it.kind === "unit") { add("Ёмкость АКБ", it.battery != null ? it.battery + "%" : null); add("Комплект", it.kit); }
-  for (const [k, v] of Object.entries(it.attrs || {})) if (typeof v === "string" || typeof v === "number") add(k, v);
+const USED_ATTR: Record<string, string> = { cycles: "Циклы зарядки", body: "Корпус", screen: "Экран", repair: "Ремонт", faceid: "Face ID / Touch ID", truetone: "True Tone", region: "Регион" };
+/** Характеристики товара для сайта. globals: глобальные атрибуты WooCommerce (имя → id), чтобы работали фильтры каталога. */
+export function attributes(it: FeedItem, f: Fields = DEFAULT_FIELDS, globals?: Map<string, number>) {
+  const a: { id?: number; name?: string; options: string[]; visible: boolean }[] = [];
+  const seen = new Set<string>();
+  const add = (on: boolean, name: string, v: unknown) => {
+    if (!on || v === null || v === undefined) return;
+    const val = Array.isArray(v) ? v.join(", ") : typeof v === "boolean" ? (v ? "да" : "нет") : String(v);
+    if (!val.trim() || seen.has(name.toLowerCase())) return;
+    seen.add(name.toLowerCase());
+    const gid = f.global_attrs && globals ? globals.get(name.toLowerCase()) : undefined;
+    a.push(gid ? { id: gid, options: [val], visible: true } : { name, options: [val], visible: true });
+  };
+  const A = f.attrs;
+  add(A.brand, "Бренд", it.brand); add(A.model, "Модель", it.model); add(A.memory, "Память", it.memory); add(A.color, "Цвет", it.color);
+  add(A.condition, "Состояние", it.condition);
+  add(A.warranty, "Гарантия", it.warranty ? it.warranty + " мес." : null);
+  for (const [k, v] of Object.entries(it.attrs || {})) if (typeof v === "string" || typeof v === "number") add(A.extra, k, v);
+  if (it.kind === "unit") {
+    add(A.battery, "Ёмкость АКБ", it.battery != null ? it.battery + "%" : null); add(A.kit, "Комплект", it.kit);
+    for (const [k, v] of Object.entries(it.used || {})) if (USED_ATTR[k]) add(A.used, USED_ATTR[k], v);
+  }
   return a;
 }
 
@@ -74,26 +109,51 @@ async function categoryIds(woo: Woo, path: string[], cache: Map<string, number>)
   return ids.length ? [{ id: ids[ids.length - 1] }] : [];
 }
 
-/** Поля для обновления существующей карточки: только цена, наличие и видимость (описание и фото на сайте не трогаем). */
-export function updatePayload(it: FeedItem) {
-  const qty = Math.max(0, Math.floor(it.qty || 0));
+/** Что меняется у существующей карточки — по настройкам (по умолчанию цена, остаток и видимость; описание и фото на сайте не трогаем). */
+export async function updatePayload(it: FeedItem, f: Fields = DEFAULT_FIELDS, ctx?: Ctx) {
+  const qty = Math.max(0, Math.floor(it.qty || 0)), U = f.update;
+  const p: Record<string, unknown> = {};
+  if (U.price) p.regular_price = String(it.price ?? 0);
+  if (U.stock) { p.manage_stock = true; p.stock_quantity = qty; p.stock_status = qty > 0 ? "instock" : "outofstock"; }
+  if (U.status) {
+    if (!it.visible) p.status = "draft";                       // снят с сайта, продан или архив — прячем
+    else if (it.kind === "unit") p.status = "publish";        // б/у экземпляр снова доступен
+  }
+  if (U.name) p.name = it.name;
+  if (U.categories && ctx) p.categories = await ctx.categories(it.categories || []);
+  if (U.attributes) p.attributes = attributes(it, f, ctx && ctx.globals);
+  if (U.description) p.description = descriptionOf(it);
+  if (U.photos) p.images = imagesOf(it);
+  return p;
+}
+const descriptionOf = (it: FeedItem) => it.kind === "unit" ? unitDescription(it) : (it.description ? `<p>${esc(it.description)}</p>` : "");
+const imagesOf = (it: FeedItem) => (it.photos || []).filter((u) => /^https?:\/\//.test(u)).map((src) => ({ src }));
+
+/** Новая карточка: название, артикул, цена и остаток всегда; остальное — по настройкам. */
+export async function createPayload(it: FeedItem, newStatus: string, f: Fields = DEFAULT_FIELDS, ctx?: Ctx) {
+  const qty = Math.max(0, Math.floor(it.qty || 0)), C = f.create;
   const p: Record<string, unknown> = {
-    regular_price: String(it.price ?? 0), manage_stock: true, stock_quantity: qty, stock_status: qty > 0 ? "instock" : "outofstock",
+    name: it.name, sku: it.sku, type: "simple", regular_price: String(it.price ?? 0),
+    manage_stock: true, stock_quantity: qty, stock_status: qty > 0 ? "instock" : "outofstock",
+    status: it.kind === "unit" ? "publish" : newStatus,
   };
-  if (!it.visible) p.status = "draft";                       // снят с сайта, продан или архив — прячем
-  if (it.kind === "unit" && it.visible) p.status = "publish"; // б/у экземпляр снова доступен
+  if (C.categories && ctx) p.categories = await ctx.categories(it.categories || []);
+  if (C.attributes) p.attributes = attributes(it, f, ctx && ctx.globals);
+  if (C.description) p.description = descriptionOf(it);
+  if (C.photos) p.images = imagesOf(it);
   return p;
 }
 
-export async function createPayload(woo: Woo, it: FeedItem, newStatus: string, cache: Map<string, number>) {
-  return {
-    ...updatePayload(it), name: it.name, sku: it.sku, type: "simple",
-    status: it.kind === "unit" ? "publish" : newStatus,
-    categories: await categoryIds(woo, it.categories || [], cache),
-    attributes: attributes(it),
-    description: it.kind === "unit" ? unitDescription(it) : (it.description ? `<p>${esc(it.description)}</p>` : ""),
-    images: (it.photos || []).filter((u) => /^https?:\/\//.test(u)).map((src) => ({ src })),
-  };
+export type Ctx = { categories: (path: string[]) => Promise<{ id: number }[]>; globals?: Map<string, number> };
+/** Контекст прогона: категории и глобальные атрибуты сайта (загружаются один раз). */
+export async function makeCtx(woo: Woo, f: Fields): Promise<Ctx> {
+  const cache = new Map<string, number>();
+  let globals: Map<string, number> | undefined;
+  if (f.global_attrs) {
+    try { const list: any[] = await woo("GET", "products/attributes?per_page=100"); globals = new Map((list || []).map((x) => [String(x.name).toLowerCase(), x.id])); }
+    catch { globals = undefined; }
+  }
+  return { categories: (path) => categoryIds(woo, path, cache), globals };
 }
 
 export async function syncRun(rpc: Rpc, makeWoo: (cfg: any) => Woo | null, log: (m: string) => void = () => {}) {
@@ -107,7 +167,7 @@ export async function syncRun(rpc: Rpc, makeWoo: (cfg: any) => Woo | null, log: 
     return { jobs: jobs.length, skipped: true };
   }
   const done: number[] = []; const failed: { id: number; error: string }[] = [];
-  const cache = new Map<string, number>();
+  const f = fieldsOf(cfg);
   const stat = { created: 0, updated: 0, linked: 0, orders: 0 };
 
   // 1) статусы заказов
@@ -122,6 +182,7 @@ export async function syncRun(rpc: Rpc, makeWoo: (cfg: any) => Woo | null, log: 
   if (ids.length) {
     const errByProduct = new Map<string, string>();
     try {
+      const ctx = await makeCtx(woo, f);
       const feed: FeedItem[] = await rpc("site_feed", { p_ids: ids });
       const creates: { it: FeedItem; body: any }[] = []; const updates: { it: FeedItem; body: any }[] = [];
       for (const it of feed) {
@@ -131,8 +192,8 @@ export async function syncRun(rpc: Rpc, makeWoo: (cfg: any) => Woo | null, log: 
             const found: any[] = await woo("GET", `products?sku=${encodeURIComponent(it.sku)}`);
             if (found && found.length) { wooId = found[0].id; await rpc("site_set_woo", { p_kind: it.kind, p_id: it.crm_id, p_woo: wooId }); stat.linked++; }
           }
-          if (wooId) updates.push({ it, body: { id: wooId, ...updatePayload(it) } });
-          else if (it.visible && (it.kind === "product" || it.qty > 0)) creates.push({ it, body: await createPayload(woo, it, cfg.new_status || "draft", cache) });
+          if (wooId) updates.push({ it, body: { id: wooId, ...(await updatePayload(it, f, ctx)) } });
+          else if (it.visible && (it.kind === "product" || it.qty > 0)) creates.push({ it, body: await createPayload(it, cfg.new_status || "draft", f, ctx) });
         } catch (e) { errByProduct.set(it.product_id, String((e as Error).message || e)); }
       }
       for (let i = 0; i < Math.max(creates.length, updates.length); i += 50) {
@@ -159,4 +220,22 @@ export async function syncRun(rpc: Rpc, makeWoo: (cfg: any) => Woo | null, log: 
   await rpc("site_sync_log", { p_error: failed.length ? failed.slice(0, 3).map((f) => f.error).join(" | ") : null });
   log(JSON.stringify({ ...stat, failed: failed.length }));
   return { jobs: jobs.length, ...stat, failed: failed.length };
+}
+
+/** Предпросмотр: что уйдёт на сайт по товару (без обращения к сайту; категории — названиями). */
+export async function preview(rpc: Rpc, productId: string) {
+  const cfg = await rpc("site_config"); const f = fieldsOf(cfg);
+  const ctx: Ctx = { categories: async (path) => path.length ? [{ id: 0, name: path.join(" / ") } as any] : [] };
+  const feed: FeedItem[] = await rpc("site_feed", { p_ids: [productId] });
+  const out = [];
+  for (const it of feed) out.push({ kind: it.kind, sku: it.sku, woo_id: it.woo_id, visible: it.visible,
+    create: await createPayload(it, cfg.new_status || "draft", f, ctx), update: await updatePayload(it, f, ctx) });
+  return { fields: f, items: out };
+}
+/** Проверка подключения к WooCommerce. */
+export async function testConnection(woo: Woo) {
+  const products: any[] = await woo("GET", "products?per_page=1");
+  let attrs: any[] = [];
+  try { attrs = await woo("GET", "products/attributes?per_page=100"); } catch { /* права только на товары */ }
+  return { ok: true, sample: products && products[0] ? products[0].name : null, global_attributes: (attrs || []).map((a) => a.name) };
 }

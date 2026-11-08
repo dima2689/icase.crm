@@ -1,6 +1,6 @@
 // Локальная проверка обмена: настоящая база (локальный Postgres со схемой CRM) + поддельный WooCommerce.
 // Запуск: deno run -A supabase/functions/tests/local_test.ts   (нужен psql и база ts на /tmp:5499)
-import { syncRun, wooClient } from "../site-sync/sync.ts";
+import { preview, syncRun, testConnection, wooClient } from "../site-sync/sync.ts";
 import { handle, hmacBase64 } from "../site-api/handler.ts";
 
 const DB = ["-h", "/tmp", "-p", "5499", "-U", "postgres", "-d", Deno.env.get("TDB") || "ts", "-tAq", "-v", "ON_ERROR_STOP=1"];
@@ -32,6 +32,7 @@ const srv = Deno.serve({ port: 8899, onListen() {} }, async (req) => {
   const body = req.method === "GET" ? null : await req.json();
   const J = (b: unknown) => new Response(JSON.stringify(b), { headers: { "Content-Type": "application/json" } });
   if (path === "products" && req.method === "GET") return J(woo.products.filter((p) => p.sku === u.searchParams.get("sku")));
+  if (path === "products/attributes" && req.method === "GET") return J([{ id: 5, name: "Память" }, { id: 6, name: "Цвет" }]);
   if (path === "products/categories" && req.method === "GET") return J(woo.cats.filter((c) => c.name.toLowerCase().includes((u.searchParams.get("search") || "").toLowerCase())));
   if (path === "products/categories" && req.method === "POST") { const c = { id: woo.nextId++, name: body.name, parent: body.parent }; woo.cats.push(c); return J(c); }
   if (path === "products/batch") {
@@ -78,6 +79,26 @@ ok(bySku("U-353000000000013")?.status === "draft" && bySku("U-353000000000013")?
 await sql(`update products set price=1190 where sku='CASE1'`);
 await syncRun(rpc, makeWoo);
 ok(bySku("CASE1")?.regular_price === "1190", "новая цена ушла на сайт");
+
+// 3б) атрибуты и выбор полей
+const ip16 = bySku("IP16");
+ok(ip16.attributes.some((x: any) => x.id === 5) && ip16.attributes.some((x: any) => x.name === "Состояние"), "«Память» ушла глобальным атрибутом сайта (для фильтров), «Состояние» — обычным");
+await sql(`update settings set site_fields = jsonb_set(site_fields,'{update,price}','false')`);
+await sql(`update products set price=1999 where sku='CASE1'`);
+await syncRun(rpc, makeWoo);
+ok(bySku("CASE1")?.regular_price === "1190", "выключили «цену при обновлении» — цена на сайте не меняется");
+await sql(`update settings set site_fields = jsonb_set(jsonb_set(site_fields,'{update,price}','true'),'{update,name}','true')`);
+await sql(`update products set name='Чехол прозрачный' where sku='CASE1'`);
+await syncRun(rpc, makeWoo);
+ok(bySku("CASE1")?.regular_price === "1999" && bySku("CASE1")?.name === "Чехол прозрачный", "включили «название при обновлении» — ушли и цена, и новое название");
+await sql(`update settings set site_fields = jsonb_set(site_fields,'{attrs,memory}','false')`);
+const pv = await preview(rpc, await sql(`select id from products where sku='IP16'`));
+ok(pv.items[0].create.attributes.every((x: any) => x.id !== 5 && x.name !== "Память"), "предпросмотр: выключенная «Память» не передаётся");
+ok((await testConnection(wooClient("http://127.0.0.1:8899", "ck_test", "cs_test"))).ok, "проверка подключения проходит");
+let bad = false; try { await testConnection(wooClient("http://127.0.0.1:8899", "ck_x", "cs_x")); } catch { bad = true; }
+ok(bad, "с неверными ключами проверка подключения сообщает об ошибке");
+await sql(`update products set price=1190, name='Чехол' where sku='CASE1'; update settings set site_fields = jsonb_set(site_fields,'{update,name}','false')`);
+await syncRun(rpc, makeWoo);
 
 // 4) заказ с сайта через вебхук (с подписью)
 const key = (await rpc("site_config")).api_key;

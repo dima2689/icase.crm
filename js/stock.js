@@ -212,6 +212,7 @@ function productForm(id){
   const attrs=Object.entries(p.attrs||{}).filter(([k,v])=>v);
   App.openModal(App.head(id?esc(p.name):"Новый товар",id&&p.archived?'<span class="pill mute">архив</span>':"")+`
   ${id?`<div class="tiles">${App.whs().map(w=>`<button type="button" class="tile click" data-act="whOpen" data-id="${esc(w.id)}" title="Открыть склад"><span>${esc(w.name)}</span><b>${App.qtyIn(p,w.id)}</b></button>`).join("")}<div class="tile"><span>Всего</span><b>${App.qtyTotal(p)}</b></div></div>`:""}
+  ${id&&p.onSite&&App.can("settings")?`<div class="row-f" style="margin:8px 0 0"><button type="button" class="btn sm" data-act="sitePreview" data-id="${esc(id)}">Как уйдёт на сайт</button></div>`:""}
   ${id&&App.can("cost")&&App.offersFor?(()=>{const of=App.offersFor(p).filter(o=>o.price>0).slice(0,5);return of.length?`<div class="offers"><span class="muted">Цены поставщиков:</span> ${of.map((o,i)=>`<button type="button" class="pill ${i?"":"ok"}" data-act="spOpen" data-id="${o.id}">${esc((App.byId("suppliers",o.supplierId)||{}).name||"")} — ${money(o.price)}</button>`).join(" ")}</div>`:""})():""}
   <div class="form">
     ${App.fld("pName","Название",App.inp("pName",p.name,"text","iPhone 15 Pro 256 ГБ, натуральный титан",edit?"":"disabled"),"full")}
