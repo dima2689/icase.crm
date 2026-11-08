@@ -195,6 +195,7 @@ ACT.whDoc=arg=>{let [type,wh,pid]=arg.split("|");if(!App.byId("warehouses",wh))w
   else if(type==="transfer"){D.whFrom=wh;const cash=App.cashWh();D.whTo=cash&&cash!==wh?cash:((App.whs().find(x=>x.id!==wh)||{}).id||wh)}
   else{D.whFrom=wh;D.whTo=wh}
   docEditor()};
+ACT.whBoxT=()=>{App.ui.whOpenBox=!App.ui.whOpenBox;App.render()};
 ACT.whStock=id=>{App.closeModal();App.ui.stockWh=id;location.hash="stock";App.render()};
 ACT.moreStock=()=>{App.ui.stockLimit=(App.ui.stockLimit||300)+300;App.render()};
 
@@ -294,7 +295,7 @@ TITLES.docs="Склад";
 App.ui.docType="";App.ui.docQ="";App.ui.docStatus="";
 VIEWS.docs={
   ownSearch:true,
-  after(){const sel=document.getElementById("docWh");if(sel)sel.addEventListener("change",()=>{App.ui.docWh=sel.value;App.render()});whSearchBind(document.querySelector(".whbox"))},
+  after(){const sel=document.getElementById("docWh");if(sel)sel.addEventListener("change",()=>{App.ui.docWh=sel.value;App.ui.whOpenBox=true;App.render()});whSearchBind(document.querySelector(".whbox"))},
   actions:()=>App.can("stock")?Object.entries(App.DOCT).map(([k,d])=>`<button class="btn ${k==="in"?"pri":""}" data-act="whDoc" data-id="${k}|${esc(App.ui.docWh||App.cashWh()||"")}">+ ${d.one}</button>`).join(""):"",
   render(){
     const u=App.ui,q=u.docQ.toLowerCase();
@@ -304,7 +305,8 @@ VIEWS.docs={
     const cw=App.byId("warehouses",u.docWh);
     const whBox=`<section class="card whbox"><div class="whtop"><div class="fld grow"><label for="docWh">Склад</label>${App.sel("docWh",whAll.map(w=>[w.id,w.name+(w.pointId?"":" (общий)")+(w.active===false?" — отключён":"")]),u.docWh,'data-nodirty')}</div>
       ${App.can("settings")&&cw?`<button class="btn" data-act="whForm" data-id="${esc(cw.id)}">Изменить</button>`:""}${App.can("settings")?'<button class="btn pri" data-act="whForm">+ Склад</button>':""}</div>
-      ${cw?whBody(cw.id,{noActs:true}):'<div class="empty">Складов пока нет — создайте первый.</div>'}</section>`;
+      ${cw?(()=>{const open=!!u.whOpenBox,ps=S.products.filter(p=>App.qtyIn(p,cw.id)>0),qn=ps.reduce((a,p)=>a+App.qtyIn(p,cw.id),0);
+        return `<button type="button" class="fsh whsum" data-act="whBoxT" aria-expanded="${open}"><span class="ft">Остатки</span><span class="fsum">${qn} шт · ${ps.length} поз. · в рознице ${money(ps.reduce((a,p)=>a+App.qtyIn(p,cw.id)*num(p.price),0))}</span><span class="car"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform:rotate(${open?180:0}deg);transition:transform .15s"><path d="M6 9l6 6 6-6"/></svg></span><span class="totbtn">${open?"Свернуть":"Развернуть"}</span></button>${open?whBody(cw.id,{noActs:true}):""}`})():'<div class="empty">Складов пока нет — создайте первый.</div>'}</section>`;
     return `${whBox}<div class="chips"><button class="chip ${!u.docType?"on":""}" data-act="docType" data-id="">Все<b>${S.docs.length}</b></button>${Object.entries(App.DOCT).map(([k,d])=>`<button class="chip ${u.docType===k?"on":""}" data-act="docType" data-id="${k}">${d.label}<b>${S.docs.filter(x=>x.type===k).length}</b></button>`).join("")}</div>
     <div class="row-f"><input id="docQ" type="search" placeholder="№, поставщик, товар" value="${esc(u.docQ)}" data-filter="docQ" aria-label="Поиск документа" style="flex:1 1 260px">${App.sel("docStatus",[["","Любой статус"],["draft","Черновики"],["posted","Проведённые"],["cancelled","Отменённые"]],u.docStatus,'data-filter-sel="docStatus" aria-label="Статус"')}</div>
     <section class="card"><div class="tbl-wrap"><table><thead><tr><th>Документ</th><th>Дата</th><th>Склад</th><th>Основание</th><th class="n">Строк</th><th class="n">Кол-во</th>${App.can("cost")?'<th class="n">Сумма</th>':""}<th>Статус</th></tr></thead><tbody>
