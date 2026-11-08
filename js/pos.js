@@ -101,7 +101,6 @@ VIEWS.pos={
     const groups={};inStock.forEach(p=>{const k=App.catName(p);(groups[k]=groups[k]||[]).push(p)});
 
     return `${sh?"":shiftBar}
-    ${posToday()}
     <div class="pos">
       <section class="card">
         <div class="row-f"><div class="fld grow"><label for="posQ">Товар или сканер</label><input id="posQ" type="search" autocomplete="off" placeholder="Название, артикул, штрихкод, IMEI / S/N"><div class="pick" id="posPick" hidden></div></div><button class="btn" data-act="posCustom" style="align-self:flex-end">+ Услуга / товар вне каталога</button>
@@ -147,6 +146,7 @@ VIEWS.pos={
         <button class="btn pri big" data-act="posPay" ${P.cart.length?"":"disabled"}>Оплата</button>
       </section>
     </div>
+    ${posToday()}
     ${sh?`<div class="shiftbottom">${shiftBar}<button class="btn" data-act="closeShift">Закрыть смену</button></div>`:""}`;
   },
   after(){
