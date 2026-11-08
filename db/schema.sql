@@ -1009,3 +1009,37 @@ grant update (condition, battery_health, diagnostics, kit, price, note, imei, im
 revoke all on units, apple_models from anon;
 revoke execute on function find_unit(text), unit_receive(uuid,uuid,jsonb,numeric,text), unit_receive_all(uuid,uuid,jsonb,numeric,text) from public, anon, authenticated;
 alter publication supabase_realtime add table units, apple_models;
+
+-- icase_v3_print_config / icase_v3_used_attrs: параметры б/у у экземпляра, категория «б/у»
+alter table units add column attrs jsonb not null default '{}'::jsonb;
+grant update (attrs) on units to authenticated;
+alter table categories add column is_used boolean not null default false;
+create or replace function unit_receive(p_product uuid, p_wh uuid, p jsonb, p_cost numeric, p_ref text, out o_id uuid, out o_created boolean, out o_before jsonb)
+language plpgsql security definer set search_path = public as $$
+declare v_imei text := nullif(trim(p->>'imei'),''); v_sn text := nullif(trim(p->>'serial_no'),''); v_imei2 text := nullif(trim(p->>'imei2'),'');
+        u units; pr products; v_attrs jsonb := coalesce(p->'attrs','{}'::jsonb);
+begin
+  if v_imei is null and v_sn is null then raise exception 'Укажите IMEI или серийный номер'; end if;
+  select * into pr from products where id = p_product;
+  select * into u from units where (v_imei is not null and (imei = v_imei or imei2 = v_imei)) or (v_sn is not null and upper(serial_no) = upper(v_sn)) limit 1 for update;
+  if u.id is not null then
+    if u.status in ('in_stock','reserved','in_repair') then
+      raise exception 'IMEI/SN % уже числится на складе («%»)', coalesce(v_imei, v_sn), (select name from products where id = u.product_id);
+    end if;
+    o_before := jsonb_build_object('product_id',u.product_id,'wh',u.warehouse_id,'status',u.status,'cost',u.cost,'price',u.price,'condition',u.condition,'battery_health',u.battery_health,'sale_item_id',u.sale_item_id);
+    update units set product_id = p_product, warehouse_id = p_wh, status = 'in_stock', sale_item_id = null, last_ref = p_ref,
+      imei = coalesce(v_imei, imei), imei2 = coalesce(v_imei2, imei2), serial_no = coalesce(v_sn, serial_no),
+      cost = coalesce(nullif(p->>'cost','')::numeric, p_cost, 0), price = nullif(p->>'price','')::numeric,
+      condition = coalesce(nullif(p->>'condition',''), pr.condition), battery_health = nullif(p->>'battery_health','')::int,
+      kit = coalesce(nullif(p->>'kit',''), pr.kit), diagnostics = nullif(p->>'diagnostics',''), attrs = v_attrs
+    where id = u.id;
+    o_id := u.id; o_created := false;
+  else
+    insert into units(product_id, imei, imei2, serial_no, warehouse_id, status, condition, battery_health, kit, diagnostics, cost, price, last_ref, attrs)
+    values (p_product, v_imei, v_imei2, v_sn, p_wh, 'in_stock', coalesce(nullif(p->>'condition',''), pr.condition), nullif(p->>'battery_health','')::int,
+      coalesce(nullif(p->>'kit',''), pr.kit), nullif(p->>'diagnostics',''), coalesce(nullif(p->>'cost','')::numeric, p_cost, 0), nullif(p->>'price','')::numeric, p_ref, v_attrs)
+    returning id into o_id;
+    o_created := true; o_before := null;
+  end if;
+end $$;
+revoke execute on function unit_receive(uuid,uuid,jsonb,numeric,text) from public, anon, authenticated;

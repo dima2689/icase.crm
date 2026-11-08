@@ -109,7 +109,8 @@ ACT.catForm=id=>{
   const c=id?App.cat(id):{parentId:"",isDevice:false};
   App.openModal(App.head(id?"Категория":"Новая категория",id&&App.can("del")?`<button class="btn sm danger" data-act="catDel" data-id="${esc(id)}">Удалить</button>`:"")+`<div class="form">
   ${App.fld("kName","Название",App.inp("kName",c.name))}${App.fld("kParent","Родительская",App.sel("kParent",[["","— верхний уровень —"],...App.catChildren("").filter(x=>x.id!==id).map(x=>[x.id,x.name])],c.parentId||""))}
-  <div class="fld full">${App.chk("kDev","Устройство (гарантия на устройства)",c.isDevice)}</div></div>
+  <div class="fld full">${App.chk("kDev","Устройство (гарантия на устройства)",c.isDevice)}</div>
+  <div class="fld full">${App.chk("kUsed","Б/у техника — у каждого экземпляра параметры б/у (АКБ, ремонт, комплект…)",c.isUsed)}</div></div>
   <div class="acts"><button class="btn pri" data-act="catSave" data-id="${esc(id||"")}">Сохранить</button></div>`);
 };
 ACT.catSave=(id,btn)=>run(btn,async()=>{
@@ -117,7 +118,7 @@ ACT.catSave=(id,btn)=>run(btn,async()=>{
   const parentId=App.val("kParent");
   if(S.categories.some(c=>c.id!==id&&(c.parentId||"")===parentId&&String(c.name).toLowerCase()===name.toLowerCase()))return App.toast("Такая категория уже есть");
   if(id&&parentId&&App.catChildren(id).length)return App.toast("У категории есть подкатегории, её нельзя вложить");
-  const data={name,parent_id:parentId||null,is_device:App.checked("kDev")};
+  const data={name,parent_id:parentId||null,is_device:App.checked("kDev"),is_used:App.checked("kUsed")};
   if(id)await App.api.update("categories",id,data);else await App.api.insert("categories",data);
   App.closeModal();App.toast("Сохранено");
 });

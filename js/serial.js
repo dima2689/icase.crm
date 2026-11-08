@@ -35,6 +35,7 @@ ACT.openUnit=id=>{
       ${App.fld("uDiag","Диагностика",App.inp("uDiag",u.diagnostics,"text","",ed?"":"disabled"),"full")}
       ${App.fld("uNote","Заметка",`<textarea id="uNote" ${ed?"":"disabled"}>${esc(u.note)}</textarea>`,"full")}
     </div>
+    ${App.isUsedUnit(u,p)?App.usedForm("uu_",u.attrs,{ro:!ed}):`<details class="more"><summary>Параметры б/у</summary>${App.usedForm("uu_",u.attrs,{ro:!ed})}</details>`}
     <dl class="kv"><dt>Последний документ</dt><dd>${esc(u.lastRef||"—")}</dd>${sale?`<dt>Продажа</dt><dd><button class="btn sm" data-act="openSale" data-id="${esc(sale.id)}">${esc(sale.num)}</button> ${App.dtt(sale.createdAt)}</dd>`:""}<dt>Принят</dt><dd>${App.dtt(u.createdAt)}</dd></dl>
     <div class="acts"><button class="btn" data-act="openProduct" data-id="${esc(u.productId)}">Карточка товара</button>${ed?`<button class="btn pri" data-act="saveUnit" data-id="${esc(id)}">Сохранить</button>`:""}</div>`);
 };
@@ -44,6 +45,7 @@ ACT.saveUnit=async(id,btn)=>{
   if(!data.imei&&!data.serial_no)return App.toast("Нужен IMEI или серийный номер");
   if(data.imei&&!/^\d{15}$/.test(data.imei))return App.toast("IMEI — это 15 цифр");
   if(App.can("price"))data.price=n(V("uPrice"));
+  if(document.getElementById("uu_body")){const r=App.readUsed("uu_");data.attrs=r.attrs;if(r.kit)data.kit=r.kit;const w=App.usedWarn(r.attrs);if(w)App.toast(w)}
   btn.disabled=true;
   try{await App.api.update("units",id,data);await App.reload(["units"]);App.toast("Сохранено");App.closeModal()}catch(e){btn.disabled=false;App.toast(e.message)}
 };
@@ -56,7 +58,7 @@ App.chooseUnit=function({productId,wh,exclude=[],title="Выберите экз�
   if(list.length===1)return onPick(list[0]);
   App.chooseUnit.cb=onPick;
   App.openModal(App.head(esc(title))+`<p class="muted" style="margin-top:-4px">${esc(p.name)} · ${list.length} шт. на складе «${esc(App.whName(wh))}». Можно отсканировать IMEI.</p>
-    <div class="list-mini">${list.map(u=>`<button data-act="unitChosen" data-id="${esc(u.id)}"><span>${esc(App.unitCode(u))}<small>${esc([u.condition,u.batteryHealth!=null&&u.batteryHealth!==""?"АКБ "+u.batteryHealth+"%":"",u.kit].filter(Boolean).join(" · "))}</small></span><b>${money(App.unitPrice(u,p))}</b></button>`).join("")}</div>`);
+    <div class="list-mini">${list.map(u=>`<button data-act="unitChosen" data-id="${esc(u.id)}"><span>${esc(App.unitCode(u))}<small>${esc([u.condition,u.batteryHealth!=null&&u.batteryHealth!==""?"АКБ "+u.batteryHealth+"%":"",(u.attrs||{}).repair==="Был"?"был ремонт":(u.attrs||{}).repair==="Не было"?"без ремонта":"",u.kit].filter(Boolean).join(" · "))}</small></span><b>${money(App.unitPrice(u,p))}</b></button>`).join("")}</div>`);
 };
 ACT.unitChosen=id=>{const u=App.byId("units",id),cb=App.chooseUnit.cb;App.closeModal();if(u&&cb)cb(u)};
 
@@ -130,7 +132,7 @@ ACT.cpCreate=async(_,btn)=>{
   if(!combos.length)return App.toast("Все эти товары уже есть");
   btn.disabled=true;
   try{
-    const cat=await familyCategory(m.family);
+    const cat=CP.cond!=="Новый"?await App.usedCategory(m.family):await familyCategory(m.family);
     const rows=combos.map(c=>({name:c.name,category_id:cat,brand:"Apple",model:m.name,memory:c.mem||null,color:c.color||null,condition:CP.cond,
       attrs:Object.fromEntries(Object.entries(CP.opts).filter(([k,v])=>v)),catalog_id:m.id,track_serial:CP.track,
       price:App.can("price")?num(CP.price):0,warranty_months:num(CP.warranty)}));
@@ -174,4 +176,85 @@ ACT.modelSave=async(id,btn)=>{
 };
 ACT.modelDel=async(id,el)=>{if(!App.confirm2(el,"Удалить модель? Нажмите ещё раз"))return;
   try{await App.api.remove("apple_models",id);await App.reload(["models"]);App.closeModal();App.toast("Модель удалена")}catch(e){App.toast(e.message)}};
+})();
+
+/* ======================= Б/у устройства: параметры экземпляра ======================= */
+(function(){
+const {S,$,esc,num,ACT}=App;
+App.USED={
+  body:["Как новый","Мелкие потёртости","Заметные царапины","Сколы / вмятины"],
+  screen:["Без царапин","Микроцарапины","Царапины","Трещина"],
+  repair:["Не было","Был"],
+  repairParts:["Дисплей","Аккумулятор","Задняя крышка","Корпус","Камера","Face ID / Touch ID","Динамик / микрофон","Разъём зарядки","Плата","Другое"],
+  parts:["Оригинальные","Неоригинальные","Неизвестно"],
+  kit:["Коробка","Кабель","Адаптер питания","Наушники","Чехол","Скрепка","Чек / документы"],
+  works:["Работает","Не работает"],
+  icloud:["Отвязан","Привязан"],
+  simlock:["Neverlock","Привязан к оператору"],
+  source:["Trade-in","Выкуп у частного лица","Комиссия","Поставщик"]
+};
+/* категория «б/у»: сама или её родитель отмечены как б/у */
+App.isUsedCat=id=>{const c=App.cat(id);if(!c)return false;if(c.isUsed)return true;const p=App.cat(c.parentId);return !!(p&&p.isUsed)};
+App.isUsedUnit=(u,p)=>!!(u&&((u.condition&&u.condition!=="Новый")||Object.keys(u.attrs||{}).length))||!!(p&&App.isUsedCat(p.categoryId));
+/* категория для б/у: «Б/у техника» → «iPhone» и т.д. */
+App.usedCategory=async function(family){
+  let root=S.categories.find(c=>!c.parentId&&c.isUsed);
+  if(!root){const r=await App.api.insert("categories",{name:"Б/у техника",is_device:true,is_used:true});await App.reload(["categories"]);root=App.byId("categories",r.id)}
+  let kid=S.categories.find(c=>c.parentId===root.id&&c.name.toLowerCase()===String(family).toLowerCase());
+  if(!kid){const r=await App.api.insert("categories",{name:family,parent_id:root.id,is_device:true,is_used:true});await App.reload(["categories"]);kid=App.byId("categories",r.id)}
+  return kid.id;
+};
+const opt=(arr,v)=>`<option value="">—</option>`+arr.map(x=>`<option${x===v?" selected":""}>${esc(x)}</option>`).join("");
+const multi=(name,arr,sel)=>`<div class="chips">${arr.map(x=>`<label class="chk"><input type="checkbox" data-um="${name}" value="${esc(x)}" ${(sel||[]).includes(x)?"checked":""}> ${esc(x)}</label>`).join("")}</div>`;
+/* форма параметров б/у; p — префикс id полей */
+App.usedForm=function(p,a={},{battery=null,ro=false}={}){
+  a=a||{};const dis=ro?"disabled":"";
+  const sel=(k,label,arr)=>App.fld(p+k,label,`<select id="${p+k}" ${dis}>${opt(arr,a[k])}</select>`);
+  return `<div class="usedbox" data-used="${p}">
+    <div class="ubh">Параметры б/у устройства</div>
+    <div class="form">
+      ${battery!==null?App.fld(p+"batt","Ёмкость АКБ, %",`<input id="${p}batt" type="number" min="0" max="100" value="${esc(battery)}" ${dis}>`):""}
+      ${App.fld(p+"cycles","Циклы заряда",`<input id="${p}cycles" type="number" min="0" value="${esc(a.cycles||"")}" placeholder="если известно" ${dis}>`)}
+      ${sel("body","Корпус",App.USED.body)}${sel("screen","Экран",App.USED.screen)}
+      ${sel("repair","Ремонт",App.USED.repair)}${sel("parts","Детали",App.USED.parts)}
+      <div class="fld full ${a.repair==="Был"?"":"dimmed"}" data-repairparts><label>Что меняли</label>${multi(p+"rp",App.USED.repairParts,a.repairParts)}</div>
+      <div class="fld full"><label>Комплект</label>${multi(p+"kit",App.USED.kit,a.kitList)}</div>
+      ${sel("faceid","Face ID / Touch ID",App.USED.works)}${sel("truetone","True Tone",App.USED.works)}
+      ${sel("icloud","iCloud / Найти iPhone",App.USED.icloud)}${sel("simlock","SIM-lock",App.USED.simlock)}
+      ${App.fld(p+"region","Регион модели",`<input id="${p}region" value="${esc(a.region||"")}" placeholder="например, LL/A, ZA/A" ${dis}>`)}
+      ${sel("source","Откуда",App.USED.source)}
+      ${App.fld(p+"defects","Неисправности / особенности",`<input id="${p}defects" value="${esc(a.defects||"")}" placeholder="если есть" ${dis}>`,"full")}
+    </div></div>`;
+};
+App.readUsed=function(p){
+  const v=id=>{const el=document.getElementById(p+id);return el?String(el.value).trim():""};
+  const m=name=>[...document.querySelectorAll(`[data-um="${p+name}"]:checked`)].map(x=>x.value);
+  const a={cycles:v("cycles"),body:v("body"),screen:v("screen"),repair:v("repair"),parts:v("parts"),repairParts:m("rp"),kitList:m("kit"),
+    faceid:v("faceid"),truetone:v("truetone"),icloud:v("icloud"),simlock:v("simlock"),region:v("region").toUpperCase(),source:v("source"),defects:v("defects")};
+  if(a.repair!=="Был")a.repairParts=[];
+  Object.keys(a).forEach(k=>{if(a[k]===""||(Array.isArray(a[k])&&!a[k].length))delete a[k]});
+  const el=document.getElementById(p+"batt");
+  return {attrs:a,battery:el?el.value:null,kit:(a.kitList||[]).join(", ")};
+};
+App.usedWarn=a=>a&&a.icloud==="Привязан"?"Устройство привязано к iCloud — продавать нельзя, пока владелец не отвяжет":"";
+/* короткая сводка плашками */
+App.usedChips=(a,batt)=>{a=a||{};const out=[];
+  if(batt!=null&&batt!=="")out.push(["АКБ "+batt+"%",num(batt)>=85?"ok":num(batt)>=80?"":"warn"]);
+  if(a.repair)out.push([a.repair==="Был"?"Ремонт: "+((a.repairParts||[]).join(", ")||"был"):"Без ремонта",a.repair==="Был"?"warn":"ok"]);
+  if(a.parts==="Неоригинальные")out.push(["Неориг. детали","warn"]);
+  if((a.kitList||[]).length)out.push([(a.kitList.includes("Коробка")?"С коробкой":"Без коробки")+(a.kitList.length>1?" +"+(a.kitList.length-(a.kitList.includes("Коробка")?1:0)):""),""]);
+  if(a.screen&&a.screen!=="Без царапин")out.push(["Экран: "+a.screen.toLowerCase(),a.screen==="Трещина"?"bad":""]);
+  if(a.body&&a.body!=="Как новый")out.push(["Корпус: "+a.body.toLowerCase(),""]);
+  if(a.faceid==="Не работает")out.push(["Face ID не работает","bad"]);
+  if(a.icloud==="Привязан")out.push(["iCloud привязан","bad"]);
+  if(a.simlock==="Привязан к оператору")out.push(["SIM-lock","warn"]);
+  return out.map(([t,c])=>`<span class="pill ${c}">${esc(t)}</span>`).join("");
+};
+document.addEventListener("change",e=>{const t=e.target;if(t.id&&/repair$/.test(t.id)){const box=t.closest(".usedbox");const rp=box&&box.querySelector("[data-repairparts]");if(rp)rp.classList.toggle("dimmed",t.value!=="Был")}});
+/* отдельное окно параметров (из приёмки) */
+App.usedModal=function({title,attrs,battery,onSave}){
+  App.usedModal.cb=onSave;
+  App.openModal(App.head(esc(title||"Параметры б/у"))+App.usedForm("um_",attrs,{battery:battery??""})+`<div class="acts"><button class="btn pri" data-act="usedModalSave">Сохранить</button></div>`,{wide:true});
+};
+ACT.usedModalSave=()=>{const r=App.readUsed("um_"),w=App.usedWarn(r.attrs);const cb=App.usedModal.cb;App.closeModal();if(w)App.toast(w);if(cb)cb(r)};
 })();

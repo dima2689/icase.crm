@@ -8,9 +8,9 @@ TITLES.stock="Товары";
 Object.assign(App.ui,{stockQ:"",stockWh:""});
 const SF_KEY="icase_sf";
 const isMob=()=>window.matchMedia&&matchMedia("(max-width:760px)").matches;
-const SF0=()=>({cat:"",brands:[],avail:"all",conds:[],mems:[],colors:[],track:"",chan:"",pmin:"",pmax:"",arch:false,sort:"name",group:"cat",open:{},
+const SF0=()=>({cat:"",brands:[],avail:"all",conds:[],mems:[],colors:[],track:"",chan:"",pmin:"",pmax:"",arch:false,sort:"name",group:"cat",open:{},ub:{batt:"",repair:"",box:false,never:false,icloud:false},
   sec:isMob()?{cat:false,brand:false,avail:false,params:false}:{cat:true,brand:false,avail:true,params:false}});
-App.ui.sf=(()=>{try{return Object.assign(SF0(),JSON.parse(localStorage.getItem(SF_KEY)||"{}"))}catch(e){return SF0()}})();
+App.ui.sf=(()=>{try{const o=Object.assign(SF0(),JSON.parse(localStorage.getItem(SF_KEY)||"{}"));o.ub=Object.assign(SF0().ub,o.ub);o.sec=Object.assign({used:false},o.sec);return o}catch(e){return SF0()}})();
 const sfSave=()=>{try{localStorage.setItem(SF_KEY,JSON.stringify(App.ui.sf))}catch(e){}};
 function lastMove(p){let m="";S.movements.forEach(x=>{if(x.productId===p.id&&x.at>m)m=x.at});return m||p.createdAt}
 App.isDead = p=>App.qtyTotal(p)>0&&App.days(lastMove(p))>App.settings().deadDays;
@@ -28,12 +28,19 @@ function stockBase(skip){
     &&(skip==="cond"||!f.conds.length||f.conds.includes(p.condition))
     &&(skip==="mem"||!f.mems.length||f.mems.includes(p.memory||"—"))
     &&(skip==="color"||!f.colors.length||f.colors.includes(p.color||"—"))
+    &&(skip==="used"||!ubOn(f)||usedMatch(p,f,u.stockWh))
     &&(!f.track||(f.track==="ser")===!!p.trackSerial)
     &&(!f.chan||(f.chan==="site"?p.onSite:f.chan==="avito"?p.onAvito:!p.onSite&&!p.onAvito))
     &&(f.pmin===""||num(p.price)>=num(f.pmin))&&(f.pmax===""||num(p.price)<=num(f.pmax))
     &&(f.avail==="all"||f.avail==="in"&&qty(p)>0||f.avail==="out"&&qty(p)<=0||f.avail==="low"&&App.isLow(p)||f.avail==="dead"&&App.isDead(p))
     &&words.every(w=>[p.name,p.sku,p.barcode,p.serial,p.brand,p.model,p.memory,p.color,App.catName(p),App.unitCodes(p.id)].join(" ").toLowerCase().includes(w)));
 }
+const ubOn=f=>{const b=f.ub||{};return !!(b.batt!==""&&b.batt!=null||b.repair||b.box||b.never||b.icloud)};
+function usedMatch(p,f,wh){const b=f.ub;return App.unitsOf(p.id,{wh}).some(u=>{const a=u.attrs||{};
+  return (b.batt===""||b.batt==null||num(u.batteryHealth)>=num(b.batt))&&(!b.repair||a.repair===b.repair)&&(!b.box||(a.kitList||[]).includes("Коробка"))&&(!b.never||a.simlock==="Neverlock")&&(!b.icloud||a.icloud==="Отвязан")})}
+function usedRange(p){if(!p.trackSerial)return "";const us=App.unitsOf(p.id).filter(u=>u.batteryHealth!=null&&u.batteryHealth!==""&&(u.condition||"")!=="Новый");if(!us.length)return "";
+  const b=us.map(u=>num(u.batteryHealth)),mn=Math.min(...b),mx=Math.max(...b),rep=us.filter(u=>(u.attrs||{}).repair==="Был").length;
+  return "АКБ "+(mn===mx?mn:mn+"–"+mx)+"%"+(rep?" · с ремонтом: "+rep:"")}
 const facet=(list,fn)=>{const m=new Map();list.forEach(p=>{const k=fn(p);if(k)m.set(k,(m.get(k)||0)+1)});return [...m.entries()].sort((a,b)=>a[0].localeCompare(b[0],"ru",{numeric:true}))};
 function catChips(){
   const f=App.ui.sf,base=stockBase("cat"),cnt=id=>base.filter(p=>App.inCat(p,id)).length,none=base.filter(p=>!p.categoryId).length;
@@ -67,7 +74,7 @@ VIEWS.stock={
     const active=[...f.brands.map(v=>["brands",v,v]),...f.conds.map(v=>["conds",v,v]),...f.mems.map(v=>["mems",v,v]),...f.colors.map(v=>["colors",v,v]),
       ...(f.avail!=="all"?[["avail","",AVAIL.find(a=>a[0]===f.avail)[1]]]:[]),...(f.track?[["track","",f.track==="ser"?"Учёт по IMEI":"Без IMEI"]]:[]),
       ...(f.chan?[["chan","",{site:"На сайте",avito:"На Авито",none:"Нигде не выставлен"}[f.chan]]]:[]),...(f.pmin!==""||f.pmax!==""?[["price","","Цена "+(f.pmin!==""?"от "+num(f.pmin):"")+(f.pmax!==""?" до "+num(f.pmax):"")]]:[]),
-      ...(f.arch?[["arch","","Архив"]]:[])];
+      ...(f.arch?[["arch","","Архив"]]:[]),...(ubOn(f)?[["ub","","Б/у параметры"]]:[])];
     // строки с группировкой
     const mob=isMob();let rows="",g=null;
     shown.forEach(p=>{const k=gkey(p);
@@ -84,13 +91,13 @@ VIEWS.stock={
       rows+=`<tr class="rowlink" data-act="openProduct" data-id="${esc(p.id)}">
       <td class="tagsel"><input type="checkbox" data-act="tagPick" data-id="${esc(p.id)}" aria-label="Ценник" ${App.ui.tagPick.has(p.id)?"checked":""}></td>
       <td><b>${esc(p.name)}</b>${p.condition&&p.condition!=="Новый"?` <span class="pill">${esc(p.condition)}</span>`:""}${p.trackSerial?' <span class="pill info">IMEI</span>':""}
-        <span class="sub">${esc([f.group!=="cat"?App.catName(p):"",f.group!=="brand"&&p.brand?p.brand:"",p.sku?"арт. "+p.sku:"",p.barcode?"ШК "+p.barcode:""].filter(Boolean).join(" · "))}</span></td>
+        <span class="sub">${esc([f.group!=="cat"?App.catName(p):"",f.group!=="brand"&&p.brand?p.brand:"",p.sku?"арт. "+p.sku:"",p.barcode?"ШК "+p.barcode:"",usedRange(p)].filter(Boolean).join(" · "))}</span></td>
       ${u.stockWh?`<td class="n">${qtyCell(App.qtyIn(p,u.stockWh),p)}</td>`:whs.map(w=>`<td class="n">${App.qtyIn(p,w.id)||'<span class="muted">·</span>'}</td>`).join("")+`<td class="n">${qtyCell(App.qtyTotal(p),p)}</td>`}
       ${showCost?`<td class="n">${money(p.cost)}</td>`:""}<td class="n"><b>${money(p.price)}</b></td>
       ${showCost?`<td class="n">${mk<0?`<span class="pill bad">${money(mk)}</span>`:money(mk)}</td>`:""}
       <td><div class="chips">${p.onSite?'<span class="pill info">Сайт</span>':""}${p.onAvito?'<span class="pill info">Авито</span>':""}</div></td></tr>`});
     const curCat=App.cat(f.cat),catLabel=f.cat==="__none"?"Без категории":curCat?App.catName({categoryId:curCat.id}):"";
-    const nOn=(f.cat?1:0)+f.brands.length+(f.avail!=="all"?1:0)+f.conds.length+f.mems.length+f.colors.length+(f.track?1:0)+(f.chan?1:0)+(f.pmin!==""||f.pmax!==""?1:0)+(f.arch?1:0);
+    const nOn=(ubOn(f)?1:0)+(f.cat?1:0)+f.brands.length+(f.avail!=="all"?1:0)+f.conds.length+f.mems.length+f.colors.length+(f.track?1:0)+(f.chan?1:0)+(f.pmin!==""||f.pmax!==""?1:0)+(f.arch?1:0);
     const allOpen=Object.values(f.sec||{}).every(Boolean);
     return `<div class="smain" data-nodirty>
       <div class="row-f stop">
@@ -104,6 +111,10 @@ VIEWS.stock={
         ${fsec("cat","Категории",catLabel||"все",catChips())}
         ${fb.length>1||f.brands.length?fsec("brand","Бренды",f.brands.join(", ")||"все",`<div class="chips">${chipset("brands",fb,f.brands)}</div>`):""}
         ${fsec("avail","Наличие",AVAIL.find(a=>a[0]===f.avail)[1],`<div class="seg wrap">${AVAIL.map(([v,l])=>`<button class="${f.avail===v?"on":""}" data-act="sfSet" data-id="avail|${v}">${l}</button>`).join("")}</div>`)}
+        ${S.units.some(x=>x.status==="in_stock"&&x.condition&&x.condition!=="Новый")||S.categories.some(c=>c.isUsed)||ubOn(f)?fsec("used","Б/у",secSum(f.ub.batt!==""&&f.ub.batt!=null?"АКБ от "+f.ub.batt+"%":"",f.ub.repair?(f.ub.repair==="Был"?"был ремонт":"без ремонта"):"",f.ub.box?"с коробкой":"",f.ub.never?"Neverlock":"",f.ub.icloud?"iCloud отвязан":"")||"любые",
+          `<div class="row-f fmore"><input type="number" min="0" max="100" placeholder="АКБ от, %" value="${esc(f.ub.batt||"")}" data-ub="batt" aria-label="АКБ от">
+          <select data-ub="repair" aria-label="Ремонт"><option value="">Ремонт: любой</option><option value="Не было"${f.ub.repair==="Не было"?" selected":""}>Без ремонта</option><option value="Был"${f.ub.repair==="Был"?" selected":""}>Был ремонт</option></select>
+          <label class="chk"><input type="checkbox" data-ub="box" ${f.ub.box?"checked":""}> С коробкой</label><label class="chk"><input type="checkbox" data-ub="never" ${f.ub.never?"checked":""}> Neverlock</label><label class="chk"><input type="checkbox" data-ub="icloud" ${f.ub.icloud?"checked":""}> iCloud отвязан</label></div>`):""}
         ${fsec("params","Параметры",secSum(f.conds.join(", "),f.mems.join(", "),f.colors.join(", "),f.track?(f.track==="ser"?"по IMEI":"без IMEI"):"",f.chan?{site:"на сайте",avito:"на Авито",none:"нигде"}[f.chan]:"",f.pmin!==""||f.pmax!==""?"цена "+(f.pmin||0)+"–"+(f.pmax||"∞"):"",f.arch?"архив":"")||"любые",
           `${fc.length>1||f.conds.length?`<div class="frow"><span class="fl">Состояние</span><div class="chips">${chipset("conds",fc,f.conds)}</div></div>`:""}
           ${fm.length?`<div class="frow"><span class="fl">Память</span><div class="chips">${chipset("mems",fm,f.mems)}</div></div>`:""}
@@ -126,18 +137,19 @@ VIEWS.stock={
 };
 ACT.sfCat=id=>{App.ui.sf.cat=id;sfSave();App.render()};
 ACT.sfSec=k=>{const f=App.ui.sf;f.sec=Object.assign({},f.sec);f.sec[k]=!f.sec[k];sfSave();App.render()};
-ACT.sfSecAll=()=>{const f=App.ui.sf,v=!Object.values(f.sec||{}).every(Boolean);f.sec={cat:v,brand:v,avail:v,params:v};sfSave();App.render()};
+ACT.sfSecAll=()=>{const f=App.ui.sf,v=!Object.values(f.sec||{}).every(Boolean);f.sec={cat:v,brand:v,avail:v,used:v,params:v};sfSave();App.render()};
 ACT.sfToggle=v=>{const [k,val]=v.split(/\|(.*)/s),a=App.ui.sf[k];const i=a.indexOf(val);i>=0?a.splice(i,1):a.push(val);sfSave();App.render()};
 ACT.sfSet=v=>{const [k,val]=v.split("|");App.ui.sf[k]=val;sfSave();App.render()};
 ACT.sfDrop=v=>{const [k,val]=v.split(/\|(.*)/s),f=App.ui.sf;
-  if(Array.isArray(f[k]))f[k]=f[k].filter(x=>x!==val);else if(k==="avail")f.avail="all";else if(k==="price"){f.pmin="";f.pmax=""}else if(k==="arch")f.arch=false;else f[k]="";sfSave();App.render()};
+  if(Array.isArray(f[k]))f[k]=f[k].filter(x=>x!==val);else if(k==="avail")f.avail="all";else if(k==="price"){f.pmin="";f.pmax=""}else if(k==="arch")f.arch=false;else if(k==="ub")f.ub=SF0().ub;else f[k]="";sfSave();App.render()};
 ACT.sfReset=()=>{const keep={sort:App.ui.sf.sort,group:App.ui.sf.group,sec:App.ui.sf.sec};App.ui.sf=Object.assign(SF0(),keep);App.ui.stockQ="";sfSave();App.render()};
 ACT.subCatNew=parent=>{ACT.catForm("");setTimeout(()=>{const s=document.getElementById("kParent");if(s)s.value=parent},0)};
 let sfT=0,wasMob=isMob();
 window.addEventListener("resize",()=>{const m=isMob();if(m!==wasMob){wasMob=m;if(App.ui.view==="stock")App.render()}});
-document.addEventListener("input",e=>{const t=e.target;if(!t.dataset||!t.dataset.sf)return;const k=t.dataset.sf;App.ui.sf[k]=t.type==="checkbox"?t.checked:t.value;sfSave();
+document.addEventListener("input",e=>{const t=e.target;if(t.dataset&&t.dataset.ub){const b=App.ui.sf.ub;b[t.dataset.ub]=t.type==="checkbox"?t.checked:t.value;sfSave();clearTimeout(sfT);sfT=setTimeout(()=>App.render(),t.type==="number"?400:0);return}
+  if(!t.dataset||!t.dataset.sf)return;const k=t.dataset.sf;App.ui.sf[k]=t.type==="checkbox"?t.checked:t.value;sfSave();
   clearTimeout(sfT);sfT=setTimeout(()=>App.render(),k==="pmin"||k==="pmax"?400:0)});
-document.addEventListener("change",e=>{const t=e.target;if(t.dataset&&t.dataset.sf&&(t.tagName==="SELECT"||t.type==="checkbox"))t.dispatchEvent(new Event("input",{bubbles:true}))});
+document.addEventListener("change",e=>{const t=e.target;if(t.dataset&&(t.dataset.sf||t.dataset.ub)&&(t.tagName==="SELECT"||t.type==="checkbox"))t.dispatchEvent(new Event("input",{bubbles:true}))});
 function qtyCell(q,p){return App.isLow(p)?`<span class="pill bad">${q}</span>`:q<=0?'<span class="pill mute">0</span>':`<b>${q}</b>`}
 ACT.moreStock=()=>{App.ui.stockLimit=(App.ui.stockLimit||300)+300;App.render()};
 
@@ -182,7 +194,7 @@ function productForm(id){
   </div>
   ${id&&p.trackSerial?`<section><div class="card-h"><h3 class="sub-h">Экземпляры (${App.unitsOf(id).length} в наличии)</h3><label class="chk"><input type="checkbox" data-act="unitAll" ${App.ui.unitAll?"checked":""}> показать проданные и списанные</label></div>
     <div class="tbl-wrap"><table><thead><tr><th>IMEI / SN</th><th>Состояние</th><th class="n">АКБ</th><th class="n">Цена</th>${cost?'<th class="n">Закупка</th>':""}<th>Где</th></tr></thead><tbody>
-    ${units.map(u=>`<tr class="rowlink" data-act="openUnit" data-id="${esc(u.id)}"><td><b>${esc(App.unitCode(u))}</b>${u.imei2?'<span class="sub">IMEI 2 '+esc(u.imei2)+"</span>":""}${u.imei&&u.serialNo?'<span class="sub">SN '+esc(u.serialNo)+"</span>":""}</td><td>${esc(u.condition||"")}</td>
+    ${units.map(u=>`<tr class="rowlink" data-act="openUnit" data-id="${esc(u.id)}"><td><b>${esc(App.unitCode(u))}</b>${u.imei2?'<span class="sub">IMEI 2 '+esc(u.imei2)+"</span>":""}${u.imei&&u.serialNo?'<span class="sub">SN '+esc(u.serialNo)+"</span>":""}</td><td>${esc(u.condition||"")}<div class="chips usum">${App.usedChips(u.attrs)}</div></td>
       <td class="n">${u.batteryHealth!=null&&u.batteryHealth!==""?u.batteryHealth+"%":"—"}</td><td class="n">${money(App.unitPrice(u,p))}</td>${cost?`<td class="n">${money(u.cost)}</td>`:""}<td>${App.unitSt(u)}</td></tr>`).join("")||`<tr><td colspan="6" class="empty">Нет экземпляров. Оформите приход и отсканируйте IMEI</td></tr>`}
     </tbody></table></div></section>`:""}
   ${id?`<section><h3 class="sub-h">Движение</h3><div class="tbl-wrap"><table><tbody>${moves.map(m=>`<tr><td>${App.dtt(m.at)}</td><td>${esc(App.MOVE[m.type]||m.type)}</td><td>${esc(App.whName(m.whId))}</td><td class="n"><span class="pill ${num(m.qty)>0?"ok":"mute"}">${num(m.qty)>0?"+":""}${num(m.qty)}</span></td><td>${esc(m.ref)}${m.note?'<span class="sub">'+esc(m.note)+"</span>":""}</td></tr>`).join("")||'<tr><td class="empty">Движений нет</td></tr>'}</tbody></table></div></section>`:""}

@@ -58,7 +58,7 @@ function lineHtml(l,i,{cost,price}){
       <button class="btn sm ghost danger" data-act="rcvDel" data-id="${i}" aria-label="Убрать">✕</button></div>
     ${ser?`<div class="runits"><input class="uscan" data-rscan="${i}" placeholder="Сканируйте IMEI / серийный номер и Enter" autocomplete="off" aria-label="IMEI">
       ${(l.units||[]).length?`<table class="units"><thead><tr><th>IMEI / SN</th><th>Состояние</th><th>АКБ, %</th>${price?"<th>Цена экз., ₽</th>":""}<th></th></tr></thead><tbody>
-      ${l.units.map((u,j)=>`<tr><td><b>${esc(codeOf(u))}</b>${u.warn?`<span class="sub warn">${esc(u.warn)}</span>`:""}</td>
+      ${l.units.map((u,j)=>`<tr><td><b>${esc(codeOf(u))}</b>${u.warn?`<span class="sub warn">${esc(u.warn)}</span>`:""}${u.condition&&u.condition!=="Новый"||u.attrs?`<div class="chips usum">${App.usedChips(u.attrs)}<button class="btn sm" data-act="rcvUsed" data-id="${i}|${j}">Параметры б/у</button></div>`:""}</td>
         <td><select data-ru="${i}|${j}|condition" aria-label="Состояние">${App.CONDS.map(c=>`<option${(u.condition||p.condition)===c?" selected":""}>${c}</option>`).join("")}</select></td>
         <td><input type="number" min="0" max="100" value="${esc(u.battery_health||"")}" data-ru="${i}|${j}|battery_health" aria-label="АКБ" style="width:70px"></td>
         ${price?`<td><input type="number" min="0" value="${esc(u.price||"")}" data-ru="${i}|${j}|price" placeholder="${num(l.price)||num(p.price)||""}" aria-label="Цена экземпляра" style="width:100px"></td>`:""}
@@ -122,6 +122,8 @@ document.addEventListener("change",e=>{const t=e.target;if(t.dataset.rh||t.datas
 function totals(){const a=$("#rcvTq"),b=$("#rcvTc");if(a)a.textContent=R.lines.reduce((x,l)=>x+lineQty(l),0);if(b)b.textContent=money(R.lines.reduce((x,l)=>x+lineQty(l)*num(l.cost),0))}
 ACT.rcvQty=v=>{const [i,d]=v.split("|").map(Number),l=R.lines[i];if(!l)return;l.qty=Math.max(1,num(l.qty)+d);save();App.render()};
 ACT.rcvDel=i=>{R.lines.splice(+i,1);save();App.render()};
+ACT.rcvUsed=v=>{const [i,j]=v.split("|").map(Number),u=R.lines[i]&&R.lines[i].units[j];if(!u)return;
+  App.usedModal({title:"Параметры б/у · "+codeOf(u),attrs:u.attrs||{},battery:u.battery_health,onSave:r=>{u.attrs=r.attrs;if(r.kit)u.kit=r.kit;if(r.battery!=null)u.battery_health=r.battery;save();App.render()}})};
 ACT.rcvUnitDel=v=>{const [i,j]=v.split("|").map(Number);R.lines[i].units.splice(j,1);save();App.render()};
 ACT.rcvClear=(_,el)=>{if(!App.confirm2(el,"Очистить список? Ещё раз"))return;R=Object.assign(blank(),{wh:R.wh,supplierId:R.supplierId});save();App.render()};
 ACT.rcvTags=()=>{if(!last)return;App.tagsAdd(last.productIds);App.ui.printTab="tags";location.hash="print"};
@@ -134,7 +136,7 @@ ACT.rcvPost=async(_,btn)=>{
   let doc=null;
   try{
     if(App.can("price"))for(const l of R.lines){const p=P(l.productId);if(l.price!==""&&l.price!=null&&num(l.price)!==num(p.price))await App.api.update("products",p.id,{price:num(l.price)})}
-    const clean=u=>{const o={};["imei","serial_no","condition","battery_health","price"].forEach(k=>{if(u[k]!==""&&u[k]!=null)o[k]=String(u[k]).trim()});return o};
+    const clean=u=>{const o={};["imei","serial_no","condition","battery_health","price","kit"].forEach(k=>{if(u[k]!==""&&u[k]!=null)o[k]=String(u[k]).trim()});if(u.attrs&&Object.keys(u.attrs).length)o.attrs=u.attrs;return o};
     const lines=R.lines.map(l=>{const p=P(l.productId);return {product_id:p.id,qty:lineQty(l),cost:num(l.cost),new_units:p.trackSerial?l.units.map(clean):[]}});
     doc=await App.api.insert("stock_docs",{type:"in",wh_to:R.wh,supplier_id:R.supplierId||null,invoice:R.invoice||null,note:R.note||"Приёмка"});
     await App.api.insertMany("stock_doc_lines",lines.map(l=>Object.assign({doc_id:doc.id},l)));
@@ -199,6 +201,7 @@ ACT.rcvDevice=(code="")=>{
 function dpModel(){return App.byId("models",DP.modelId)}
 function dpName(){const m=dpModel();return m?App.catalogName(m,DP.mem,DP.color,DP.opts):""}
 function drawDP(){
+  if(document.getElementById("dpu_body"))DP.ua=App.readUsed("dpu_").attrs;
   const m=dpModel(),name=dpName(),ex=S.products.find(p=>!p.archived&&p.name===name&&p.condition===DP.cond);
   const chips=(kind,vals,cur)=>vals.map(v=>`<button class="chip ${cur===v?"on":""}" data-act="dpSet" data-id="${esc(kind+"|"+v)}">${esc(v)}</button>`).join("");
   const html=App.head("Устройство Apple")+`
@@ -212,6 +215,7 @@ function drawDP(){
       ${App.fld("dpBatt","Ёмкость АКБ, %",App.inp("dpBatt",DP.battery,"number","для б/у"))}
       ${App.can("cost")?App.fld("dpCost","Закупка, ₽",App.inp("dpCost",DP.cost,"number")):""}
       ${App.can("price")?App.fld("dpPrice",DP.cond==="Новый"?"Цена продажи, ₽":"Цена этого экземпляра, ₽",App.inp("dpPrice",DP.price,"number",ex?String(num(ex.price)):"")):""}
+      ${DP.cond!=="Новый"?`<div class="fld full">${App.usedForm("dpu_",DP.ua||{})}</div>`:""}
       ${App.fld("dpCode","IMEI или серийный номер",App.inp("dpCode",DP.code,"text","сканируйте",'autocomplete="off" class="mono"'),"full")}
     </div>
     <div class="dpname">${name?`<b>${esc(name)}</b> · ${esc(DP.cond)} ${ex?'<span class="pill">товар уже есть</span>':'<span class="pill info">будет создан</span>'}`:'<span class="muted">Выберите модель, память и цвет</span>'}</div>
@@ -238,16 +242,17 @@ ACT.dpAdd=async(_,btn)=>{
   try{
     const name=dpName();let p=S.products.find(x=>!x.archived&&x.name===name&&x.condition===DP.cond);
     if(!p){
-      const cat=await App.familyCategory(m.family);
+      const cat=DP.cond!=="Новый"?await App.usedCategory(m.family):await App.familyCategory(m.family);
       const row=await App.api.insert("products",{name,category_id:cat,brand:"Apple",model:m.name,memory:DP.mem||null,color:DP.color||null,condition:DP.cond,
         attrs:Object.fromEntries(Object.entries(DP.opts).filter(([k,v])=>v)),catalog_id:m.id,track_serial:true,price:DP.cond==="Новый"&&App.can("price")?num(DP.price):0});
       await App.reload(["products"]);p=P(row.id);
     }else if(!p.trackSerial){if(btn)btn.disabled=false;return App.toast("Товар «"+name+"» ведётся без IMEI — включите учёт по IMEI в карточке")}
     const extra={condition:DP.cond,battery_health:DP.battery||""};
+    if(DP.cond!=="Новый"&&document.getElementById("dpu_body")){const r=App.readUsed("dpu_");extra.attrs=r.attrs;if(r.kit)extra.kit=r.kit;const w=App.usedWarn(r.attrs);if(w)App.toast(w)}
     if(DP.cond!=="Новый"&&DP.price)extra.price=DP.price;
     if(!addUnit(p,code,extra)){if(btn)btn.disabled=false;return}
     const i=ensureLine(p);if(DP.cost)R.lines[i].cost=DP.cost;if(DP.cond==="Новый"&&DP.price)R.lines[i].price=DP.price;save();
-    DP.count++;DP.code="";DP.battery="";if(DP.cond!=="Новый")DP.price="";
+    DP.count++;DP.code="";DP.battery="";DP.ua={};if(DP.cond!=="Новый")DP.price="";
     drawDP();App.toast("Добавлено: "+code);
   }catch(e){if(btn)btn.disabled=false;App.toast(e.message)}
 };

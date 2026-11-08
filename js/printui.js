@@ -39,7 +39,7 @@ ACT.tagClear=()=>{App.ui.tagQueue=[];saveQueue();App.render()};
 ACT.tagByStock=()=>{queueItems().forEach(({q,p})=>q.copies=Math.max(1,qtyHere(p)));saveQueue();App.render()};
 ACT.tagOnes=()=>{App.ui.tagQueue.forEach(q=>q.copies=1);saveQueue();App.render()};
 const unitsForTags=p=>{const pt=App.point(),here=pt&&pt.cashWh?App.unitsOf(p.id,{wh:pt.cashWh}):[];return here.length?here:App.unitsOf(p.id)};
-const asUnit=(p,u)=>Object.assign({},p,{serial:App.unitCode(u),batteryHealth:u.batteryHealth!=null&&u.batteryHealth!==""?u.batteryHealth:p.batteryHealth,condition:u.condition||p.condition,kit:u.kit||p.kit,price:App.unitPrice(u,p)});
+const asUnit=(p,u)=>Object.assign({},p,{uattrs:u.attrs||{},serial:App.unitCode(u),batteryHealth:u.batteryHealth!=null&&u.batteryHealth!==""?u.batteryHealth:p.batteryHealth,condition:u.condition||p.condition,kit:u.kit||p.kit,price:App.unitPrice(u,p)});
 function printList(){const out=[];queueItems().forEach(({q,p})=>{if(p.trackSerial&&q.perUnit!==false){unitsForTags(p).forEach(u=>out.push({p:asUnit(p,u),copies:Math.max(1,num(q.copies)||1)}))}else out.push({p,copies:q.copies})});return out}
 ACT.tagUnitMode=i=>{const q=App.ui.tagQueue[+i];if(q){q.perUnit=q.perUnit===false;saveQueue();App.render()}};
 ACT.tagPrint=()=>{const list=printList();if(!list.length)return App.toast("Добавьте товары");

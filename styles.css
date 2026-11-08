@@ -323,3 +323,19 @@ tr.grow td{background:var(--surface-2,#f1eee4);padding:8px 12px;font-size:14px}t
   .top-acts{flex-wrap:wrap}.top-acts .btn{flex:1 1 auto}
 }
 .seg.wrap{border:0;background:none;gap:6px;border-radius:0}.seg.wrap button{border:1px solid var(--line);border-radius:99px}
+
+/* ---------- отступы раздела «Товары» ---------- */
+.smain{display:flex;flex-direction:column;gap:14px}
+.smain>.fpanel,.smain>.tiles,.smain>.activef,.smain>section.card{margin:0}
+.smain .tiles .tile{padding:14px 16px}
+.fpanel{padding:4px 16px 8px}.fhead{padding:10px 0 8px}
+.fsb{padding:2px 0 14px;gap:10px}
+.fsb .chips{gap:6px}
+.stop{gap:10px}
+@media (max-width:760px){.smain{gap:10px}.fpanel{padding:2px 12px 6px}.mlist{padding:8px}}
+
+/* ---------- б/у параметры ---------- */
+.usedbox{border:1px dashed var(--line);border-radius:12px;padding:10px 12px;background:var(--surface,#fbfaf6)}
+.ubh{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted,#666);margin-bottom:8px}
+.dimmed{opacity:.45}
+.chips.usum{margin-top:4px;gap:4px}.chips.usum .pill{font-size:11px}

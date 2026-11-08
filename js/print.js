@@ -255,13 +255,14 @@ App.demoSale=function(){
    ЦЕННИКИ
    ===================================================================== */
 const TAG_FIELDS=[["shop","Название магазина"],["name","Название товара"],["model","Модель"],["chips","Память и цвет"],["cond","Состояние"],["battery","Ёмкость АКБ"],
-  ["kit","Комплектация"],["warranty","Гарантия"],["imei","IMEI / серийный"],["sku","Артикул"],["barcode","Штрихкод"],["price","Цена"],["note","Своя надпись"]];
+  ["kit","Комплектация"],["used","Б/у: ремонт, детали"],["warranty","Гарантия"],["imei","IMEI / серийный"],["sku","Артикул"],["barcode","Штрихкод"],["price","Цена"],["note","Своя надпись"]];
 App.TAG_FIELDS=TAG_FIELDS;
 const F=(...on)=>Object.fromEntries(TAG_FIELDS.map(([k])=>[k,on.includes(k)]));
 App.TAG_PRESETS=[
   {id:"dev70",name:"Устройство 70×50",w:70,h:50,media:"sheet",border:true,round:true,invert:false,priceSize:"L",note:"",fields:F("shop","name","chips","cond","battery","warranty","price")},
   {id:"acc58",name:"Аксессуар 58×40",w:58,h:40,media:"sheet",border:true,round:false,invert:false,priceSize:"M",note:"",fields:F("name","sku","barcode","price")},
   {id:"show100",name:"Витрина 100×70",w:100,h:70,media:"sheet",border:true,round:true,invert:true,priceSize:"L",note:"Принимаем ваше устройство в Trade-in",fields:F("shop","name","chips","cond","battery","kit","warranty","price","note")},
+  {id:"used70",name:"Б/у устройство 70×50",w:70,h:50,media:"sheet",border:true,round:true,invert:false,priceSize:"L",note:"",fields:F("name","chips","cond","battery","kit","used","warranty","price")},
   {id:"label40",name:"Этикетка 40×30 (термопринтер)",w:40,h:30,media:"label",border:false,round:false,invert:false,priceSize:"M",note:"",fields:F("name","barcode","price")}
 ];
 App.tagTemplates=()=>[...App.TAG_PRESETS.map(t=>({...t,builtin:true})),...((App.settings().tagTemplates)||[])];
@@ -310,7 +311,7 @@ function tagHtml(p,t){
     ${f.shop?`<div class="shop">${esc(st.shopName||"iCase")}${f.sku&&p.sku?`<span>${esc(p.sku)}</span>`:""}</div>`:""}
     <div class="mid">${f.name?`<div class="nm">${esc(p.name)}</div>`:""}${f.model&&p.model?`<div class="md">${esc(p.model)}</div>`:""}
     ${chips?`<div class="ch">${chips}</div>`:""}
-    ${f.kit&&p.kit?`<div class="ln">Комплект: ${esc(p.kit)}</div>`:""}${f.imei&&p.serial?`<div class="ln">IMEI/SN ${esc(p.serial)}</div>`:""}
+    ${f.kit&&p.kit?`<div class="ln">Комплект: ${esc(p.kit)}</div>`:""}${f.used&&p.uattrs&&(p.uattrs.repair||p.uattrs.parts)?`<div class="ln">${esc([p.uattrs.repair==="Был"?"Был ремонт"+((p.uattrs.repairParts||[]).length?": "+p.uattrs.repairParts.join(", "):""):p.uattrs.repair==="Не было"?"Без ремонта":"",p.uattrs.parts==="Оригинальные"?"детали оригинальные":""].filter(Boolean).join(", "))}</div>`:""}${f.imei&&p.serial?`<div class="ln">IMEI/SN ${esc(p.serial)}</div>`:""}
     ${!f.shop&&f.sku&&p.sku?`<div class="ln">Арт. ${esc(p.sku)}</div>`:""}
 </div>
     <div class="bt">${f.note&&t.note?`<div class="note">${esc(t.note).replace(/-/g,"\u2011")}</div>`:""}${f.barcode&&code?`<div class="bc">${barcodeSvg(code,Math.max(6,h*.2))}</div>`:""}${f.price?`<div class="pr">${price}<small>₽</small></div>`:""}</div></div>`;
