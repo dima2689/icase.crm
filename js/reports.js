@@ -13,7 +13,7 @@ VIEWS.reports={
     const byPoint=App.points(true).map(p=>[p.name,App.periodStats(from,to,p.id).rev]);
     // по категориям и товарам
     const byCat={},byProd={},bySeller={},byPay={};
-    st.sales.forEach(s=>{(s.items||[]).forEach(i=>{const p=App.byId("products",i.productId)||{};const k=App.catName(p).split(" / ")[0];const v=i.qty*i.price-num(i.disc);
+    st.sales.forEach(s=>{(s.items||[]).forEach(i=>{const p=App.byId("products",i.productId)||{};const k=i.productId?App.catName(p).split(" / ")[0]:(i.kind==="goods"?"Товары вне каталога":"Услуги");const v=i.qty*i.price-num(i.disc);
       byCat[k]=(byCat[k]||0)+v;const pk=i.name;byProd[pk]=byProd[pk]||{v:0,q:0,pr:0};byProd[pk].v+=v;byProd[pk].q+=i.qty;byProd[pk].pr+=v-num(i.cost)*i.qty});
       bySeller[s.by||""]=(bySeller[s.by||""]||0)+num(s.total);(s.payments||[]).forEach(p=>byPay[p.method]=(byPay[p.method]||0)+num(p.amount))});
     const top=Object.entries(byProd).sort((a,b)=>b[1].v-a[1].v).slice(0,10);

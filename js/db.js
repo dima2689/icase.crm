@@ -45,7 +45,7 @@ const M={
     createdAt:r.created_at,stock:{}}),
   sales:r=>({id:r.id,num:r.num,pointId:r.point_id,whId:r.warehouse_id,shiftId:r.shift_id,customerId:r.customer_id,channel:r.channel,subtotal:num(r.subtotal),discount:num(r.discount),
     tradeIn:r.tradein_device?{device:r.tradein_device,amount:num(r.tradein_amount),imei:r.tradein_imei||""}:null,total:num(r.total),status:r.status,by:r.staff_id,createdAt:r.created_at,
-    items:(r.sale_items||[]).sort((a,b)=>a.id-b.id).map(i=>({line:i.id,productId:i.product_id,name:i.name,serial:i.serial||"",qty:i.qty,price:num(i.price),disc:num(i.line_discount),cost:num(i.cost),warranty:i.warranty_months,model:i.model||"",memory:i.memory||"",color:i.color||"",condition:i.condition||"",battery:i.battery_health,kit:i.kit||"",unitId:i.unit_id||""})),
+    items:(r.sale_items||[]).sort((a,b)=>a.id-b.id).map(i=>({line:i.id,productId:i.product_id,name:i.name,kind:i.kind||"",serial:i.serial||"",qty:i.qty,price:num(i.price),disc:num(i.line_discount),cost:num(i.cost),warranty:i.warranty_months,model:i.model||"",memory:i.memory||"",color:i.color||"",condition:i.condition||"",battery:i.battery_health,kit:i.kit||"",unitId:i.unit_id||""})),
     payments:(r.sale_payments||[]).map(p=>({method:p.method,amount:num(p.amount)}))}),
   returns:r=>({id:r.id,num:r.num,saleId:r.sale_id,customerId:r.customer_id,amount:num(r.amount),method:r.method,reason:r.reason,note:r.note||"",whId:r.warehouse_id,defect:r.is_defect,
     shiftId:r.shift_id,by:r.staff_id,createdAt:r.created_at,

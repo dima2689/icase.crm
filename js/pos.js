@@ -91,7 +91,7 @@ VIEWS.pos={
     return `${shiftBar}
     <div class="pos">
       <section class="card">
-        <div class="row-f"><div class="fld grow"><label for="posQ">Товар или сканер</label><input id="posQ" type="search" autocomplete="off" placeholder="Название, артикул, штрихкод, IMEI / S/N"><div class="pick" id="posPick" hidden></div></div>
+        <div class="row-f"><div class="fld grow"><label for="posQ">Товар или сканер</label><input id="posQ" type="search" autocomplete="off" placeholder="Название, артикул, штрихкод, IMEI / S/N"><div class="pick" id="posPick" hidden></div></div><button class="btn" data-act="posCustom" style="align-self:flex-end">+ Услуга / товар вне каталога</button>
 </div>
         <div class="chips" style="margin:12px 0"><button class="chip ${!App.ui.posCat?"on":""}" data-act="posCat" data-id="">Все</button>${cats.map(cg=>`<button class="chip ${App.ui.posCat===cg.id?"on":""}" data-act="posCat" data-id="${esc(cg.id)}">${esc(cg.name)}</button>`).join("")}</div>
         <div class="tilegrid">${quick.map(p=>`<button class="ptile" data-act="posAdd" data-id="${esc(p.id)}"><span>${esc(p.name)}</span><small>${esc(p.condition||"")} · ${App.qtyIn(p,wh)} шт</small><b>${money(p.price)}</b></button>`).join("")||'<div class="empty">На этом складе нет товаров в наличии</div>'}</div>
@@ -105,7 +105,7 @@ VIEWS.pos={
         ${c?`<div class="hint ${c.blacklisted?"bad":"ok"}" style="margin-top:6px">${c.blacklisted?'<span class="pill bad">Чёрный список</span> '+esc(c.blackReason||"")+" · ":""}${esc(c.name)} · покупок ${S.sales.filter(s=>s.customerId===c.id).length}${num(c.discount)?" · скидка "+num(c.discount)+"%":""}${(c.tags||[]).length?" · "+esc(c.tags.join(", ")):""}</div>`:App.phoneKey(P.phone).length===10?'<div class="hint" style="margin-top:6px">Новый клиент, добавится при продаже</div>':""}
         <div class="clist">
         ${P.cart.length?P.cart.map((i,k)=>{const p=App.byId("products",i.productId);const below=p&&num(i.price)-num(i.disc)/Math.max(1,num(i.qty))<num(i.unitId?i.cost:p.cost);
-          return `<div class="cline"><div class="cl-top"><div class="cl-name"><b>${esc(i.name)}</b>${i.serial?'<span class="sub">'+App.codeLbl(i.productId)+" "+esc(i.serial)+(i.battery!=null&&i.battery!==""?" · АКБ "+i.battery+"%":"")+"</span>":""}${below?'<span class="sub bad">ниже закупки</span>':""}</div>
+          return `<div class="cline"><div class="cl-top"><div class="cl-name"><b>${esc(i.name)}${i.productId?"":` <span class="pill ${i.kind==="goods"?"":"info"}">${i.kind==="goods"?"вне каталога":"услуга"}</span>`}</b>${i.serial?'<span class="sub">'+App.codeLbl(i.productId)+" "+esc(i.serial)+(i.battery!=null&&i.battery!==""?" · АКБ "+i.battery+"%":"")+"</span>":""}${below?'<span class="sub bad">ниже закупки</span>':""}</div>
             <button class="btn sm ghost danger" data-act="posDel" data-id="${k}" aria-label="Убрать">✕</button></div>
             <div class="cl-row"><label>Кол-во<input type="number" min="1" value="${num(i.qty)}" data-cart="${k}" data-f="qty" id="cq${k}" ${i.serial?"disabled":""}></label>
             <label>Цена<input type="number" min="0" value="${num(i.price)}" data-cart="${k}" data-f="price" id="cp${k}" ${App.can("price")?"":"disabled"}></label>
@@ -134,7 +134,7 @@ VIEWS.pos={
       if(f==="whId"){P.cart=P.cart.filter(i=>{const p=App.byId("products",i.productId);if(i.unitId){const u=App.byId("units",i.unitId);return u&&u.status==="in_stock"&&u.whId===el.value}return p&&App.qtyIn(p,el.value)>=num(i.qty)});}
       App.schedule()}));
     document.querySelectorAll("[data-cart]").forEach(el=>el.addEventListener("input",()=>{const i=P.cart[+el.dataset.cart];if(!i)return;const v=num(el.value);
-      if(el.dataset.f==="qty"){const p=App.byId("products",i.productId),max=App.qtyIn(p,posWh());i.qty=Math.max(1,Math.min(v||1,max));if(v>max)App.toast("На складе только "+max)}else i[el.dataset.f]=Math.max(0,v);App.schedule()}));
+      if(el.dataset.f==="qty"&&!i.productId)i.qty=Math.max(1,v||1);else if(el.dataset.f==="qty"){const p=App.byId("products",i.productId),max=App.qtyIn(p,posWh());i.qty=Math.max(1,Math.min(v||1,max));if(v>max)App.toast("На складе только "+max)}else i[el.dataset.f]=Math.max(0,v);App.schedule()}));
   }
 };
 function posAdd(pid,unit){
@@ -156,6 +156,33 @@ function posAdd(pid,unit){
   App.schedule();
 }
 ACT.posAdd=id=>posAdd(id);
+/* произвольная позиция: услуга или товар, которого нет в справочнике (без списания со склада) */
+const PC={kind:"service"};
+ACT.posCustom=()=>{
+  const svc=S.services||[],cost=App.can("cost");
+  App.openModal(App.head("Позиция вне каталога")+`
+    <div class="chips" style="margin-bottom:12px"><button class="chip ${PC.kind==="service"?"on":""}" data-act="pcKind" data-id="service">Услуга</button><button class="chip ${PC.kind==="goods"?"on":""}" data-act="pcKind" data-id="goods">Товар</button></div>
+    <div class="form">
+      ${App.fld("pcName","Название",App.inp("pcName","","text",PC.kind==="service"?"Например: наклейка плёнки, настройка телефона":"Например: чехол без штрихкода",'list="pcSvc" autocomplete="off"'),"full")}
+      <datalist id="pcSvc">${svc.map(x=>`<option value="${esc(x.name)}">${money(x.price)}</option>`).join("")}</datalist>
+      ${App.fld("pcPrice","Цена, ₽",App.inp("pcPrice","","number","0"))}${App.fld("pcQty","Количество",App.inp("pcQty","1","number","1",'min="1"'))}
+      ${cost?App.fld("pcCost","Себестоимость, ₽",App.inp("pcCost","","number","0")):""}${App.fld("pcWar","Гарантия, мес.",App.inp("pcWar","","number","0"))}
+      ${PC.kind==="goods"?App.fld("pcSn","Серийный номер (если есть)",App.inp("pcSn","","text","",'autocomplete="off"'),"full"):""}
+    </div>
+    <p class="muted" style="margin:10px 0 0">Позиция попадёт в чек и выручку, но не спишется со склада${PC.kind==="goods"?". Если товар будет продаваться регулярно — заведите его в каталоге":""}.</p>
+    <div class="acts"><button class="btn" data-act="close">Отмена</button><button class="btn pri" data-act="pcAdd">Добавить в чек</button></div>`);
+  const nm=document.getElementById("pcName");
+  nm.addEventListener("input",()=>{const x=svc.find(x=>x.name===nm.value);const pr=document.getElementById("pcPrice");if(x&&pr&&!pr.value)pr.value=x.price});
+  setTimeout(()=>nm.focus(),0);
+};
+ACT.pcKind=k=>{PC.kind=k;ACT.posCustom()};
+ACT.pcAdd=()=>{
+  const name=App.val("pcName"),price=num(App.val("pcPrice")),qty=Math.max(1,Math.round(num(App.val("pcQty"))||1));
+  if(!name)return App.toast("Укажите название");
+  if(price<0)return App.toast("Цена не может быть отрицательной");
+  P.cart.push({line:App.uid("ln"),productId:null,kind:PC.kind,name,qty,price,cost:num(App.val("pcCost")),disc:0,serial:App.val("pcSn").toUpperCase(),warranty:num(App.val("pcWar"))});
+  App.closeModal();App.schedule();
+};
 ACT.posDel=k=>{P.cart.splice(+k,1);App.schedule()};
 ACT.posClear=()=>{Object.assign(P,{cart:[],phone:"",name:"",discPct:0,discSum:0,tiDev:"",tiAmt:0,tiImei:"",manualPct:false});App.schedule()};
 ACT.posCat=id=>{App.ui.posCat=id;App.render()};
@@ -193,7 +220,8 @@ ACT.posConfirm=async(_,btn)=>{
   btn.disabled=true;btn.textContent="Проводим…";
   try{
     const customerId=(P.phone||P.name)?await App.api.customer(P.phone,P.name,"Магазин"):null;
-    const items=P.cart.map(i=>({product_id:i.productId,unit_id:i.unitId||null,qty:num(i.qty),price:num(i.price),discount:num(i.disc)}));
+    const items=P.cart.map(i=>i.productId?{product_id:i.productId,unit_id:i.unitId||null,qty:num(i.qty),price:num(i.price),discount:num(i.disc)}
+      :{product_id:null,name:i.name,kind:i.kind,serial:i.serial||null,qty:num(i.qty),price:num(i.price),discount:num(i.disc),cost:num(i.cost),warranty:num(i.warranty)});
     const id=await App.api.rpc("create_sale",{p_wh:wh,p_customer:customerId,p_items:items,p_payments:payments,p_discount:t.disc,
       p_tradein_device:P.tiDev||null,p_tradein_amount:num(P.tiAmt),p_tradein_imei:P.tiImei||null},["sales","stock","stock_movements","cash_ops","products","audit_log","units"]);
     ACT.posClear();App.closeModal();App.toast("Продажа проведена");

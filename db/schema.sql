@@ -292,7 +292,8 @@ create table sale_items (
   product_id uuid references products(id),
   name text not null, serial text,
   qty int not null check (qty > 0), price numeric(12,2) not null, line_discount numeric(12,2) not null default 0,
-  cost numeric(12,2) not null default 0, warranty_months int not null default 0
+  cost numeric(12,2) not null default 0, warranty_months int not null default 0,
+  kind text check (kind in ('goods','service'))  -- только у произвольных позиций (product_id is null)
 );
 create table sale_payments (
   id bigint generated always as identity primary key,
@@ -914,6 +915,12 @@ begin
   select * into st from settings where id = 1;
   if st.require_shift and v_shift is null then raise exception 'Откройте кассовую смену'; end if;
   for it in select * from jsonb_array_elements(p_items) loop
+    if nullif(it->>'product_id','') is null then  -- произвольная позиция: товар или услуга не из справочника
+      if nullif(trim(coalesce(it->>'name','')),'') is null then raise exception 'Укажите название произвольной позиции'; end if;
+      if coalesce((it->>'qty')::int,0) < 1 or coalesce((it->>'price')::numeric,-1) < 0 then raise exception 'Проверьте количество и цену «%»', it->>'name'; end if;
+      v_sub := v_sub + (it->>'qty')::int * (it->>'price')::numeric - coalesce((it->>'discount')::numeric,0);
+      continue;
+    end if;
     select * into p from products where id = (it->>'product_id')::uuid;
     v_cost := p.cost;
     if p.track_serial then
@@ -931,6 +938,13 @@ begin
   insert into sales(point_id,warehouse_id,shift_id,customer_id,channel,subtotal,discount,tradein_device,tradein_imei,tradein_amount,total)
     values (v_point,p_wh,v_shift,p_customer,p_channel,v_sub,p_discount,p_tradein_device,p_tradein_imei,p_tradein_amount,v_total) returning id,num into v_sale,v_num;
   for it in select * from jsonb_array_elements(p_items) loop
+    if nullif(it->>'product_id','') is null then
+      insert into sale_items(sale_id,product_id,name,kind,serial,qty,price,line_discount,cost,warranty_months)
+        values (v_sale,null,trim(it->>'name'),case when it->>'kind'='goods' then 'goods' else 'service' end,nullif(trim(coalesce(it->>'serial','')),''),
+          (it->>'qty')::int,(it->>'price')::numeric,coalesce((it->>'discount')::numeric,0),
+          case when has_role('owner','manager') then coalesce((it->>'cost')::numeric,0) else 0 end,coalesce((it->>'warranty')::int,0));
+      continue;
+    end if;
     select * into p from products where id = (it->>'product_id')::uuid;
     u := null;
     if p.track_serial then
@@ -982,8 +996,10 @@ begin
     select coalesce(sum(ri.qty),0) into done_qty from return_items ri where ri.sale_item_id = si.id;
     if done_qty + (it->>'qty')::int > si.qty then raise exception 'Нельзя вернуть больше, чем продано: %', si.name; end if;
     insert into return_items(return_id,sale_item_id,qty) values (v_ret,si.id,(it->>'qty')::int);
+    if si.product_id is not null then
     insert into stock_movements(product_id,warehouse_id,type,qty,ref) values (si.product_id,v_wh,'return',(it->>'qty')::int,v_num);
     if p_defect then insert into stock_movements(product_id,warehouse_id,type,qty,ref,note) values (si.product_id,v_wh,'writeoff',-(it->>'qty')::int,v_num,'Брак по возврату'); end if;
+    end if;
     if si.unit_id is not null then
       update units set status = case when p_defect then 'written_off' else 'in_stock' end::unit_status, warehouse_id = case when p_defect then null else v_wh end,
         sale_item_id = case when p_defect then sale_item_id end, last_ref = v_num where id = si.unit_id;
