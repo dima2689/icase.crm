@@ -5,7 +5,7 @@ const {S,$,esc,num,money,ACT,VIEWS,TITLES}=App;
 
 /* ======================= ТОВАРЫ ======================= */
 TITLES.stock="Товары";
-Object.assign(App.ui,{stockQ:"",stockWh:""});
+Object.assign(App.ui,{stockQ:"",stockWh:"",docWh:""});
 const SF_KEY="icase_sf";
 const isMob=()=>window.matchMedia&&matchMedia("(max-width:760px)").matches;
 const isNarrow=()=>window.matchMedia&&matchMedia("(max-width:860px)").matches;
@@ -156,33 +156,39 @@ document.addEventListener("input",e=>{const t=e.target;if(t.dataset&&t.dataset.u
 document.addEventListener("change",e=>{const t=e.target;if(t.dataset&&(t.dataset.sf||t.dataset.ub)&&(t.tagName==="SELECT"||t.type==="checkbox"))t.dispatchEvent(new Event("input",{bubbles:true}))});
 function qtyCell(q,p){return App.isLow(p)?`<span class="pill bad">${q}</span>`:q<=0?'<span class="pill mute">0</span>':`<b>${q}</b>`}
 /* карточка склада: его товары, поиск и действия */
+/* содержимое склада: итоги, действия, поиск и список товаров (и в карточке, и на странице «Склад») */
+function whBody(id,{noActs=false}={}){
+  const w=App.byId("warehouses",id);if(!w)return '<div class="empty">Склад не найден</div>';
+  const cost=App.can("cost"),st=App.can("stock");
+  const ps=S.products.filter(p=>App.qtyIn(p,id)!==0).sort((a,b)=>App.catName(a).localeCompare(App.catName(b))||String(a.name).localeCompare(b.name));
+  const qn=ps.reduce((a,p)=>a+Math.max(0,App.qtyIn(p,id)),0);
+  const sumC=ps.reduce((a,p)=>a+Math.max(0,App.qtyIn(p,id))*num(p.cost),0),sumP=ps.reduce((a,p)=>a+Math.max(0,App.qtyIn(p,id))*num(p.price),0);
+  return `<div class="tiles"><div class="tile"><span>Штук</span><b>${qn}</b><small>${ps.length} поз.</small></div>${cost?`<div class="tile"><span>В закупке</span><b>${money(sumC)}</b></div>`:""}<div class="tile"><span>В рознице</span><b>${money(sumP)}</b></div></div>
+    ${st&&!noActs?`<div class="row-f whacts"><button class="btn pri sm" data-act="whDoc" data-id="in|${esc(id)}">+ Приход</button><button class="btn sm" data-act="whDoc" data-id="transfer|${esc(id)}">Переместить</button><button class="btn sm" data-act="whDoc" data-id="writeoff|${esc(id)}">Списать</button><button class="btn sm" data-act="whDoc" data-id="inventory|${esc(id)}">Инвентаризация</button></div>`:""}
+    <input type="search" class="whQ" placeholder="Найти товар на этом складе" autocomplete="off" data-nodirty aria-label="Поиск по складу" style="width:100%;margin:12px 0 8px">
+    <div class="whlist">${ps.map(p=>{const q=App.qtyIn(p,id),units=p.trackSerial?App.unitsOf(p.id,{wh:id}):[];
+      return `<div class="whr" data-s="${esc([p.name,p.brand,p.sku,p.barcode,App.catName(p),...units.map(App.unitCode)].join(" ").toLowerCase())}">
+        <button type="button" class="whr-main" data-act="openProduct" data-id="${esc(p.id)}"><b>${esc(p.name)}${p.trackSerial?` <span class="pill info">${App.codeLbl(p)}</span>`:""}</b><small>${esc(App.catName(p))}${units.length?" · "+units.slice(0,3).map(u=>esc(App.unitCode(u))).join(", ")+(units.length>3?" и ещё "+(units.length-3):""):""}</small></button>
+        <span class="whr-q ${q<0?"bad":""}">${q} шт</span><span class="whr-p">${money(p.price)}</span>
+        ${st?`<span class="whr-a"><button class="btn sm ghost" data-act="whDoc" data-id="transfer|${esc(id)}|${esc(p.id)}" title="Переместить на другой склад">⇄</button><button class="btn sm ghost danger" data-act="whDoc" data-id="writeoff|${esc(id)}|${esc(p.id)}" title="Списать">−</button></span>`:""}</div>`}).join("")||'<div class="empty">На складе пока нет товаров. Добавьте их приходом или перемещением.</div>'}
+      <div class="empty whNone" hidden>Ничего не найдено</div></div>`;
+}
+function whSearchBind(root){root=root||document;root.querySelectorAll(".whQ").forEach(q=>{const box=q.parentElement;
+  q.addEventListener("input",()=>{const t=q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);let n=0;
+    box.querySelectorAll(".whr").forEach(r=>{const ok=t.every(x=>r.dataset.s.includes(x));r.hidden=!ok;if(ok)n++});const e=box.querySelector(".whNone");if(e)e.hidden=!!n||!box.querySelector(".whr")})})}
+const whLabel=w=>{const pt=w.pointId?App.byId("points",w.pointId):null,role=pt&&pt.cashWh===w.id?"склад кассы":pt&&pt.serviceWh===w.id?"склад сервиса":"";return (pt?pt.name:"общий склад")+(role?" · "+role:"")+(w.active===false?" · отключён":"")};
+/* карточка склада (из карточки товара) */
 ACT.whOpen=id=>{
   const draw=()=>{
     const w=App.byId("warehouses",id);if(!w)return App.closeModal();
-    const pt=w.pointId?App.byId("points",w.pointId):null,role=pt&&pt.cashWh===w.id?"склад кассы":pt&&pt.serviceWh===w.id?"склад сервиса":"";
-    const cost=App.can("cost"),st=App.can("stock");
-    const ps=S.products.filter(p=>App.qtyIn(p,id)!==0).sort((a,b)=>App.catName(a).localeCompare(App.catName(b))||String(a.name).localeCompare(b.name));
-    const qn=ps.reduce((a,p)=>a+Math.max(0,App.qtyIn(p,id)),0);
-    const sumC=ps.reduce((a,p)=>a+Math.max(0,App.qtyIn(p,id))*num(p.cost),0),sumP=ps.reduce((a,p)=>a+Math.max(0,App.qtyIn(p,id))*num(p.price),0);
-    App.redrawModal(App.head(esc(w.name),`<span class="pill ${w.active===false?"mute":"info"}">${pt?esc(pt.name):"общий склад"}${role?" · "+role:""}${w.active===false?" · отключён":""}</span>${App.can("settings")?`<button class="btn sm" data-act="whForm" data-id="${esc(id)}">Изменить</button>`:""}`)+`
-      <div class="tiles"><div class="tile"><span>Штук</span><b>${qn}</b><small>${ps.length} поз.</small></div>${cost?`<div class="tile"><span>В закупке</span><b>${money(sumC)}</b></div>`:""}<div class="tile"><span>В рознице</span><b>${money(sumP)}</b></div></div>
-      ${st?`<div class="row-f whacts"><button class="btn pri sm" data-act="whDoc" data-id="in|${esc(id)}">+ Приход</button><button class="btn sm" data-act="whDoc" data-id="transfer|${esc(id)}">Переместить</button><button class="btn sm" data-act="whDoc" data-id="writeoff|${esc(id)}">Списать</button><button class="btn sm" data-act="whDoc" data-id="inventory|${esc(id)}">Инвентаризация</button></div>`:""}
-      <input type="search" id="whQ" placeholder="Найти товар на этом складе" autocomplete="off" data-nodirty aria-label="Поиск по складу" style="width:100%;margin:12px 0 8px">
-      <div class="whlist">${ps.map(p=>{const q=App.qtyIn(p,id),units=p.trackSerial?App.unitsOf(p.id,{wh:id}):[];
-        return `<div class="whr" data-s="${esc([p.name,p.brand,p.sku,p.barcode,App.catName(p),...units.map(App.unitCode)].join(" ").toLowerCase())}">
-          <button type="button" class="whr-main" data-act="openProduct" data-id="${esc(p.id)}"><b>${esc(p.name)}${p.trackSerial?` <span class="pill info">${App.codeLbl(p)}</span>`:""}</b><small>${esc(App.catName(p))}${units.length?" · "+units.slice(0,3).map(u=>esc(App.unitCode(u))).join(", ")+(units.length>3?" и ещё "+(units.length-3):""):""}</small></button>
-          <span class="whr-q ${q<0?"bad":""}">${q} шт</span><span class="whr-p">${money(p.price)}</span>
-          ${st?`<span class="whr-a"><button class="btn sm ghost" data-act="whDoc" data-id="transfer|${esc(id)}|${esc(p.id)}" title="Переместить на другой склад">⇄</button><button class="btn sm ghost danger" data-act="whDoc" data-id="writeoff|${esc(id)}|${esc(p.id)}" title="Списать">−</button></span>`:""}</div>`}).join("")||'<div class="empty">На складе пока нет товаров. Добавьте их приходом или перемещением.</div>'}
-        <div class="empty" id="whNone" hidden>Ничего не найдено</div></div>
+    App.redrawModal(App.head(esc(w.name),`<span class="pill ${w.active===false?"mute":"info"}">${esc(whLabel(w))}</span>${App.can("settings")?`<button class="btn sm" data-act="whForm" data-id="${esc(id)}">Изменить</button>`:""}`)+whBody(id)+`
       <div class="acts"><button class="btn" data-act="whStock" data-id="${esc(id)}">Открыть в «Товарах»</button><button class="btn" data-act="close">Закрыть</button></div>`);
-    const q=document.getElementById("whQ");
-    if(q)q.addEventListener("input",()=>{const t=q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);let n=0;
-      document.querySelectorAll(".whr").forEach(r=>{const ok=t.every(x=>r.dataset.s.includes(x));r.hidden=!ok;if(ok)n++});const e=document.getElementById("whNone");if(e)e.hidden=!!n||!document.querySelector(".whr")});
+    whSearchBind(document.getElementById("modal"));
   };
   App.openModal("",{wide:true,refresh:draw});draw();
 };
 /* документ со склада: тип|склад|товар */
-ACT.whDoc=arg=>{const [type,wh,pid]=arg.split("|"),p=pid?App.byId("products",pid):null;App.closeModal();
+ACT.whDoc=arg=>{let [type,wh,pid]=arg.split("|");if(!App.byId("warehouses",wh))wh=App.cashWh();const p=pid?App.byId("products",pid):null;App.closeModal();
   ACT.newDoc(type,p?{productId:p.id,name:p.name,qty:p.trackSerial?0:1,cost:num(p.cost),newUnits:[],unitIds:[],foundCodes:[]}:null);
   if(!D)return;
   if(type==="in"||type==="inventory")D.whTo=wh;
@@ -288,15 +294,17 @@ TITLES.docs="Склад";
 App.ui.docType="";App.ui.docQ="";App.ui.docStatus="";
 VIEWS.docs={
   ownSearch:true,
-  actions:()=>App.can("stock")?Object.entries(App.DOCT).map(([k,d])=>`<button class="btn ${k==="in"?"pri":""}" data-act="newDoc" data-id="${k}">+ ${d.one}</button>`).join(""):"",
+  after(){const sel=document.getElementById("docWh");if(sel)sel.addEventListener("change",()=>{App.ui.docWh=sel.value;App.render()});whSearchBind(document.querySelector(".whbox"))},
+  actions:()=>App.can("stock")?Object.entries(App.DOCT).map(([k,d])=>`<button class="btn ${k==="in"?"pri":""}" data-act="whDoc" data-id="${k}|${esc(App.ui.docWh||App.cashWh()||"")}">+ ${d.one}</button>`).join(""):"",
   render(){
     const u=App.ui,q=u.docQ.toLowerCase();
     const list=App.sortDesc(S.docs.filter(d=>(!u.docType||d.type===u.docType)&&(!u.docStatus||d.status===u.docStatus)&&(!q||[d.num,d.note,(App.byId("suppliers",d.supplierId)||{}).name,(d.lines||[]).map(l=>l.name).join(" ")].join(" ").toLowerCase().includes(q))));
     const moves=App.sortDesc(S.movements,"at").slice(0,40);
-    const whBox=`<section class="card whbox"><div class="card-h"><h2>Склады</h2>${App.can("settings")?'<button class="btn pri sm" data-act="whForm">+ Склад</button>':""}</div>
-      <div class="whgrid">${App.whs(true).map(w=>{const ps=S.products.filter(p=>App.qtyIn(p,w.id)>0),qn=ps.reduce((a,p)=>a+App.qtyIn(p,w.id),0),pt=w.pointId?App.byId("points",w.pointId):null;
-        const role=pt&&pt.cashWh===w.id?"касса":pt&&pt.serviceWh===w.id?"сервис":"";
-        return `<button type="button" class="whc ${w.active===false?"off":""}" data-act="whOpen" data-id="${esc(w.id)}"><b>${esc(w.name)}</b><small>${pt?esc(pt.name):"общий"}${role?" · "+role:""}${w.active===false?" · отключён":""}</small><span>${qn} шт · ${ps.length} поз.</span></button>`}).join("")||'<div class="empty">Складов пока нет</div>'}</div></section>`;
+    const whAll=App.whs(true);if(!App.byId("warehouses",u.docWh))u.docWh=App.cashWh()||(whAll[0]||{}).id||"";
+    const cw=App.byId("warehouses",u.docWh);
+    const whBox=`<section class="card whbox"><div class="whtop"><div class="fld grow"><label for="docWh">Склад</label>${App.sel("docWh",whAll.map(w=>[w.id,w.name+(w.pointId?"":" (общий)")+(w.active===false?" — отключён":"")]),u.docWh,'data-nodirty')}</div>
+      ${App.can("settings")&&cw?`<button class="btn" data-act="whForm" data-id="${esc(cw.id)}">Изменить</button>`:""}${App.can("settings")?'<button class="btn pri" data-act="whForm">+ Склад</button>':""}</div>
+      ${cw?whBody(cw.id,{noActs:true}):'<div class="empty">Складов пока нет — создайте первый.</div>'}</section>`;
     return `${whBox}<div class="chips"><button class="chip ${!u.docType?"on":""}" data-act="docType" data-id="">Все<b>${S.docs.length}</b></button>${Object.entries(App.DOCT).map(([k,d])=>`<button class="chip ${u.docType===k?"on":""}" data-act="docType" data-id="${k}">${d.label}<b>${S.docs.filter(x=>x.type===k).length}</b></button>`).join("")}</div>
     <div class="row-f"><input id="docQ" type="search" placeholder="№, поставщик, товар" value="${esc(u.docQ)}" data-filter="docQ" aria-label="Поиск документа" style="flex:1 1 260px">${App.sel("docStatus",[["","Любой статус"],["draft","Черновики"],["posted","Проведённые"],["cancelled","Отменённые"]],u.docStatus,'data-filter-sel="docStatus" aria-label="Статус"')}</div>
     <section class="card"><div class="tbl-wrap"><table><thead><tr><th>Документ</th><th>Дата</th><th>Склад</th><th>Основание</th><th class="n">Строк</th><th class="n">Кол-во</th>${App.can("cost")?'<th class="n">Сумма</th>':""}<th>Статус</th></tr></thead><tbody>
