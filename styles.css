@@ -267,3 +267,25 @@ label.chk.bad{border-color:#c0392b;color:#c0392b}
 table.cart input.uscan{width:100%;max-width:420px;text-align:left}
 table.cart input[type=checkbox]{width:auto;height:auto}
 table.cart table.units input{text-align:right}
+
+/* ---------- приёмка ---------- */
+.recv{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;align-items:start}
+@media (max-width:1100px){.recv{grid-template-columns:1fr}}
+.rsum{position:sticky;top:0;display:flex;flex-direction:column;gap:10px}.rsum h2{margin:0}
+.scanbar{position:relative;margin-top:14px;display:flex;align-items:center;gap:10px;border:2px solid var(--ink,#111);border-radius:14px;padding:4px 12px;background:#fff}
+.scanbar svg{width:26px;height:26px;flex:none}.scanbar input{border:0;outline:0;font-size:18px;padding:12px 0;flex:1;background:transparent;box-shadow:none}
+.scanbar .pick{position:absolute;left:0;right:0;top:100%;z-index:20}
+.hintline{margin:6px 2px 12px;font-size:13px}
+.rlines{display:flex;flex-direction:column;gap:10px}
+.rline{border:1px solid var(--line);border-radius:14px;padding:10px 12px;background:#fff}
+.rhead{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:12px;align-items:center}
+.rq{display:flex;align-items:center;gap:6px;white-space:nowrap}.rq input{width:64px;text-align:center}
+.rprices{display:flex;gap:8px}.mini{display:flex;flex-direction:column;font-size:11px;color:var(--muted,#666);gap:2px}.mini input{width:110px}
+.runits{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px}
+.runits input.uscan{width:100%;max-width:440px;margin-bottom:8px;font-family:"SF Mono",Menlo,Consolas,monospace}
+.empty.big{padding:40px 10px;text-align:center}
+.donebox{border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:6px;background:var(--surface-2,#f6f3ea)}
+.dpname{margin:12px 0 4px;font-size:15px}.row-f.nowrap{flex-wrap:nowrap}input.mono{font-family:"SF Mono",Menlo,Consolas,monospace}
+@media (max-width:700px){.rhead{grid-template-columns:1fr auto}.rprices{grid-column:1/-1}}
+.rhead .sub{display:block;font-size:12px;color:var(--muted,#666);margin-top:2px}
+.row-f.nowrap select{flex:1;min-width:0}

@@ -24,6 +24,7 @@ ACT.printTab=k=>{App.ui.printTab=k;if(App.ui.view!=="print")location.hash="print
 /* ---------- очередь ценников ---------- */
 const queueItems=()=>App.ui.tagQueue.map(q=>({q,p:App.byId("products",q.id)})).filter(x=>x.p);
 const qtyHere=p=>{const pt=App.point();return pt&&pt.cashWh?App.qtyIn(p,pt.cashWh):App.qtyTotal(p)};
+App.tagsAdd=ids=>addToQueue(ids);
 function addToQueue(ids){
   let n=0;ids.forEach(id=>{if(!App.ui.tagQueue.some(q=>q.id===id)){App.ui.tagQueue.push({id,copies:1});n++}});saveQueue();return n;
 }

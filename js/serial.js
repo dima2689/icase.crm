@@ -115,6 +115,7 @@ function drawCP(){
 ACT.cpFamily=f=>{CP.family=f;CP.modelId=(App.models(f)[0]||{}).id||"";CP.mems=[];CP.colors=[];CP.opts={};drawCP()};
 ACT.cpToggle=v=>{const [k,val]=v.split(/\|(.*)/s);const arr=k==="mem"?CP.mems:CP.colors;const i=arr.indexOf(val);i>=0?arr.splice(i,1):arr.push(val);drawCP()};
 ACT.cpAll=k=>{const m=cpModel();if(!m)return;if(k==="mem")CP.mems=CP.mems.length===m.memories.length?[]:m.memories.slice();else CP.colors=CP.colors.length===m.colors.length?[]:m.colors.slice();drawCP()};
+App.familyCategory=family=>familyCategory(family);
 async function familyCategory(family){
   let c=S.categories.find(x=>!x.parentId&&x.name.toLowerCase()===family.toLowerCase());
   if(!c){c=await App.api.insert("categories",{name:family,is_device:family!=="Другое"});await App.reload(["categories"]);c=App.byId("categories",c.id)||c}
