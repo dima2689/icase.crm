@@ -100,15 +100,7 @@ VIEWS.stock={
     const curCat=App.cat(f.cat),catLabel=f.cat==="__none"?"Без категории":curCat?App.catName({categoryId:curCat.id}):"";
     const nOn=(ubOn(f)?1:0)+(f.cat?1:0)+f.brands.length+(f.avail!=="all"?1:0)+f.conds.length+f.mems.length+f.colors.length+(f.track?1:0)+(f.chan?1:0)+(f.pmin!==""||f.pmax!==""?1:0)+(f.arch?1:0);
     const allOpen=["cat","brand","avail","used","params"].every(k=>(f.sec||{})[k]);
-    return `<div class="smain" data-nodirty>
-      <div class="row-f stop">
-        <input id="stockQ" type="search" placeholder="Название, артикул, штрихкод, IMEI, модель, цвет" value="${esc(u.stockQ)}" data-filter="stockQ" aria-label="Поиск товара">
-        ${App.sel("stockWh",[["","Все склады"],...App.whOpts()],u.stockWh,'data-filter-sel="stockWh" aria-label="Склад"')}
-        <select data-sf="sort" aria-label="Сортировка">${SORTS.map(([v,l])=>`<option value="${v}"${f.sort===v?" selected":""}>${l}</option>`).join("")}</select>
-        <select data-sf="group" aria-label="Группировка">${GROUPS.map(([v,l])=>`<option value="${v}"${f.group===v?" selected":""}>${l}</option>`).join("")}</select>
-      </div>
-      <div class="fpanel">
-        <div class="fhead"><b>Фильтры</b>${nOn?`<span class="pill dark">${nOn}</span>`:""}<button class="btn sm ghost" data-act="sfSecAll">${allOpen?"Свернуть все":"Развернуть все"}</button></div>
+    const filtersBody=()=>`
         ${fsec("cat","Категории",catLabel||"все",catChips())}
         ${fb.length>1||f.brands.length?fsec("brand","Бренды",f.brands.join(", ")||"все",`<div class="chips">${chipset("brands",fb,f.brands)}</div>`):""}
         ${fsec("avail","Наличие",AVAIL.find(a=>a[0]===f.avail)[1],`<div class="seg wrap">${AVAIL.map(([v,l])=>`<button class="${f.avail===v?"on":""}" data-act="sfSet" data-id="avail|${v}">${l}</button>`).join("")}</div>`)}
@@ -125,6 +117,18 @@ VIEWS.stock={
             <select data-sf="chan" aria-label="Каналы"><option value="">Любые каналы</option><option value="site"${f.chan==="site"?" selected":""}>На сайте</option><option value="avito"${f.chan==="avito"?" selected":""}>На Авито</option><option value="none"${f.chan==="none"?" selected":""}>Нигде не выставлен</option></select>
             <input type="number" min="0" placeholder="Цена от" value="${esc(f.pmin)}" data-sf="pmin" aria-label="Цена от"><input type="number" min="0" placeholder="до" value="${esc(f.pmax)}" data-sf="pmax" aria-label="Цена до">
             <label class="chk"><input type="checkbox" data-sf="arch" ${f.arch?"checked":""}> Архив</label></div></div>`)}
+    `;
+    const pOpen=!!(f.sec||{}).panel;
+    return `<div class="smain" data-nodirty>
+      <div class="row-f stop">
+        <input id="stockQ" type="search" placeholder="Название, артикул, штрихкод, IMEI, модель, цвет" value="${esc(u.stockQ)}" data-filter="stockQ" aria-label="Поиск товара">
+        ${App.sel("stockWh",[["","Все склады"],...App.whOpts()],u.stockWh,'data-filter-sel="stockWh" aria-label="Склад"')}
+        <select data-sf="sort" aria-label="Сортировка">${SORTS.map(([v,l])=>`<option value="${v}"${f.sort===v?" selected":""}>${l}</option>`).join("")}</select>
+        <select data-sf="group" aria-label="Группировка">${GROUPS.map(([v,l])=>`<option value="${v}"${f.group===v?" selected":""}>${l}</option>`).join("")}</select>
+      </div>
+      <div class="fpanel ${pOpen?"open":"closed"}">
+        <div class="fhead"><button class="fsh fmain" data-act="sfSec" data-id="panel" aria-expanded="${pOpen}"><span class="ft">Фильтры</span>${nOn?`<span class="pill dark">${nOn}</span>`:""}<span class="fsum">${esc(nOn?active.map(a=>a[2]).concat(f.cat?[catLabel]:[]).join(", "):"не выбраны")}</span><span class="car"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform:rotate(${pOpen?180:0}deg);transition:transform .15s"><path d="M6 9l6 6 6-6"/></svg></span><span class="totbtn">${pOpen?"Свернуть":"Развернуть"}</span></button>${pOpen?`<button class="btn sm ghost" data-act="sfSecAll">${allOpen?"Свернуть все":"Развернуть все"}</button>`:""}</div>
+        ${pOpen?filtersBody():""}
       </div>
       ${active.length?`<div class="chips activef">${active.map(([k,v,l])=>`<button class="chip on" data-act="sfDrop" data-id="${esc(k+"|"+v)}">${esc(l)} ✕</button>`).join("")}<button class="btn sm ghost" data-act="sfReset">Сбросить всё</button></div>`:""}
       ${(()=>{const open=!!(f.sec||{}).totals;return `<div class="totbox ${open?"open":""}"><button class="fsh" data-act="sfSec" data-id="totals" aria-expanded="${open}"><span class="ft">Итоги</span><span class="fsum">${list.length} поз. · ${totQty} шт · в рознице ${money(totPrice)}</span><span class="car"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform:rotate(${open?180:0}deg);transition:transform .15s"><path d="M6 9l6 6 6-6"/></svg></span><span class="totbtn">${open?"Свернуть":"Развернуть"}</span></button>${open?`<div class="totbody"><div class="tiles"><div class="tile"><span>Позиций</span><b>${list.length}</b><small>${totQty} шт</small></div>${showCost?`<div class="tile"><span>В закупке</span><b>${money(totCost)}</b></div>`:""}<div class="tile"><span>В рознице</span><b>${money(totPrice)}</b></div>${showCost?`<div class="tile"><span>Потенциальная наценка</span><b>${money(totPrice-totCost)}</b></div>`:""}</div></div>`:""}</div>`})()}

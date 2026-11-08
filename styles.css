@@ -355,3 +355,7 @@ details>summary{padding-right:8px}
 .totbtn{font-size:13px;font-weight:600;color:var(--muted,#666);flex:none}
 .totbody{padding:0 0 14px}
 @media (max-width:760px){.totbox{padding:0 12px}.totbox .fsum{font-size:13px}.totbtn{display:none}}
+.fhead .fmain{flex:1;padding:12px 2px;min-width:0}.fhead .fmain .pill{flex:none}
+.fpanel.closed{padding-bottom:0}.fpanel.closed .fhead{padding:0}
+.fhead .btn{margin-left:8px}
+@media (max-width:760px){.fhead{flex-wrap:wrap}.fhead>.btn{margin:0 0 8px auto}}
