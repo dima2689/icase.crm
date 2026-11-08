@@ -36,7 +36,7 @@ App.qrSvg=function(text){
 /* ---------- данные продажи для документов ---------- */
 App.saleDocData=function(s){
   const st=App.settings(),pt=s.pointId?App.byId("points",s.pointId):null,c=App.cust(s.customerId);
-  const items=(s.items||[]).map((i,k)=>({n:k+1,name:i.name,spec:[i.model,i.memory,i.color].filter(Boolean).join(", "),cond:i.condition||"",serial:i.serial||"",
+  const items=(s.items||[]).map((i,k)=>({n:k+1,name:i.name,spec:[i.model,i.memory,i.color].filter(Boolean).join(", "),model:i.model||"",memory:i.memory||"",color:i.color||"",cond:i.condition||"",serial:i.serial||"",
     qty:num(i.qty),price:num(i.price),disc:num(i.disc),sum:num(i.qty)*num(i.price)-num(i.disc),warranty:num(i.warranty)}));
   const goods=items.reduce((a,i)=>a+i.sum,0);
   return {st,s,c,items,goods,
@@ -48,54 +48,80 @@ App.saleDocData=function(s){
 const siteLabel=u=>String(u||"").replace(/^https?:\/\//,"").replace(/\/$/,"");
 
 /* ---------- товарный чек A4 ---------- */
-const CSS_A4=`@page{size:A4;margin:12mm 12mm 12mm 14mm}
-*{box-sizing:border-box}body{margin:0;font:10pt/1.35 "Helvetica Neue",Arial,sans-serif;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:2px solid #000;padding-bottom:8px}
-.logo{font:800 22pt/1 "Helvetica Neue",Arial,sans-serif;letter-spacing:-.5px}.logo small{display:block;font:600 7.5pt/1.4 Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;margin-top:4px}
-.req{text-align:right;font-size:8.5pt;line-height:1.45;max-width:65%}
-h1{font:800 15pt/1.2 "Helvetica Neue",Arial,sans-serif;margin:14px 0 4px}
-.meta{display:flex;gap:24px;flex-wrap:wrap;font-size:9pt;margin-bottom:10px}.meta b{font-weight:700}
-table{width:100%;border-collapse:collapse;font-size:8.6pt}th,td{border:1px solid #000;padding:4px 5px;vertical-align:top}
-th{background:#e8e8e8;font-weight:700;text-align:left;font-size:8pt}td.n,th.n{text-align:right;white-space:nowrap}td.c{text-align:center}
-.sub{display:block;font-size:7.5pt;color:#333}
-.bottom{display:flex;gap:16px;margin-top:10px;align-items:flex-start}.bottom .left{flex:1}
-.sums{width:78mm;flex:none;border-collapse:collapse}.sums td{border:0;border-bottom:1px solid #bbb;padding:3px 0}.sums td.n{padding-left:12px}.sums tr.tot td{border-bottom:2px solid #000;font-weight:800;font-size:10.5pt;padding-top:5px}
-.box{border:1px solid #000;padding:6px 8px;margin-top:8px;font-size:9pt}
-.words{margin-top:8px;font-size:9pt}
-.ack{border:1.5px solid #000;padding:8px 10px;margin-top:12px}.ack p{margin:0 0 14px}
-.sig{display:flex;justify-content:space-between;gap:24px;margin-top:20px;font-size:9pt}.sig div{flex:1}
-.line{display:inline-block;border-bottom:1px solid #000;min-width:120px;margin:0 4px}
-.foot{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-top:18px;border-top:1px solid #000;padding-top:8px;font-size:7.8pt;color:#222}
-.qrs{display:flex;gap:14px}.qr{text-align:center;font-size:7.5pt;width:24mm}.qr svg{width:22mm;height:22mm;display:block;margin:0 auto 2px}`;
+const CSS_A4=`@page{size:A4;margin:0}
+*{box-sizing:border-box}html,body{margin:0}
+body{font:9.6pt/1.45 "Helvetica Neue",Helvetica,Arial,sans-serif;color:#17170F;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.page{width:210mm;min-height:297mm;padding:14mm 15mm 12mm;background:#F6F3EA;display:flex;flex-direction:column}
+.top{display:flex;justify-content:space-between;align-items:flex-start}
+.logo{font:800 26pt/1 "Helvetica Neue",Helvetica,Arial,sans-serif;letter-spacing:-1px}
+.logo span{display:inline-block;vertical-align:middle;margin-left:8px;font:700 7.5pt/1 Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;background:#3B4A2A;color:#F6F3EA;border-radius:99px;padding:5px 10px}
+.doc{text-align:right}.doc .t{font:800 20pt/1.05 "Helvetica Neue",Helvetica,Arial,sans-serif;letter-spacing:-.5px}
+.doc .n{display:inline-block;margin-top:6px;background:#DCE4D2;color:#2E3A20;border-radius:99px;padding:4px 11px;font-weight:700;font-size:9pt}
+.lbl{font:700 6.8pt/1.2 Arial,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:#6B705F;margin-bottom:4px}
+.info{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:8px;margin-top:12mm}
+.card{background:#FFFDF7;border:1px solid #E4DFCF;border-radius:10px;padding:9px 11px}
+.card b{font-size:9.8pt}.card .m{color:#4A4D40;font-size:8.6pt}
+.items{margin-top:7mm;background:#FFFDF7;border:1px solid #E4DFCF;border-radius:12px;overflow:hidden}
+.ih,.ir{display:grid;grid-template-columns:7mm 1fr 14mm 25mm 23mm 26mm;gap:6px;align-items:start;padding:8px 12px}
+.ih{background:#3B4A2A;color:#F6F3EA;font:700 6.8pt/1.2 Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;padding:7px 12px}
+.ir+.ir{border-top:1px solid #ECE7D8}.r{text-align:right}.k{color:#8A8D7E;font-weight:700}
+.nm{font-weight:800;font-size:10.4pt;line-height:1.25}
+.chips{margin-top:4px;display:flex;flex-wrap:wrap;gap:4px}
+.chip{background:#EEF1E6;color:#3B4A2A;border-radius:99px;padding:2px 8px;font-size:7.6pt;font-weight:600;white-space:nowrap}
+.chip.d{background:#3B4A2A;color:#F6F3EA}
+.imei{margin-top:4px;font:8pt/1.2 "SF Mono",Menlo,Consolas,monospace;color:#4A4D40}
+.sum{font-weight:800;font-size:10.4pt}.old{color:#8A8D7E;font-size:8pt}
+.bottom{display:grid;grid-template-columns:1fr 74mm;gap:10px;margin-top:7mm;align-items:start}
+.tot{background:#DCE4D2;border-radius:12px;padding:11px 13px}
+.tl{display:flex;justify-content:space-between;padding:3px 0;font-size:9.2pt;color:#2E3A20}
+.big{border-top:1.5px solid #3B4A2A;margin-top:6px;padding-top:8px;display:flex;justify-content:space-between;align-items:baseline}
+.big span{font-weight:700;font-size:10pt}.big b{font:800 19pt/1 "Helvetica Neue",Helvetica,Arial,sans-serif;letter-spacing:-.5px}
+.words{margin-top:7px;font-size:7.8pt;color:#2E3A20;line-height:1.35}
+.ti{border-left:3px solid #3B4A2A}
+.ack{margin-top:7mm;border:1.5px dashed #9AA88A;border-radius:12px;padding:11px 13px;background:#FFFDF7}
+.ack p{margin:0 0 16px;font-weight:600}
+.sigs{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.sg{font-size:8.4pt;color:#4A4D40}.sg .ln{border-bottom:1px solid #17170F;height:20px;margin-bottom:3px;display:flex;align-items:flex-end;justify-content:flex-end;font-size:8.6pt;color:#17170F;padding-bottom:2px}
+.foot{margin-top:auto;padding-top:8mm;display:flex;justify-content:space-between;align-items:flex-end;gap:14px}
+.thanks{font:800 15pt/1.15 "Helvetica Neue",Helvetica,Arial,sans-serif;letter-spacing:-.3px;max-width:105mm}
+.legal{margin-top:6px;font-size:7.2pt;color:#6B705F;line-height:1.4}
+.qrs{display:flex;gap:8px}.qr{background:#FFFDF7;border:1px solid #E4DFCF;border-radius:10px;padding:7px 7px 5px;text-align:center;font-size:7pt;font-weight:700;color:#3B4A2A;width:27mm}
+.qr svg{width:21mm;height:21mm;display:block;margin:0 auto 4px}
+@media screen{body{background:#d9d6cc}.page{margin:0 auto}}`;
 
 App.receiptA4=function(s){
   const D=App.saleDocData(s),{st,c,items}=D;
   const qrs=[[st.siteUrl,"Наш сайт"],[st.reviewUrl,"Оставить отзыв"]].filter(q=>q[0]).map(([u,l])=>`<div class="qr">${App.qrSvg(u)}${esc(l)}</div>`).join("");
-  return `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>Товарный чек ${esc(s.num)}</title><style>${CSS_A4}</style></head><body>
-  <div class="top"><div class="logo">${esc(st.shopName||"iCase")}${D.pointName?`<small>${esc(D.pointName)}</small>`:""}</div>
-    <div class="req"><b>${esc(D.seller)}</b>${D.address?"<br>"+esc(D.address):""}${D.phone?"<br>Тел. "+esc(D.phone):""}${D.site?"<br>"+esc(siteLabel(D.site)):""}</div></div>
-  <h1>Товарный чек № ${esc(s.num)} от ${date(s.createdAt)}</h1>
-  <div class="meta"><span>Время: <b>${time(s.createdAt)}</b></span><span>Продавец: <b>${esc(D.staff)}</b></span>${c?`<span>Покупатель: <b>${esc(c.name)}</b>${c.phone?" · "+esc(c.phone):""}</span>`:""}</div>
-  <table><thead><tr><th class="c">№</th><th>Наименование</th><th>Модель, память, цвет</th><th>Состояние</th><th>IMEI / серийный номер</th><th class="n">Кол-во</th><th class="n">Цена</th><th class="n">Скидка</th><th class="n">Сумма</th></tr></thead><tbody>
-  ${items.map(i=>`<tr><td class="c">${i.n}</td><td>${esc(i.name)}${i.warranty?`<span class="sub">Гарантия ${i.warranty} мес.</span>`:""}</td><td>${esc(i.spec)||"—"}</td><td>${esc(i.cond)||"—"}</td><td>${esc(i.serial)||"—"}</td>
-    <td class="n">${i.qty}</td><td class="n">${rub(i.price)}</td><td class="n">${i.disc?rub(i.disc):"—"}</td><td class="n">${rub(i.sum)}</td></tr>`).join("")}
-  </tbody></table>
-  <div class="bottom"><div class="left">
-    ${s.tradeIn?`<div class="box"><b>Зачёт Trade-in:</b> ${esc(s.tradeIn.device)}${s.tradeIn.imei?", IMEI "+esc(s.tradeIn.imei):""} — <b>${rub(s.tradeIn.amount)}</b></div>`:""}
-    <div class="box"><b>Оплата:</b> ${esc(D.pays)}</div>
-    <div class="words">Всего наименований ${items.length}, на сумму ${rub(s.total)}<br><b>${esc(App.rubWords(s.total))}</b></div>
-  </div><table class="sums"><tbody>
-    <tr><td>Сумма по товарам</td><td class="n">${rub(D.goods)}</td></tr>
-    ${num(s.discount)?`<tr><td>Скидка на чек</td><td class="n">−${rub(s.discount)}</td></tr>`:""}
-    ${s.tradeIn?`<tr><td>Зачёт Trade-in</td><td class="n">−${rub(s.tradeIn.amount)}</td></tr>`:""}
-    <tr class="tot"><td>${s.tradeIn?"Доплата":"Итого к оплате"}</td><td class="n">${rub(s.total)}</td></tr>
-  </tbody></table></div>
+  const chips=i=>[i.memory,i.color,i.cond].filter(Boolean).map(x=>`<span class="chip">${esc(x)}</span>`).join("")+(i.warranty?`<span class="chip d">гарантия ${i.warranty} мес.</span>`:"");
+  return `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>Товарный чек ${esc(s.num)}</title><style>${CSS_A4}</style></head><body><div class="page">
+  <div class="top"><div class="logo">${esc(st.shopName||"iCase")}${D.pointName?`<span>${esc(D.pointName)}</span>`:""}</div>
+    <div class="doc"><div class="t">Товарный чек</div><div class="n">№ ${esc(s.num)} · ${date(s.createdAt)}, ${time(s.createdAt)}</div></div></div>
+  <div class="info">
+    <div class="card"><div class="lbl">Продавец</div><b>${esc(st.legalName||st.shopName||"")}</b><div class="m">${[st.inn?"ИНН "+st.inn:"",st.ogrnip?"ОГРНИП "+st.ogrnip:""].filter(Boolean).map(esc).join(" · ")||"&nbsp;"}</div></div>
+    <div class="card"><div class="lbl">Магазин</div><b>${esc(D.address||D.pointName||"—")}</b><div class="m">${[D.phone,D.site?siteLabel(D.site):""].filter(Boolean).map(esc).join(" · ")||"&nbsp;"}</div></div>
+    <div class="card"><div class="lbl">Покупатель</div><b>${c?esc(c.name):"—"}</b><div class="m">${c&&c.phone?esc(c.phone):"&nbsp;"}</div></div>
+  </div>
+  <div class="items">
+    <div class="ih"><span>№</span><span>Товар</span><span class="r">Кол-во</span><span class="r">Цена</span><span class="r">Скидка</span><span class="r">Сумма</span></div>
+    ${items.map(i=>`<div class="ir"><span class="k">${String(i.n).padStart(2,"0")}</span>
+      <div><div class="nm">${esc(i.name)}</div>${i.model&&i.model!==i.name?`<div style="font-size:8.4pt;color:#4A4D40">${esc(i.model)}</div>`:""}<div class="chips">${chips(i)}</div>${i.serial?`<div class="imei">IMEI / SN ${esc(i.serial)}</div>`:""}</div>
+      <span class="r">${i.qty}</span><span class="r">${rub(i.price)}</span><span class="r">${i.disc?"−"+rub(i.disc):"—"}</span><span class="r sum">${rub(i.sum)}</span></div>`).join("")}
+  </div>
+  <div class="bottom"><div>
+    ${s.tradeIn?`<div class="card ti"><div class="lbl">Зачёт Trade-in</div><b>${esc(s.tradeIn.device)}</b><div class="m">${s.tradeIn.imei?"IMEI "+esc(s.tradeIn.imei)+" · ":""}зачтено ${rub(s.tradeIn.amount)}</div></div>`:""}
+    <div class="card" style="margin-top:${s.tradeIn?8:0}px"><div class="lbl">Оплата</div><b>${esc(D.pays)}</b><div class="m">Продавец-консультант: ${esc(D.staff)}</div></div>
+  </div>
+  <div class="tot"><div class="tl"><span>Товары</span><span>${rub(D.goods)}</span></div>
+    ${num(s.discount)?`<div class="tl"><span>Скидка на чек</span><span>−${rub(s.discount)}</span></div>`:""}
+    ${s.tradeIn?`<div class="tl"><span>Зачёт Trade-in</span><span>−${rub(s.tradeIn.amount)}</span></div>`:""}
+    <div class="big"><span>${s.tradeIn?"Доплата":"Итого"}</span><b>${rub(s.total)}</b></div>
+    <div class="words">${esc(App.rubWords(s.total))}</div></div></div>
   <div class="ack"><p>${esc(st.receiptAck||App.DEFAULTS.receiptAck)}</p>
-    <div>Покупатель <span class="line"></span> / <span class="line">${c?esc(c.name):""}</span> /</div></div>
-  <div class="sig"><div>Продавец <span class="line"></span> / ${esc(D.staff)} /</div><div style="text-align:right">М. П. (при наличии)</div></div>
-  <div class="foot"><div>Товарный чек выдан в дополнение к кассовому чеку и не заменяет его.<br>Отметка покупателя не ограничивает его права по Закону РФ «О защите прав потребителей».${st.receiptFooter?"<br><b>"+esc(st.receiptFooter)+"</b>":""}</div>
+    <div class="sigs"><div class="sg"><div class="ln">${c?esc(c.name):""}</div>Покупатель — подпись, расшифровка</div><div class="sg"><div class="ln">${esc(D.staff)}</div>Продавец — подпись, расшифровка</div></div></div>
+  <div class="foot"><div><div class="thanks">${esc(st.receiptFooter||"Спасибо за покупку!")}</div>
+    <div class="legal">Товарный чек выдан в дополнение к кассовому чеку и не заменяет его.<br>Отметка покупателя не ограничивает его права по Закону РФ «О защите прав потребителей».</div></div>
     ${qrs?`<div class="qrs">${qrs}</div>`:""}</div>
-  </body></html>`;
+  </div></body></html>`;
 };
 
 /* ---------- товарный чек на ленте 80 мм ---------- */
