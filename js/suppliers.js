@@ -23,25 +23,21 @@ VIEWS.suppliers={
     const best={};list.forEach(o=>{const k=offerKey(o);if(o.price>0&&(!best[k]||o.price<best[k]))best[k]=o.price});
     const multi={};list.forEach(o=>{const k=offerKey(o);multi[k]=(multi[k]||0)+1});
     list.sort(u.spSort==="name"?(a,b)=>String(a.name).localeCompare(b.name):u.spSort==="supplier"?(a,b)=>supName(a.supplierId).localeCompare(supName(b.supplierId))||a.price-b.price:(a,b)=>(a.price||1e12)-(b.price||1e12));
-    const shown=list.slice(0,300),showList=words.length||u.spSup;
+    const shown=list.slice(0,300),cur=u.spSup?App.byId("suppliers",u.spSup):null;
     return `<div class="cfilt"><input id="spQ" type="search" placeholder="Поиск по всем прайсам: модель, память, цвет, артикул" value="${esc(u.spQ)}" data-filter="spQ" aria-label="Поиск по прайсам">
-      ${App.sel("spSup",[["","Все поставщики"],...sups.map(s=>[s.id,s.name+" ("+cnt(s.id)+")"])],u.spSup,'data-filter-sel="spSup" aria-label="Поставщик"')}
+      ${App.sel("spSup",[["","Все поставщики ("+S.sprices.length+")"],...sups.map(s=>[s.id,s.name+" ("+cnt(s.id)+")"])],u.spSup,'data-filter-sel="spSup" aria-label="Поставщик"')}
       ${App.sel("spSort",[["price","Сначала дешевле"],["name","По названию"],["supplier","По поставщику"]],u.spSort,'data-filter-sel="spSort" aria-label="Сортировка"')}</div>
-    ${showList?`<section class="card crow-list">${shown.map(o=>{const k=offerKey(o),p=o.productId?App.byId("products",o.productId):null,isBest=multi[k]>1&&o.price>0&&o.price===best[k];
+    ${cur?`<div class="supbar"><span><b>${esc(cur.name)}</b>${[cur.contact,cur.phone].filter(Boolean).length?" · "+esc([cur.contact,cur.phone].filter(Boolean).join(" · ")):""} · ${cnt(cur.id)} позиций${cur.priceUpdatedAt?" · прайс от "+App.dt(cur.priceUpdatedAt):" · прайса нет"}${cur.note?" · "+esc(cur.note):""}</span>
+      ${App.can("stock")?`<span class="row-f"><button class="btn sm" data-act="spImport" data-id="${esc(cur.id)}">Загрузить прайс</button><button class="btn sm ghost" data-act="supForm" data-id="${esc(cur.id)}">Изменить</button></span>`:""}</div>`:""}
+    <section class="card crow-list">${shown.length?`<div class="sphead"><span>Товар · поставщик</span><span>Закупка</span></div>`:""}${shown.map(o=>{const k=offerKey(o),p=o.productId?App.byId("products",o.productId):null,isBest=multi[k]>1&&o.price>0&&o.price===best[k];
         return `<button type="button" class="crow sprow" data-act="spOpen" data-id="${o.id}">
           <span class="cnm"><b>${esc(o.name)}${isBest?' <span class="pill ok">лучшая цена</span>':""}${multi[k]>1&&!isBest?` <span class="pill mute">есть дешевле на ${money(o.price-best[k])}</span>`:""}</b>
-          <small>${esc(supName(o.supplierId))}${o.sku?" · арт. "+esc(o.sku):""}${o.brand?" · "+esc(o.brand):""}${o.stock?" · "+esc(o.stock):""}</small>
-          ${p?`<small class="ok">в CRM: ${esc(p.name)} · закупка ${money(p.cost)} · розница ${money(p.price)}${num(p.price)&&o.price?" · наценка "+money(num(p.price)-o.price):""}</small>`:""}</span>
-          <span class="csum">${o.price?money(o.price):"—"}</span></button>`}).join("")||'<div class="empty">Ничего не найдено. Попробуйте короче: «15 pro 256» или артикул.</div>'}
-        ${list.length>shown.length?`<div class="empty">Показаны первые ${shown.length} из ${list.length}. Уточните поиск.</div>`:""}</section>`:""}
-    <section class="card"><div class="card-h"><h2>Поставщики</h2><span class="muted">${S.sprices.length} позиций в прайсах</span></div>
-      <div class="whgrid">${sups.map(s=>`<div class="whc spc"><b>${esc(s.name)}</b><small>${esc([s.contact,s.phone].filter(Boolean).join(" · ")||"контакты не указаны")}</small>
-        <span>${cnt(s.id)} позиций${s.priceUpdatedAt?" · прайс от "+App.dt(s.priceUpdatedAt):" · прайса нет"}</span>
-        <div class="row-f"><button class="btn sm" data-act="spShow" data-id="${esc(s.id)}">Прайс</button>${App.can("stock")?`<button class="btn sm" data-act="spImport" data-id="${esc(s.id)}">Загрузить</button><button class="btn sm ghost" data-act="supForm" data-id="${esc(s.id)}">Изменить</button>`:""}</div></div>`).join("")
-        ||'<div class="empty">Поставщиков пока нет. Добавьте первого и загрузите его прайс.</div>'}</div></section>`;
+          <small><span class="spsup">${esc(supName(o.supplierId))}</span>${o.sku?" · арт. "+esc(o.sku):""}${o.brand?" · "+esc(o.brand):""}${o.stock?" · "+esc(o.stock):""}</small>
+          ${p?`<small class="ok">в CRM: розница ${money(p.price)}${num(p.price)&&o.price?" · наценка "+money(num(p.price)-o.price):""} · у нас ${App.qtyTotal(p)} шт</small>`:""}</span>
+          <span class="csum">${o.price?money(o.price):"—"}</span></button>`}).join("")||`<div class="empty">${S.sprices.length?"Ничего не найдено. Попробуйте короче: «15 pro 256» или артикул.":S.suppliers.length?"Прайсов пока нет — нажмите «Загрузить прайс».":"Поставщиков пока нет — добавьте первого и загрузите его прайс."}</div>`}
+      ${list.length>shown.length?`<div class="empty">Показаны первые ${shown.length} из ${list.length}. Уточните поиск или выберите поставщика.</div>`:""}</section>`;
   }
 };
-ACT.spShow=id=>{App.ui.spSup=id;App.ui.spQ="";App.render();$("#main").scrollTop=0};
 
 /* карточка предложения: сравнение у всех поставщиков, привязка к товару, приход */
 ACT.spOpen=id=>{
