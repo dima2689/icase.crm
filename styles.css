@@ -500,3 +500,7 @@ label.chip{cursor:pointer}
 .banner.ok{background:var(--ok-soft);color:var(--ok)}
 .chk.sfchk{border:0;background:none;padding:3px 0;border-radius:0}
 .sfchk input{flex:none;width:18px;height:18px;margin-top:1px}
+.sfgrid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.apidoc{font-size:13px;line-height:1.5}.apidoc p{margin:6px 0}.apidoc code,.steps code{background:#fff;border:1px solid var(--line);border-radius:6px;padding:1px 5px;font-size:12px}
+.pvjson{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;font-size:12px;max-height:300px;overflow:auto;white-space:pre-wrap}
+@media (max-width:900px){.sfgrid.two{grid-template-columns:1fr}}

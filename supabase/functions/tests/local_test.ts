@@ -1,6 +1,6 @@
 // Локальная проверка обмена: настоящая база (локальный Postgres со схемой CRM) + поддельный WooCommerce.
 // Запуск: deno run -A supabase/functions/tests/local_test.ts   (нужен psql и база ts на /tmp:5499)
-import { preview, syncRun, testConnection, wooClient } from "../site-sync/sync.ts";
+import { notifySite, preview, sign, syncRun, testConnection, wooClient } from "../site-sync/sync.ts";
 import { handle, hmacBase64 } from "../site-api/handler.ts";
 
 const DB = ["-h", "/tmp", "-p", "5499", "-U", "postgres", "-d", Deno.env.get("TDB") || "ts", "-tAq", "-v", "ON_ERROR_STOP=1"];
@@ -14,7 +14,7 @@ const lit = (v: unknown, t: string) => v === null || v === undefined ? `null::${
 const SIG: Record<string, Record<string, string>> = {
   site_config: {}, site_jobs_take: { p_limit: "int" }, site_jobs_finish: { p_done: "bigint[]", p_failed: "jsonb" },
   site_feed: { p_ids: "uuid[]" }, site_set_woo: { p_kind: "text", p_id: "uuid", p_woo: "bigint" }, site_sync_log: { p_error: "text" },
-  site_order_upsert: { p: "jsonb" }, site_check_cron: { p_token: "text" },
+  site_order_upsert: { p: "jsonb" }, site_check_cron: { p_token: "text" }, site_order_public: { p_num: "text", p_phone4: "text" },
 };
 const rpc = async (fn: string, args: Record<string, unknown> = {}) => {
   const a = Object.entries(args).map(([k, v]) => `${k} => ${lit(v, SIG[fn][k])}`).join(", ");
@@ -51,7 +51,7 @@ let fails = 0;
 const ok = (c: unknown, m: string) => { console.log((c ? "✓ " : "✗ ") + m); if (!c) fails++; };
 
 // подготовка: ключи, выгрузка включена
-await sql(`select site_api_key(); select site_set_credentials('http://127.0.0.1:8899','ck_test','cs_test'); update settings set site_sync=true, site_orders=true, site_new_status='publish'`);
+await sql(`select site_api_key(); select site_set_credentials('http://127.0.0.1:8899','ck_test','cs_test'); update settings set site_sync=true, site_orders=true, site_new_status='publish', site_mode='woocommerce'`);
 const makeWoo = (cfg: any) => wooClient(cfg.url, cfg.woo_key, cfg.woo_secret);
 
 // 1) первый прогон: всё уходит на сайт
@@ -134,6 +134,44 @@ ok(!JSON.stringify(feed).includes("cost"), "в фиде нет закупочн�
 await sql(`update settings set site_sync=false; update products set price=1290 where sku='CASE1'`);
 r = await syncRun(rpc, makeWoo);
 ok((r as any).skipped && bySku("CASE1")?.regular_price === "1190", "при выключенной выгрузке сайт не меняется, задание ждёт");
+
+// ===== свой сайт (Next.js) =====
+await sql(`update settings set site_mode='custom', site_sync=true, site_hook_url='http://127.0.0.1:8898/api/icase'`);
+const hooks: any[] = [];
+const hookSrv = Deno.serve({ port: 8898, onListen() {} }, async (req) => {
+  const body = await req.text(); const cfg = await rpc("site_config");
+  hooks.push({ ok: req.headers.get("x-icase-signature") === await sign(cfg.hook_secret, body), event: req.headers.get("x-icase-event"), body: JSON.parse(body) });
+  return new Response("ok");
+});
+const H = (path: string, init?: RequestInit) => handle(new Request("http://x/functions/v1/site-api/" + path, { ...(init || {}), headers: { "x-api-key": key, ...((init && init.headers) || {}) } }), rpc);
+res = await H("catalog?q=чехол"); let cj = await res.json();
+ok(res.status === 200 && cj.total === 1 && cj.items[0].slug && cj.items[0].price === 1290 && !("cost" in cj.items[0]), "каталог: поиск, цена, ЧПУ-адрес, без закупки");
+res = await H("catalog?type=used_unit&in_stock=1"); cj = await res.json();
+ok(cj.items.length === 1 && cj.items[0].battery === 93 && cj.items[0].specs.some((x: any) => x.name === "Ёмкость АКБ"), "каталог: б/у экземпляры с АКБ и характеристиками");
+res = await H("product?sku=IP16"); const pj = await res.json();
+ok(res.status === 200 && !("memory" in pj) && pj.color === "Черный" && pj.qty === 2, "товар по артикулу; выключенная «Память» не отдаётся");
+res = await H("product?slug=" + pj.slug); ok(res.status === 200, "товар по ЧПУ-адресу");
+res = await H("categories"); const cats = await res.json();
+ok(cats.some((c: any) => c.name === "Смартфоны" && c.count >= 1), "категории с количеством");
+res = await handle(new Request("http://x/functions/v1/site-api/catalog"), rpc); ok(res.status === 401, "каталог без ключа закрыт");
+// заказ в простом формате
+res = await H("order", { method: "POST", body: JSON.stringify({ id: "web-555", customer: { name: "Тест Сайтов", phone: "+7 900 555-44-33" }, items: [{ sku: "CASE1", qty: 1, price: 1190 }], delivery: "Самовывоз", comment: "тест" }) });
+const oj = await res.json();
+ok(res.status === 200 && oj.num && oj.status === "new", "заказ в простом формате принят, номер " + oj.num);
+res = await H("order-status?num=" + encodeURIComponent(oj.num) + "&phone=4433"); ok(res.status === 200 && (await res.json()).items.length === 1, "статус заказа по номеру и 4 цифрам телефона");
+res = await H("order-status?num=" + encodeURIComponent(oj.num) + "&phone=0000"); ok(res.status === 404, "чужой телефон — статус не показывается");
+res = await H("order", { method: "POST", body: JSON.stringify({ id: 1, items: [{ sku: "CASE1", qty: 1 }] }) }); ok(res.status === 400, "заказ без телефона отклонён");
+// уведомление сайта
+await sql(`update products set price=1390 where sku='CASE1'`);
+let nr: any = await syncRun(rpc, makeWoo);
+const last = hooks[hooks.length - 1];
+ok(nr.notified && last && last.ok && last.event === "catalog.updated" && last.body.products.some((x: any) => x.sku === "CASE1" && x.price === 1390), "сайт получил подписанное уведомление с новой ценой");
+await sql(`update products set on_site=false where sku='CASE1'`);
+await syncRun(rpc, makeWoo);
+ok(hooks[hooks.length - 1].body.removed.some((x: any) => x.sku === "CASE1"), "снятый с сайта товар пришёл в списке removed");
+const pv2: any = await preview(rpc, await sql(`select id from products where sku='IP16'`));
+ok(pv2.mode === "custom" && pv2.items[0].api.slug, "предпросмотр показывает JSON для сайта");
+await hookSrv.shutdown();
 
 await srv.shutdown();
 console.log(fails ? `ОШИБОК: ${fails}` : "ВСЁ ПРОШЛО");

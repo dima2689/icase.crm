@@ -66,53 +66,73 @@ ACT.soPayOk=(id,btn)=>run(btn,async()=>{
 
 /* ======================= настройки → сайт ======================= */
 App.siteTab=()=>{
-  const s=App.settings(),own=App.can("staff"),ed=App.can("settings"),st=App.ui.siteStatus;
+  const s=App.settings(),own=App.can("staff"),ed=App.can("settings"),st=App.ui.siteStatus,custom=s.siteMode!=="woocommerce";
   if(!st&&!App.ui.siteStatusLoading){App.ui.siteStatusLoading=true;App.api.rpc("site_status",{}).then(r=>{App.ui.siteStatus=r||{};App.ui.siteStatusLoading=false;App.render()}).catch(e=>{App.ui.siteStatus={error:e.message};App.ui.siteStatusLoading=false;App.render()})}
   const whs=App.whs(true).filter(w=>w.id!==s.siteReserveWh);
-  const hook=FN()+"site-api/woo-order",feed=FN()+"site-api/feed";
-  return `<section class="card"><div class="card-h"><h2>Обмен с сайтом</h2>${st&&st.has_keys?'<span class="pill ok">ключи WooCommerce сохранены</span>':'<span class="pill warn">ключи не заданы</span>'}</div>
-    <div class="banner warn">Сейчас база CRM — тестовая (Supabase, Франкфурт). Цены и остатки выгружать можно, а <b>приём заказов с настоящего сайта включайте только после переезда базы на российский сервер</b>: в заказах есть персональные данные покупателей (152-ФЗ).</div>
+  const api=FN()+"site-api",hook=FN()+"site-api/woo-order";
+  const copy=(label,val,id)=>`<div class="kvcopy"><span>${label}</span><code${id?` id="${id}"`:""}>${esc(val)}</code><button class="btn sm" data-act="copyTxt" data-id="${esc(val)}">Копировать</button></div>`;
+  const secret=(label,key,act,actNew)=>`<div class="kvcopy"><span>${label}</span><code>${App.ui[key]?esc(App.ui[key]):"••••••••••••"}</code>${App.ui[key]?`<button class="btn sm" data-act="copyTxt" data-id="${esc(App.ui[key])}">Копировать</button><button class="btn sm ghost" data-act="${actNew}">Новый</button>`:`<button class="btn sm" data-act="${act}">Показать</button>`}</div>`;
+  const test=App.ui.siteTest?`<div class="banner ${App.ui.siteTest.ok?"ok":"err"}">${App.ui.siteTest.ok?(App.ui.siteTest.mode==="custom"?(App.ui.siteTest.hook?"Сайт принял проверочное уведомление — подпись и адрес верные.":esc(App.ui.siteTest.note||"Готово")):"Подключение работает."+(App.ui.siteTest.sample?" Сайт отвечает, пример товара: «"+esc(App.ui.siteTest.sample)+"».":"")+((App.ui.siteTest.global_attributes||[]).length?" Атрибуты сайта: "+esc(App.ui.siteTest.global_attributes.join(", "))+".":"")):"Не удалось: "+esc(App.ui.siteTest.error||"")}</div>`:"";
+  return `<section class="card"><div class="card-h"><h2>Обмен с сайтом</h2>${custom?'<span class="pill info">свой сайт · API</span>':(st&&st.has_keys?'<span class="pill ok">ключи WooCommerce сохранены</span>':'<span class="pill warn">ключи не заданы</span>')}</div>
+    <div class="banner warn">Сейчас база CRM — тестовая (Supabase, Франкфурт). Каталог отдавать можно, а <b>приём заказов с настоящего сайта включайте только после переезда базы на российский сервер</b>: в заказах есть персональные данные покупателей (152-ФЗ).</div>
     <div class="form">
-      <div class="fld full">${App.chk("ssSync","Выгружать на сайт цены, остатки и новые товары",s.siteSync)}</div>
+      ${App.fld("ssMode","Какой сайт",App.sel("ssMode",[["custom","Свой сайт (Next.js, React и др.) — сайт берёт данные по API"],["woocommerce","WordPress + WooCommerce — CRM сама обновляет товары на сайте"]],custom?"custom":"woocommerce"),"full")}
+      <div class="fld full">${App.chk("ssSync",custom?"Отдавать каталог сайту и сообщать об изменениях":"Выгружать на сайт цены, остатки и новые товары",s.siteSync)}</div>
       <div class="fld full">${App.chk("ssOrders","Принимать заказы с сайта (резерв товара и раздел «Заказы»)",s.siteOrders)}</div>
-      ${App.fld("ssNew","Новые товары появляются на сайте",App.sel("ssNew",[["draft","Черновиком — проверю фото и опубликую сам"],["publish","Сразу опубликованными"]],s.siteNewStatus))}
+      ${custom?"":App.fld("ssNew","Новые товары появляются на сайте",App.sel("ssNew",[["draft","Черновиком — проверю фото и опубликую сам"],["publish","Сразу опубликованными"]],s.siteNewStatus))}
       <div class="fld full"><label>Склады, остатки которых видны на сайте</label><div class="chips">${whs.map(w=>`<label class="chip ${s.siteWarehouses.includes(w.id)?"on":""}"><input type="checkbox" class="sswh" value="${esc(w.id)}" ${s.siteWarehouses.includes(w.id)?"checked":""} style="display:none">${esc(w.name)}</label>`).join("")}</div>
         <small class="muted">На сайте наличие = сумма по отмеченным складам. Заказ с сайта резервирует товар с этих складов на склад «Резерв · сайт».</small></div>
     </div>
     <div class="acts">${ed?'<button class="btn pri" data-act="siteSave">Сохранить</button>':""}</div></section>
 
   ${App.siteFieldsCard()}
-  <section class="card"><div class="card-h"><h2>Подключение WooCommerce</h2></div>
+  ${custom?`<section class="card"><div class="card-h"><h2>Подключение сайта (API)</h2></div>
+    <ol class="steps">
+      <li>В проект сайта добавьте готовые файлы для Next.js (кнопка ниже) и переменные окружения <code>ICASE_API_URL</code>, <code>ICASE_API_KEY</code>, <code>ICASE_HOOK_SECRET</code> — значения здесь.</li>
+      <li>Сайт берёт каталог, карточки и категории по API с кэшем, а по уведомлению CRM сразу сбрасывает кэш — цены и наличие на сайте обновляются за секунды.</li>
+      <li>Оформленный на сайте заказ уходит в CRM, товар резервируется, заказ появляется в разделе «Заказы».</li>
+    </ol>
+    ${copy("Адрес API (ICASE_API_URL)",api)}
+    ${own?secret("Ключ API (ICASE_API_KEY)","siteKey","siteKeyShow","siteKeyNew")+secret("Секрет уведомлений (ICASE_HOOK_SECRET)","siteHookKey","siteHookShow","siteHookNew"):'<p class="muted">Ключи показываются только владельцу.</p>'}
+    <div class="form" style="margin-top:10px">${App.fld("ssHook","Адрес уведомлений сайта",App.inp("ssHook",s.siteHookUrl,"url","https://ваш-сайт.ru/api/icase",ed?"":"disabled"),"full")}</div>
+    <div class="acts">${ed?'<button class="btn" data-act="siteTest">Проверить подключение</button><button class="btn pri" data-act="siteHookSave">Сохранить адрес</button>':""}<a class="btn" href="${esc(App.NEXT_KIT||"#")}" download="icase-nextjs.zip" ${App.NEXT_KIT?"":'data-act="siteKitInfo"'}>Файлы для Next.js</a></div>
+    ${test}
+    <details class="more"><summary>Методы API</summary><div class="apidoc">
+      <p><code>GET /catalog</code> — товары: <code>q, category, in_stock=1, type=product|used_unit, sort=price|-price|name, page, per_page</code></p>
+      <p><code>GET /product?slug=</code> (или <code>sku=</code>, <code>id=</code>) — карточка товара</p>
+      <p><code>GET /categories</code> — категории с количеством в наличии</p>
+      <p><code>POST /order</code> — заказ: <code>{id, customer:{name,phone,email}, items:[{sku,qty,price}], delivery, address, comment, paid}</code></p>
+      <p><code>GET /order-status?num=С-…&amp;phone=1234</code> — статус заказа для покупателя</p>
+      <p>Все запросы — с сервера сайта с заголовком <code>X-Api-Key</code>. Уведомления CRM приходят POST-запросом с заголовками <code>X-Icase-Event</code> и <code>X-Icase-Signature</code> (HMAC-SHA256 тела, base64).</p></div></details>
+  </section>`
+  :`<section class="card"><div class="card-h"><h2>Подключение WooCommerce</h2></div>
     <ol class="steps">
       <li>В админке сайта: <b>WooCommerce → Настройки → Дополнительно → REST API → Добавить ключ</b>, права «Чтение/Запись». Скопируйте Consumer key и Consumer secret сюда — они хранятся в защищённом хранилище базы и больше нигде не показываются.</li>
       <li>Для заказов: <b>WooCommerce → Настройки → Дополнительно → Веб-хуки → Добавить</b>: тема «Заказ создан», адрес доставки — ниже, секрет — ключ API из этого раздела. Второй веб-хук такой же, тема «Заказ обновлён».</li>
       <li>У товаров в CRM отметьте «На сайте». Товары сопоставляются по артикулу (SKU), б/у экземпляры получают артикул «U-IMEI».</li>
     </ol>
     ${own?`<div class="form">
-      ${App.fld("ssUrl","Адрес сайта",App.inp("ssUrl",s.siteUrl,"url","https://icase52.ru"),"full")}
+      ${App.fld("ssUrl","Адрес сайта",App.inp("ssUrl",s.siteUrl,"url","https://…"),"full")}
       ${App.fld("ssKey","Consumer key",App.inp("ssKey","","password",st&&st.has_keys?"сохранён — введите, чтобы заменить":"ck_…",'autocomplete="off"'))}
       ${App.fld("ssSecret","Consumer secret",App.inp("ssSecret","","password",st&&st.has_keys?"сохранён — введите, чтобы заменить":"cs_…",'autocomplete="off"'))}
     </div><div class="acts"><button class="btn" data-act="siteTest">Проверить подключение</button><button class="btn pri" data-act="siteKeys">Сохранить подключение</button></div>
-    ${App.ui.siteTest?`<div class="banner ${App.ui.siteTest.ok?"ok":"err"}">${App.ui.siteTest.ok?"Подключение работает."+(App.ui.siteTest.sample?" Сайт отвечает, пример товара: «"+esc(App.ui.siteTest.sample)+"».":"")+((App.ui.siteTest.global_attributes||[]).length?" Атрибуты сайта: "+esc(App.ui.siteTest.global_attributes.join(", "))+".":" Глобальных атрибутов на сайте нет — характеристики уйдут обычными."):"Не удалось подключиться: "+esc(App.ui.siteTest.error||"")}</div>`:""}
-    <div class="kvcopy"><span>Адрес веб-хука заказов</span><code>${esc(hook)}</code><button class="btn sm" data-act="copyTxt" data-id="${esc(hook)}">Копировать</button></div>
-    <div class="kvcopy"><span>Каталог для сайта (JSON)</span><code>${esc(feed)}</code><button class="btn sm" data-act="copyTxt" data-id="${esc(feed)}">Копировать</button></div>
-    <div class="kvcopy"><span>Ключ API (секрет веб-хука)</span><code id="ssApiKey">${App.ui.siteKey?esc(App.ui.siteKey):"••••••••••••"}</code>${App.ui.siteKey?`<button class="btn sm" data-act="copyTxt" data-id="${esc(App.ui.siteKey)}">Копировать</button><button class="btn sm ghost" data-act="siteKeyNew">Новый ключ</button>`:'<button class="btn sm" data-act="siteKeyShow">Показать</button>'}</div>`
+    ${test}${copy("Адрес веб-хука заказов",hook)}${secret("Ключ API (секрет веб-хука)","siteKey","siteKeyShow","siteKeyNew")}`
     :'<p class="muted">Ключи подключения задаёт владелец.</p>'}
-  </section>
+  </section>`}
 
-  <section class="card"><div class="card-h"><h2>Состояние обмена</h2><div class="row-f">${ed?'<button class="btn sm" data-act="siteResync">Выгрузить всё заново</button><button class="btn sm pri" data-act="siteNow">Выгрузить сейчас</button>':""}</div></div>
+  <section class="card"><div class="card-h"><h2>Состояние обмена</h2><div class="row-f">${ed?`<button class="btn sm" data-act="siteResync">${custom?"Уведомить сайт обо всём":"Выгрузить всё заново"}</button><button class="btn sm pri" data-act="siteNow">${custom?"Отправить сейчас":"Выгрузить сейчас"}</button>`:""}</div></div>
     ${st&&st.error?`<div class="banner err">${esc(st.error)}</div>`:""}
-    <div class="tiles"><div class="tile"><span>Последняя выгрузка</span><b class="mid">${s.siteLastSync?App.dtt(s.siteLastSync):"ещё не было"}</b>${s.siteLastError?`<small class="bad">${esc(s.siteLastError)}</small>`:'<small>без ошибок</small>'}</div>
-      <div class="tile"><span>Товаров «на сайте»</span><b>${st?num(st.on_site):"…"}</b><small>связано с сайтом: ${st?num(st.linked):"…"}</small></div>
+    <div class="tiles"><div class="tile"><span>${custom?"Последнее уведомление":"Последняя выгрузка"}</span><b class="mid">${s.siteLastSync?App.dtt(s.siteLastSync):"ещё не было"}</b>${s.siteLastError?`<small class="bad">${esc(s.siteLastError)}</small>`:'<small>без ошибок</small>'}</div>
+      <div class="tile"><span>Товаров «на сайте»</span><b>${st?num(st.on_site):"…"}</b><small>${custom?"отдаются по API":"связано с сайтом: "+(st?num(st.linked):"…")}</small></div>
       <div class="tile"><span>В очереди</span><b>${st?num(st.pending):"…"}</b><small>с ошибкой: ${st?num(st.errors):"…"}</small></div></div>
     ${st&&(st.last_errors||[]).length?`<details class="more"><summary>Последние ошибки</summary><div class="list-mini">${st.last_errors.map(e=>`<div class="hist"><b>${esc(e.action)}</b> ${App.dtt(e.created_at)}<br><small>${esc(e.last_error)}</small></div>`).join("")}</div></details>`:""}
-    <p class="muted">Изменения цен и остатков уходят на сайт автоматически в течение 2 минут.</p>
+    <p class="muted">${custom?"Об изменениях цен, остатков и товаров сайт узнаёт в течение 2 минут; без адреса уведомлений — по таймеру кэша сайта (5 минут).":"Изменения цен и остатков уходят на сайт автоматически в течение 2 минут."}</p>
   </section>`;
 };
 ACT.siteSave=(_,btn)=>run(btn,async()=>{
   const wh=[...document.querySelectorAll(".sswh:checked")].map(x=>x.value);
   if(App.checked("ssSync")&&!wh.length)return App.toast("Отметьте хотя бы один склад для сайта");
-  await App.api.update("settings",1,{site_sync:App.checked("ssSync"),site_orders:App.checked("ssOrders"),site_new_status:App.val("ssNew"),site_warehouses:wh});
+  await App.api.update("settings",1,{site_mode:App.val("ssMode"),site_sync:App.checked("ssSync"),site_orders:App.checked("ssOrders"),site_new_status:App.val("ssNew")||App.settings().siteNewStatus||"draft",site_warehouses:wh});
   App.ui.siteStatus=null;App.toast("Сохранено");
 });
 ACT.siteKeys=(_,btn)=>run(btn,async()=>{
@@ -129,13 +149,13 @@ const SF_LBL={
   create:[["categories","Категория (создаётся на сайте, если её нет)"],["attributes","Характеристики"],["description","Описание (у б/у — состояние, АКБ, комплект, диагностика)"],["photos","Фото из карточки товара"]],
   update:[["price","Цена"],["stock","Остаток"],["status","Прятать проданное, снятое с сайта и архив"],["name","Название"],["categories","Категория"],["attributes","Характеристики"],["description","Описание"],["photos","Фото"]],
   attrs:[["brand","Бренд"],["model","Модель"],["memory","Память"],["color","Цвет"],["condition","Состояние"],["warranty","Гарантия"],["battery","Ёмкость АКБ (б/у)"],["kit","Комплект (б/у)"],["used","Параметры б/у: циклы, корпус, экран, ремонт, Face ID, True Tone, регион"],["extra","Доп. параметры из карточки: SIM, ОЗУ, размер и др."]]};
-App.siteFieldsCard=()=>{const f=sfNow(),ed=App.can("settings");
+App.siteFieldsCard=()=>{const f=sfNow(),ed=App.can("settings"),custom=App.settings().siteMode!=="woocommerce";
   const box=(g,k,l)=>`<label class="chk sfchk"><input type="checkbox" data-sitef="${g}.${k}" ${f[g][k]?"checked":""} ${ed?"":"disabled"}> ${esc(l)}</label>`;
   return `<section class="card"><div class="card-h"><h2>Что передавать на сайт</h2></div>
-    <div class="sfgrid">
-      <div><h3 class="sub-h">Новая карточка на сайте</h3><label class="chk sfchk"><input type="checkbox" checked disabled> Название, артикул, цена, остаток — всегда</label>${SF_LBL.create.map(([k,l])=>box("create",k,l)).join("")}</div>
-      <div><h3 class="sub-h">Обновление существующей</h3>${SF_LBL.update.map(([k,l])=>box("update",k,l)).join("")}
-        <small class="muted">Название, категорию, описание и фото лучше не включать, если вы правите их на сайте вручную — CRM их перезапишет.</small></div>
+    <div class="sfgrid ${custom?"two":""}">
+      <div><h3 class="sub-h">${custom?"Поля товара":"Новая карточка на сайте"}</h3><label class="chk sfchk"><input type="checkbox" checked disabled> Название, артикул, цена, наличие${custom?", адрес (slug)":""} — всегда</label>${SF_LBL.create.map(([k,l])=>box("create",k,l)).join("")}</div>
+      ${custom?"":`<div><h3 class="sub-h">Обновление существующей</h3>${SF_LBL.update.map(([k,l])=>box("update",k,l)).join("")}
+        <small class="muted">Название, категорию, описание и фото лучше не включать, если вы правите их на сайте вручную — CRM их перезапишет.</small></div>`}
       <div><h3 class="sub-h">Характеристики</h3>${SF_LBL.attrs.map(([k,l])=>box("attrs",k,l)).join("")}
         <label class="chk sfchk"><input type="checkbox" data-sitef="global_attrs" ${f.global_attrs?"checked":""} ${ed?"":"disabled"}> Использовать атрибуты сайта с тем же названием (для фильтров каталога)</label></div>
     </div>
@@ -152,9 +172,22 @@ ACT.sitePreview=(id,btn)=>run(btn,async()=>{
   const HV={manage_stock:{true:"да",false:"нет"},stock_status:{instock:"в наличии",outofstock:"нет в наличии"},status:{draft:"черновик (не виден покупателям)",publish:"опубликован",private:"скрыт"}};
   const L={name:"Название",sku:"Артикул",regular_price:"Цена",manage_stock:"Учёт остатка",stock_quantity:"Остаток",stock_status:"Наличие",status:"Статус",categories:"Категория",attributes:"Характеристики",description:"Описание",images:"Фото"};
   const tbl=o=>{const ks=Object.keys(o).filter(k=>k!=="type");return ks.length?`<dl class="kv pv">${ks.map(k=>`<dt>${L[k]||k}</dt><dd>${HV[k]&&HV[k][String(o[k])]?HV[k][String(o[k])]:o[k]===""||(Array.isArray(o[k])&&!o[k].length)?'<span class="muted">—</span>':show(o[k])}</dd>`).join("")}</dl>`:'<p class="muted">Ничего не меняется</p>'};
+  if(r.mode==="custom"){
+    const SL={id:"ID в CRM",sku:"Артикул",slug:"Адрес (slug)",type:"Тип",name:"Название",price:"Цена",in_stock:"В наличии",qty:"Количество",visible:"Показывать",category:"Категория",specs:"Характеристики",brand:"Бренд",model:"Модель",memory:"Память",color:"Цвет",condition:"Состояние",warranty_months:"Гарантия, мес.",battery:"АКБ, %",description:"Описание",photos:"Фото"};
+    const val=(k,v)=>v===null||v===undefined||v===""||(Array.isArray(v)&&!v.length)?'<span class="muted">—</span>':k==="specs"?v.map(x=>`${esc(x.name)}: <b>${esc(x.value)}</b>`).join("<br>"):k==="type"?(v==="used_unit"?"б/у экземпляр":"товар"):typeof v==="boolean"?(v?"да":"нет"):Array.isArray(v)?v.map(x=>esc(x)).join(k==="category"?" / ":"<br>"):esc(String(v));
+    return App.openModal(App.head("Как товар видит сайт: "+esc(p.name||""))+`<p class="muted">Так товар отдаётся сайту по API (<code>GET /product</code>). Закупочные цены не передаются.</p>`+((r.items||[]).map(it=>`<section class="pvbox"><h3 class="sub-h">${it.kind==="unit"?"Экземпляр":"Товар"} ${esc(it.sku)} ${it.visible?'<span class="pill ok">на сайте</span>':'<span class="pill mute">скрыт</span>'}</h3>
+      <dl class="kv pv">${Object.entries(it.api).map(([k,v])=>`<dt>${SL[k]||k}</dt><dd>${val(k,v)}</dd>`).join("")}</dl>
+      <details class="more"><summary>JSON</summary><pre class="pvjson">${esc(JSON.stringify(it.api,null,2))}</pre></details></section>`).join("")||'<p class="muted">Товар не отмечен «На сайте» или нет на складах сайта.</p>'),{wide:true});
+  }
   App.openModal(App.head("Как уйдёт на сайт: "+esc(p.name||""))+((r.items||[]).map(it=>`<section class="pvbox"><h3 class="sub-h">${it.kind==="unit"?"Экземпляр "+esc(it.sku):"Товар "+esc(it.sku)} ${it.visible?'<span class="pill ok">на сайте</span>':'<span class="pill mute">скрыт</span>'}${it.woo_id?' <span class="pill info">связан, #'+it.woo_id+"</span>":""}</h3>
     ${it.woo_id?`<p class="muted">Карточка уже есть на сайте — при изменениях уйдёт:</p>${tbl(it.update)}`:`<p class="muted">Карточки на сайте ещё нет — будет создана:</p>${tbl(it.create)}`}</section>`).join("")||'<p class="muted">Товар не отмечен «На сайте» или нет на складах сайта.</p>'),{wide:true});
 });
+ACT.siteHookSave=(_,btn)=>run(btn,async()=>{const u=App.val("ssHook");if(u&&!/^https:\/\//.test(u))return App.toast("Адрес должен начинаться с https://");
+  await App.api.update("settings",1,{site_hook_url:u||null});App.toast("Сохранено")});
+ACT.siteHookShow=(_,btn)=>run(btn,async()=>{App.ui.siteHookKey=await App.api.rpc("site_hook_secret",{p_regenerate:false});App.render()});
+ACT.siteHookNew=(_,btn)=>{if(!App.confirm2(btn,"Нажмите ещё раз: старый секрет перестанет работать, его нужно заменить на сайте"))return;
+  run(btn,async()=>{App.ui.siteHookKey=await App.api.rpc("site_hook_secret",{p_regenerate:true});App.render();App.toast("Создан новый секрет")})};
+ACT.siteKitInfo=()=>App.toast("Файлы для Next.js лежат в репозитории CRM: integrations/nextjs");
 ACT.siteKeyShow=(_,btn)=>run(btn,async()=>{App.ui.siteKey=await App.api.rpc("site_api_key",{p_regenerate:false});App.render()});
 ACT.siteKeyNew=(_,btn)=>{if(!App.confirm2(btn,"Нажмите ещё раз: старый ключ перестанет работать, его нужно будет заменить в веб-хуках сайта"))return;
   run(btn,async()=>{App.ui.siteKey=await App.api.rpc("site_api_key",{p_regenerate:true});App.render();App.toast("Создан новый ключ")})};

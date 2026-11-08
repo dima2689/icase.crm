@@ -57,7 +57,7 @@ create or replace function site_fields_changed() returns trigger language plpgsq
 declare r record;
 begin
   if new.site_fields is distinct from old.site_fields then
-    for r in select id from products where woo_id is not null or id in (select product_id from units where woo_id is not null) loop
+    for r in select id from products where woo_id is not null or on_site or id in (select product_id from units where woo_id is not null) loop
       perform site_enqueue('sync_product', jsonb_build_object('product_id',r.id));
     end loop;
   end if;

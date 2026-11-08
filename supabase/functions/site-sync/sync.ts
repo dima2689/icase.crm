@@ -11,24 +11,8 @@ export type FeedItem = {
   attrs?: Record<string, unknown>; description?: string | null; photos?: string[]; warranty?: number | null;
 };
 
-/** Что передавать на сайт — настраивается в CRM («Настройки → Сайт → Что передавать»). */
-export type Fields = {
-  create: { categories: boolean; attributes: boolean; description: boolean; photos: boolean };
-  update: { price: boolean; stock: boolean; status: boolean; name: boolean; categories: boolean; attributes: boolean; description: boolean; photos: boolean };
-  attrs: { brand: boolean; model: boolean; memory: boolean; color: boolean; condition: boolean; warranty: boolean; battery: boolean; kit: boolean; used: boolean; extra: boolean };
-  global_attrs: boolean;
-};
-export const DEFAULT_FIELDS: Fields = {
-  create: { categories: true, attributes: true, description: true, photos: true },
-  update: { price: true, stock: true, status: true, name: false, categories: false, attributes: false, description: false, photos: false },
-  attrs: { brand: true, model: true, memory: true, color: true, condition: true, warranty: true, battery: true, kit: true, used: true, extra: true },
-  global_attrs: true,
-};
-export function fieldsOf(cfg: any): Fields {
-  const f = (cfg && cfg.fields) || {};
-  return { create: { ...DEFAULT_FIELDS.create, ...(f.create || {}) }, update: { ...DEFAULT_FIELDS.update, ...(f.update || {}) },
-    attrs: { ...DEFAULT_FIELDS.attrs, ...(f.attrs || {}) }, global_attrs: f.global_attrs !== false };
-}
+import { DEFAULT_FIELDS, fieldsOf, shape, type Fields } from "./shape.ts";
+export { DEFAULT_FIELDS, fieldsOf, type Fields };
 
 /** Basic-авторизация WooCommerce REST API (ключи создаются в WooCommerce → Настройки → Дополнительно → REST API). */
 export function wooClient(baseUrl: string, key: string, secret: string, fetcher: typeof fetch = fetch): Woo {
@@ -160,6 +144,7 @@ export async function syncRun(rpc: Rpc, makeWoo: (cfg: any) => Woo | null, log: 
   const cfg = await rpc("site_config");
   const jobs: any[] = await rpc("site_jobs_take", { p_limit: 100 });
   if (!jobs.length) return { jobs: 0 };
+  if ((cfg.mode || "custom") === "custom") return notifySite(rpc, cfg, jobs, log);
   const woo = cfg.sync ? makeWoo(cfg) : null;
   if (!woo) {
     // выгрузка выключена или нет ключей — задания остаются в очереди
@@ -222,11 +207,52 @@ export async function syncRun(rpc: Rpc, makeWoo: (cfg: any) => Woo | null, log: 
   return { jobs: jobs.length, ...stat, failed: failed.length };
 }
 
+/** HMAC-SHA256 (base64) — подпись уведомлений сайту. */
+export async function sign(secret: string, body: string) {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body)));
+  let s = ""; for (const b of sig) s += String.fromCharCode(b);
+  return btoa(s);
+}
+/** Отправить уведомление своему сайту (Next.js): POST hook_url, заголовки X-Icase-Event и X-Icase-Signature. */
+export async function postHook(cfg: any, payload: unknown, fetcher: typeof fetch = fetch) {
+  const body = JSON.stringify(payload);
+  const r = await fetcher(cfg.hook_url, { method: "POST", body, headers: { "Content-Type": "application/json",
+    "X-Icase-Event": String((payload as any).event || ""), "X-Icase-Signature": await sign(cfg.hook_secret || "", body) } });
+  if (!r.ok) throw new Error(`Сайт ответил ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  return true;
+}
+/** Свой сайт: сайт сам читает каталог через API, CRM только сообщает, что изменилось (чтобы сайт сбросил кэш). */
+export async function notifySite(rpc: Rpc, cfg: any, jobs: any[], log: (m: string) => void = () => {}, fetcher: typeof fetch = fetch) {
+  const f = fieldsOf(cfg);
+  const ids = [...new Set(jobs.filter((j) => j.action === "sync_product").map((j) => j.payload.product_id))];
+  const orders = jobs.filter((j) => j.action === "order_status").map((j) => ({ id: j.payload.woo_id, status: j.payload.status }));
+  const all = jobs.map((j) => j.id);
+  if (!cfg.hook_url) { await rpc("site_jobs_finish", { p_done: all, p_failed: [] }); await rpc("site_sync_log", { p_error: null }); return { jobs: jobs.length, notified: false }; }
+  try {
+    const feed: any[] = ids.length ? await rpc("site_feed", { p_ids: ids }) : [];
+    const products = feed.map((i) => shape(i, f));
+    await postHook(cfg, { event: "catalog.updated", at: new Date().toISOString(),
+      products: products.filter((p: any) => p.visible), removed: products.filter((p: any) => !p.visible).map((p: any) => ({ id: p.id, sku: p.sku, slug: p.slug })),
+      orders }, fetcher);
+    await rpc("site_jobs_finish", { p_done: all, p_failed: [] });
+    await rpc("site_sync_log", { p_error: null });
+    log(JSON.stringify({ notified: products.length, orders: orders.length }));
+    return { jobs: jobs.length, notified: true, products: products.length, orders: orders.length };
+  } catch (e) {
+    const err = String((e as Error).message || e);
+    await rpc("site_jobs_finish", { p_done: [], p_failed: jobs.map((j) => ({ id: j.id, error: err })) });
+    await rpc("site_sync_log", { p_error: err });
+    return { jobs: jobs.length, notified: false, failed: jobs.length, error: err };
+  }
+}
+
 /** Предпросмотр: что уйдёт на сайт по товару (без обращения к сайту; категории — названиями). */
 export async function preview(rpc: Rpc, productId: string) {
   const cfg = await rpc("site_config"); const f = fieldsOf(cfg);
   const ctx: Ctx = { categories: async (path) => path.length ? [{ id: 0, name: path.join(" / ") } as any] : [] };
   const feed: FeedItem[] = await rpc("site_feed", { p_ids: [productId] });
+  if ((cfg.mode || "custom") === "custom") return { mode: "custom", fields: f, items: feed.map((it) => ({ kind: it.kind, sku: it.sku, visible: it.visible, api: shape(it, f) })) };
   const out = [];
   for (const it of feed) out.push({ kind: it.kind, sku: it.sku, woo_id: it.woo_id, visible: it.visible,
     create: await createPayload(it, cfg.new_status || "draft", f, ctx), update: await updatePayload(it, f, ctx) });

@@ -1,4 +1,19 @@
-# Обмен iCase CRM ↔ сайт (WooCommerce)
+# Обмен iCase CRM ↔ сайт
+
+Основной режим — **свой сайт (Next.js / React)**: сайт сам берёт каталог по API, CRM сообщает сайту об изменениях, заказы с сайта уходят в CRM. Режим WooCommerce оставлен как запасной.
+
+## Свой сайт (Next.js) — API `…/functions/v1/site-api`
+Все запросы с сервера сайта, заголовок `X-Api-Key`.
+- `GET /catalog` — `q, category, in_stock=1, type=product|used_unit, sort=price|-price|name, page, per_page` → `{total, page, per_page, items[]}`
+- `GET /product?slug=` (или `sku=`, `id=`) — карточка товара
+- `GET /categories` — категории и подкатегории с количеством в наличии
+- `POST /order` — `{id, customer:{name,phone,email}, items:[{sku,qty,price}], delivery, address, comment, paid}` → `{ok, num, status}`; товар резервируется
+- `GET /order-status?num=С-…&phone=1234` — статус для покупателя (по номеру и 4 последним цифрам телефона)
+- Уведомления CRM → сайт: `POST <адрес уведомлений>` с `X-Icase-Event` (`ping`, `catalog.updated`) и `X-Icase-Signature` = base64(HMAC-SHA256(тело, ICASE_HOOK_SECRET)); тело `catalog.updated`: `{products[], removed[{id,sku,slug}], orders[{id,status}]}`.
+- Товар: `id, sku, slug, type, name, price, in_stock, qty, category[], specs[{name,value}], brand, model, memory, color, condition, warranty_months, battery, description, photos[]` — по настройке «Что передавать». Закупочные цены не передаются.
+- Готовые файлы для Next.js (App Router): `integrations/nextjs/` — `lib/icase.ts`, `app/api/icase/route.ts` (приём уведомлений и сброс кэша), `app/api/order/route.ts` (оформление заказа с ценами из CRM).
+
+## Режим WooCommerce (запасной)
 
 ## Что работает
 - **CRM → сайт** (функция `site-sync`, раз в 2 минуты по расписанию, если включено «Выгружать на сайт»):

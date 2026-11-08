@@ -1,7 +1,7 @@
 // Edge-функция site-sync: запускается по расписанию (pg_cron, заголовок x-cron-token)
 // или вручную из CRM владельцем/управляющим (кнопка «Выгрузить сейчас»).
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { preview, syncRun, testConnection, wooClient } from "./sync.ts";
+import { postHook, preview, syncRun, testConnection, wooClient } from "./sync.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info, x-cron-token" };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
@@ -34,6 +34,11 @@ Deno.serve(async (req) => {
     if (body && body.preview) return json(await preview(rpc, String(body.preview)));
     if (body && body.test) {
       const cfg = await rpc("site_config");
+      if ((cfg.mode || "custom") === "custom") {
+        if (!cfg.hook_url) return json({ ok: true, mode: "custom", note: "Адрес уведомлений сайта не задан — сайт обновит данные сам по таймеру кэша" });
+        try { await postHook(cfg, { event: "ping", at: new Date().toISOString() }); return json({ ok: true, mode: "custom", hook: true }); }
+        catch (e) { return json({ ok: false, error: String((e as Error).message || e) }); }
+      }
       if (!cfg.url || !cfg.woo_key || !cfg.woo_secret) return json({ ok: false, error: "Не заданы адрес сайта или ключи WooCommerce" });
       try { return json(await testConnection(wooClient(cfg.url, cfg.woo_key, cfg.woo_secret))); }
       catch (e) { return json({ ok: false, error: String((e as Error).message || e) }); }
