@@ -74,7 +74,7 @@ VIEWS.stock={
     const fb=facet(stockBase("brand"),brandOf),fc=facet(stockBase("cond"),p=>p.condition),fm=facet(stockBase("mem"),p=>p.memory),fcol=facet(stockBase("color"),p=>p.color);
     const chipset=(kind,arr,sel)=>arr.map(([v,n])=>`<button class="chip ${sel.includes(v)?"on":""}" data-act="sfToggle" data-id="${esc(kind+"|"+v)}">${esc(v)}<b>${n}</b></button>`).join("");
     const active=[...f.brands.map(v=>["brands",v,v]),...f.conds.map(v=>["conds",v,v]),...f.mems.map(v=>["mems",v,v]),...f.colors.map(v=>["colors",v,v]),
-      ...(f.avail!=="all"?[["avail","",AVAIL.find(a=>a[0]===f.avail)[1]]]:[]),...(f.track?[["track","",f.track==="ser"?"Учёт по IMEI":"Без IMEI"]]:[]),
+      ...(f.avail!=="all"?[["avail","",AVAIL.find(a=>a[0]===f.avail)[1]]]:[]),...(f.track?[["track","",f.track==="ser"?"Поштучный учёт":"Без поштучного учёта"]]:[]),
       ...(f.chan?[["chan","",{site:"На сайте",avito:"На Авито",none:"Нигде не выставлен"}[f.chan]]]:[]),...(f.pmin!==""||f.pmax!==""?[["price","","Цена "+(f.pmin!==""?"от "+num(f.pmin):"")+(f.pmax!==""?" до "+num(f.pmax):"")]]:[]),
       ...(f.arch?[["arch","","Архив"]]:[]),...(ubOn(f)?[["ub","","Б/у параметры"]]:[])];
     // строки с группировкой
@@ -83,7 +83,7 @@ VIEWS.stock={
       if(f.group!=="none"&&k!==g&&mob){g=k;const inG=list.filter(x=>gkey(x)===k);rows+=`<div class="mgrow"><b>${esc(k)}</b><span>${inG.length} поз. · ${inG.reduce((a,x)=>a+Math.max(0,qty(x)),0)} шт</span></div>`}
       if(mob){const q=qty(p),mk=num(p.price)-num(p.cost);
         rows+=`<div class="pcard rowlink" data-act="openProduct" data-id="${esc(p.id)}"><input type="checkbox" class="pck" data-act="tagPick" data-id="${esc(p.id)}" aria-label="Ценник" ${App.ui.tagPick.has(p.id)?"checked":""}>
-          <div class="pci"><b>${esc(p.name)}</b><div class="chips">${p.condition&&p.condition!=="Новый"?`<span class="pill">${esc(p.condition)}</span>`:""}${p.trackSerial?'<span class="pill info">IMEI</span>':""}${p.onSite?'<span class="pill info">Сайт</span>':""}${p.onAvito?'<span class="pill info">Авито</span>':""}</div>
+          <div class="pci"><b>${esc(p.name)}</b><div class="chips">${p.condition&&p.condition!=="Новый"?`<span class="pill">${esc(p.condition)}</span>`:""}${p.trackSerial?'<span class="pill info">'+App.codeLbl(p)+'</span>':""}${p.onSite?'<span class="pill info">Сайт</span>':""}${p.onAvito?'<span class="pill info">Авито</span>':""}</div>
           <span class="sub">${esc([f.group!=="cat"?App.catName(p):"",p.brand,p.sku?"арт. "+p.sku:""].filter(Boolean).join(" · "))}</span>
 </div>
           <div class="pcr"><b>${money(p.price)}</b><span>${qtyCell(q,p)} шт</span>${showCost?`<small>закупка ${money(p.cost)}</small>`:""}</div></div>`;return}
@@ -92,7 +92,7 @@ VIEWS.stock={
       const mk=num(p.price)-num(p.cost);
       rows+=`<tr class="rowlink" data-act="openProduct" data-id="${esc(p.id)}">
       <td class="tagsel"><input type="checkbox" data-act="tagPick" data-id="${esc(p.id)}" aria-label="Ценник" ${App.ui.tagPick.has(p.id)?"checked":""}></td>
-      <td><b>${esc(p.name)}</b>${p.condition&&p.condition!=="Новый"?` <span class="pill">${esc(p.condition)}</span>`:""}${p.trackSerial?' <span class="pill info">IMEI</span>':""}${p.onSite?' <span class="pill info">Сайт</span>':""}${p.onAvito?' <span class="pill info">Авито</span>':""}
+      <td><b>${esc(p.name)}</b>${p.condition&&p.condition!=="Новый"?` <span class="pill">${esc(p.condition)}</span>`:""}${p.trackSerial?' <span class="pill info">'+App.codeLbl(p)+'</span>':""}${p.onSite?' <span class="pill info">Сайт</span>':""}${p.onAvito?' <span class="pill info">Авито</span>':""}
         <span class="sub">${esc([f.group!=="cat"?App.catName(p):"",f.group!=="brand"&&p.brand?p.brand:"",p.sku?"арт. "+p.sku:"",p.barcode?"ШК "+p.barcode:"",usedRange(p)].filter(Boolean).join(" · "))}</span></td>
       ${u.stockWh?`<td class="n">${qtyCell(App.qtyIn(p,u.stockWh),p)}</td>`:`<td class="n">${qtyCell(App.qtyTotal(p),p)}</td>`}
       ${showCost?`<td class="n">${money(p.cost)}</td>`:""}<td class="n"><b>${money(p.price)}</b></td></tr>`});
@@ -107,12 +107,12 @@ VIEWS.stock={
           `<div class="row-f fmore"><input type="number" min="0" max="100" placeholder="АКБ от, %" value="${esc(f.ub.batt||"")}" data-ub="batt" aria-label="АКБ от">
           <select data-ub="repair" aria-label="Ремонт"><option value="">Ремонт: любой</option><option value="Не было"${f.ub.repair==="Не было"?" selected":""}>Без ремонта</option><option value="Был"${f.ub.repair==="Был"?" selected":""}>Был ремонт</option></select>
           <label class="chk"><input type="checkbox" data-ub="box" ${f.ub.box?"checked":""}> С коробкой</label><label class="chk"><input type="checkbox" data-ub="never" ${f.ub.never?"checked":""}> Neverlock</label><label class="chk"><input type="checkbox" data-ub="icloud" ${f.ub.icloud?"checked":""}> iCloud отвязан</label></div>`):""}
-        ${fsec("params","Параметры",secSum(f.conds.join(", "),f.mems.join(", "),f.colors.join(", "),f.track?(f.track==="ser"?"по IMEI":"без IMEI"):"",f.chan?{site:"на сайте",avito:"на Авито",none:"нигде"}[f.chan]:"",f.pmin!==""||f.pmax!==""?"цена "+(f.pmin||0)+"–"+(f.pmax||"∞"):"",f.arch?"архив":"")||"любые",
+        ${fsec("params","Параметры",secSum(f.conds.join(", "),f.mems.join(", "),f.colors.join(", "),f.track?(f.track==="ser"?"поштучно":"без поштучного"):"",f.chan?{site:"на сайте",avito:"на Авито",none:"нигде"}[f.chan]:"",f.pmin!==""||f.pmax!==""?"цена "+(f.pmin||0)+"–"+(f.pmax||"∞"):"",f.arch?"архив":"")||"любые",
           `${fc.length>1||f.conds.length?`<div class="frow"><span class="fl">Состояние</span><div class="chips">${chipset("conds",fc,f.conds)}</div></div>`:""}
           ${fm.length?`<div class="frow"><span class="fl">Память</span><div class="chips">${chipset("mems",fm,f.mems)}</div></div>`:""}
           ${fcol.length?`<div class="frow"><span class="fl">Цвет</span><div class="chips">${chipset("colors",fcol,f.colors)}</div></div>`:""}
           <div class="frow"><span class="fl">Ещё</span><div class="row-f fmore">
-            <select data-sf="track" aria-label="Учёт"><option value="">Любой учёт</option><option value="ser"${f.track==="ser"?" selected":""}>По IMEI</option><option value="qty"${f.track==="qty"?" selected":""}>Без IMEI</option></select>
+            <select data-sf="track" aria-label="Учёт"><option value="">Любой учёт</option><option value="ser"${f.track==="ser"?" selected":""}>Поштучно (IMEI / S/N)</option><option value="qty"${f.track==="qty"?" selected":""}>Без IMEI</option></select>
             <select data-sf="chan" aria-label="Каналы"><option value="">Любые каналы</option><option value="site"${f.chan==="site"?" selected":""}>На сайте</option><option value="avito"${f.chan==="avito"?" selected":""}>На Авито</option><option value="none"${f.chan==="none"?" selected":""}>Нигде не выставлен</option></select>
             <input type="number" min="0" placeholder="Цена от" value="${esc(f.pmin)}" data-sf="pmin" aria-label="Цена от"><input type="number" min="0" placeholder="до" value="${esc(f.pmax)}" data-sf="pmax" aria-label="Цена до">
             <label class="chk"><input type="checkbox" data-sf="arch" ${f.arch?"checked":""}> Архив</label></div></div>`)}
@@ -120,7 +120,7 @@ VIEWS.stock={
     const pOpen=!!(f.sec||{}).panel;
     return `<div class="smain" data-nodirty>
       <div class="row-f stop">
-        <input id="stockQ" type="search" placeholder="Название, артикул, штрихкод, IMEI, модель, цвет" value="${esc(u.stockQ)}" data-filter="stockQ" aria-label="Поиск товара">
+        <input id="stockQ" type="search" placeholder="Название, артикул, штрихкод, IMEI / S/N, модель, цвет" value="${esc(u.stockQ)}" data-filter="stockQ" aria-label="Поиск товара">
         ${App.sel("stockWh",[["","Все склады"],...App.whOpts()],u.stockWh,'data-filter-sel="stockWh" aria-label="Склад"')}
         <select data-sf="sort" aria-label="Сортировка">${SORTS.map(([v,l])=>`<option value="${v}"${f.sort===v?" selected":""}>${l}</option>`).join("")}</select>
         <select data-sf="group" aria-label="Группировка">${GROUPS.map(([v,l])=>`<option value="${v}"${f.group===v?" selected":""}>${l}</option>`).join("")}</select>
@@ -180,8 +180,8 @@ function productForm(id){
     ${App.fld("pBrand","Бренд",App.inp("pBrand",p.brand,"text","Apple",(edit?"":"disabled ")+'list="brandList"')+`<datalist id="brandList">${[...new Set(["Apple",...S.products.map(x=>x.brand).filter(Boolean)])].sort().map(b=>`<option value="${esc(b)}">`).join("")}</datalist>`)}
     ${App.fld("pSku","Артикул",App.inp("pSku",p.sku,"text","",edit?"":"disabled"))}
     ${App.fld("pBar","Штрихкод",App.inp("pBar",p.barcode,"text","отсканируйте",edit?"":"disabled"))}
-    <div class="fld full">${App.chk("pTrack","Учёт по IMEI / серийным номерам — каждый экземпляр отдельно",p.trackSerial).replace("<input",edit?"<input":"<input disabled")}</div>
-    ${p.trackSerial?"":App.fld("pSerial","IMEI / серийный (если товар один)",App.inp("pSerial",p.serial,"text","",edit?"":"disabled"))}
+    <div class="fld full">${App.chk("pTrack","Поштучный учёт — каждый экземпляр отдельно (IMEI у телефонов, серийный номер у остальной техники)",p.trackSerial).replace("<input",edit?"<input":"<input disabled")}</div>
+    ${p.trackSerial?"":App.fld("pSerial",(App.isPhone(p)?"IMEI":"Серийный номер")+" (если товар один)",App.inp("pSerial",p.serial,"text","",edit?"":"disabled"))}
     ${attrs.length?`<div class="fld full"><label>Параметры</label><div class="chips">${attrs.map(([k,v])=>`<span class="pill">${esc(k)}: ${esc(v)}</span>`).join("")}</div></div>`:""}
     ${cost?App.fld("pCost","Закупка, ₽",App.inp("pCost",p.cost||"","number","",price?"":"disabled")):""}
     ${App.fld("pPrice","Цена продажи, ₽",App.inp("pPrice",p.price||"","number","",price?"":"disabled"))}
@@ -192,12 +192,12 @@ function productForm(id){
     ${App.fld("pAvito","Цена на Авито, ₽",App.inp("pAvito",p.avitoPrice,"number","как розничная",price?"":"disabled"))}
     ${App.fld("pDiag","Результат диагностики",App.inp("pDiag",p.diagnostics,"text","Всё исправно, замен не было",edit?"":"disabled"),"full")}
     ${App.fld("pKit","Комплектация",App.inp("pKit",p.kit,"text","Коробка, кабель",edit?"":"disabled"),"full")}
-    ${!id&&edit&&!p.trackSerial?App.fld("pQty","Начальный остаток (для товара без IMEI)",App.inp("pQty","","number","0"))+App.fld("pWh","На склад",App.sel("pWh",App.whs().map(w=>[w.id,w.name]),App.cashWh())):""}
+    ${!id&&edit&&!p.trackSerial?App.fld("pQty","Начальный остаток (без поштучного учёта)",App.inp("pQty","","number","0"))+App.fld("pWh","На склад",App.sel("pWh",App.whs().map(w=>[w.id,w.name]),App.cashWh())):""}
     <div class="fld full"><label>Где продаём</label><div class="chips">${App.chk("pSite","Сайт",p.onSite)}${App.chk("pOnAvito","Авито",p.onAvito)}</div></div>
     ${App.fld("pNote","Описание / заметка",App.area("pNote",p.note||""),"full")}
   </div>
   ${id&&p.trackSerial?`<section><div class="card-h"><h3 class="sub-h">Экземпляры (${App.unitsOf(id).length} в наличии)</h3><label class="chk"><input type="checkbox" data-act="unitAll" ${App.ui.unitAll?"checked":""}> показать проданные и списанные</label></div>
-    <div class="tbl-wrap"><table><thead><tr><th>IMEI / SN</th><th>Состояние</th><th class="n">АКБ</th><th class="n">Цена</th>${cost?'<th class="n">Закупка</th>':""}<th>Где</th></tr></thead><tbody>
+    <div class="tbl-wrap"><table><thead><tr><th>${App.isPhone(p)?"IMEI":"Серийный номер"}</th><th>Состояние</th><th class="n">АКБ</th><th class="n">Цена</th>${cost?'<th class="n">Закупка</th>':""}<th>Где</th></tr></thead><tbody>
     ${units.map(u=>`<tr class="rowlink" data-act="openUnit" data-id="${esc(u.id)}"><td><b>${esc(App.unitCode(u))}</b>${u.imei2?'<span class="sub">IMEI 2 '+esc(u.imei2)+"</span>":""}${u.imei&&u.serialNo?'<span class="sub">SN '+esc(u.serialNo)+"</span>":""}</td><td>${esc(u.condition||"")}<div class="chips usum">${App.usedChips(u.attrs)}</div></td>
       <td class="n">${u.batteryHealth!=null&&u.batteryHealth!==""?u.batteryHealth+"%":"—"}</td><td class="n">${money(App.unitPrice(u,p))}</td>${cost?`<td class="n">${money(u.cost)}</td>`:""}<td>${App.unitSt(u)}</td></tr>`).join("")||`<tr><td colspan="6" class="empty">Нет экземпляров. Оформите приход и отсканируйте IMEI</td></tr>`}
     </tbody></table></div></section>`:""}
@@ -306,7 +306,7 @@ function docEditor(){
   const rows=D.lines.map((l,k)=>{const p=App.byId("products",l.productId);const have=p?App.qtyIn(p,wh):0;
     if(p&&p.trackSerial){const R=serialRow(l,k,p,{ro,cost,inv,wh});sumQ+=R.q;sumC+=R.c;if(R.c>0)plusC+=R.c;else minusC+=R.c;return R.html}
     if(inv){const diff=num(l.counted)-num(l.expected);sumQ+=diff;const c=diff*num(l.cost);if(c>0)plusC+=c;else minusC+=c;
-      return `<tr class="${l.counted===""||l.counted==null?"":diff?"diffrow":""}"><td>${esc(l.name)}${p&&p.serial?'<span class="sub">IMEI '+esc(p.serial)+"</span>":""}</td><td class="n">${num(l.expected)}</td>
+      return `<tr class="${l.counted===""||l.counted==null?"":diff?"diffrow":""}"><td>${esc(l.name)}${p&&p.serial?'<span class="sub">'+App.codeLbl(p)+" "+esc(p.serial)+"</span>":""}</td><td class="n">${num(l.expected)}</td>
       <td class="n"><input type="number" min="0" id="lc${k}" data-line="${k}" data-lf="counted" value="${l.counted==null?"":esc(l.counted)}" placeholder="?" ${ro?"disabled":""} aria-label="Фактически"></td>
       <td class="n">${l.counted===""||l.counted==null?'<span class="muted">не посчитан</span>':diff?`<span class="pill ${diff>0?"ok":"bad"}">${diff>0?"+":""}${diff}</span>`:'<span class="pill">0</span>'}</td>${cost?`<td class="n">${money(diff*num(l.cost))}</td>`:""}</tr>`}
     sumQ+=num(l.qty);sumC+=num(l.qty)*num(l.cost);
@@ -355,8 +355,8 @@ ACT.docUnitDel=v=>{const [k,j]=v.split("|").map(Number),l=D.lines[k];if(!l)retur
 /* ---------- строки с серийным учётом ---------- */
 function serialRow(l,k,p,{ro,cost,inv,wh}){
   l.newUnits=l.newUnits||[];l.unitIds=l.unitIds||[];l.foundCodes=l.foundCodes||[];
-  const scan=ro?"":`<input class="uscan" data-uscan="${k}" placeholder="Сканируйте IMEI / SN и нажмите Enter" autocomplete="off" aria-label="IMEI или серийный номер">`;
-  const tag='<span class="pill info">IMEI</span> ';
+  const scan=ro?"":`<input class="uscan" data-uscan="${k}" placeholder="Сканируйте ${App.codeName(p)} и нажмите Enter" autocomplete="off" aria-label="${App.codeName(p)}">`;
+  const tag='<span class="pill info">'+App.codeLbl(p)+'</span> ';
   if(inv){
     const inWh=App.unitsOf(p.id,{wh:D.whTo}),found=l.foundCodes,exp=ro?num(l.expected):inWh.length,cnt=found.length,diff=cnt-exp,c=diff*num(l.cost);
     const missing=ro?[]:inWh.filter(u=>!found.some(x=>[u.imei,u.imei2,u.serialNo].some(y=>y&&y.toLowerCase()===String(x).toLowerCase())));
@@ -371,7 +371,7 @@ function serialRow(l,k,p,{ro,cost,inv,wh}){
       ${cost?`<td class="n"><input type="number" min="0" id="lk${k}" data-line="${k}" data-lf="cost" value="${num(l.cost)}" ${ro?"disabled":""} aria-label="Закупка"></td><td class="n">${money(c)}</td>`:""}
       <td class="n">${ro?"":`<button class="btn sm ghost danger" data-act="docDelLine" data-id="${k}" aria-label="Убрать">✕</button>`}</td></tr>
       <tr class="subrow"><td colspan="${cost?5:3}">${scan}
-      ${n?`<table class="units"><thead><tr><th>IMEI / SN</th><th>Состояние</th><th>АКБ, %</th>${App.can("price")?"<th>Цена экз., ₽</th>":""}<th></th></tr></thead><tbody>
+      ${n?`<table class="units"><thead><tr><th>${App.codeLbl(p)}</th><th>Состояние</th><th>АКБ, %</th>${App.can("price")?"<th>Цена экз., ₽</th>":""}<th></th></tr></thead><tbody>
       ${l.newUnits.map((u,j)=>`<tr><td><b>${esc(u.imei||u.serial_no)}</b>${u.warn?`<span class="sub warn">${esc(u.warn)}</span>`:""}</td>
         <td>${ro?esc(u.condition||""):`<select data-unf="${k}|${j}|condition" aria-label="Состояние">${App.CONDS.map(x=>`<option${(u.condition||p.condition)===x?" selected":""}>${x}</option>`).join("")}</select>`}</td>
         <td><input type="number" min="0" max="100" value="${esc(u.battery_health||"")}" data-unf="${k}|${j}|battery_health" ${ro?"disabled":""} aria-label="АКБ" style="width:70px"></td>
@@ -388,23 +388,23 @@ function serialRow(l,k,p,{ro,cost,inv,wh}){
 }
 function lineScan(k,raw){
   const l=D.lines[k],p=l&&App.byId("products",l.productId);if(!p)return false;
-  const pc=App.parseCode(raw);if(!pc)return false;const code=pc.imei||pc.serial_no;
+  const pc=App.parseCode(raw,App.isPhone(p));if(!pc)return false;const code=pc.imei||pc.serial_no;
   const u=App.findUnit(code);
   if(D.type==="in"){
     if(D.lines.some(x=>(x.newUnits||[]).some(n=>(n.imei||n.serial_no)===code))){App.toast("Этот код уже есть в документе");return false}
-    if(u&&["in_stock","reserved","in_repair"].includes(u.status)){App.toast("IMEI/SN "+code+" уже числится на складе: «"+(App.byId("products",u.productId)||{}).name+"»");return false}
+    if(u&&["in_stock","reserved","in_repair"].includes(u.status)){App.toast(App.codeLbl(p)+" "+code+" уже числится на складе: «"+(App.byId("products",u.productId)||{}).name+"»");return false}
     if(u)App.toast("Этот экземпляр уже был в базе ("+(App.UNIT_ST[u.status]||[u.status])[0].toLowerCase()+") — вернётся на склад");
     else if(pc.warn)App.toast(pc.warn);
     l.newUnits.push({imei:pc.imei||"",serial_no:pc.serial_no||"",condition:p.condition,battery_health:"",price:"",warn:pc.warn||""});return true;
   }
   if(D.type==="inventory"){
     if(l.foundCodes.some(x=>x.toLowerCase()===code.toLowerCase())){App.toast("Уже отсканирован");return false}
-    if(!u){App.toast("IMEI/SN "+code+" не числится в базе — оформите приход");return false}
+    if(!u){App.toast(App.codeLbl(p)+" "+code+" не числится в базе — оформите приход");return false}
     if(u.productId!==p.id){App.toast("Это «"+(App.byId("products",u.productId)||{}).name+"»");return false}
     if(u.status!=="in_stock"){App.toast("Числится как «"+(App.UNIT_ST[u.status]||[u.status])[0]+"»");return false}
     l.foundCodes.push(App.unitCode(u));return true;
   }
-  if(!u){App.toast("IMEI/SN "+code+" не найден");return false}
+  if(!u){App.toast(App.codeLbl(p)+" "+code+" не найден");return false}
   if(u.productId!==p.id){App.toast("Это «"+(App.byId("products",u.productId)||{}).name+"»");return false}
   if(u.status!=="in_stock"||u.whId!==D.whFrom){App.toast("Этого экземпляра нет на складе «"+App.whName(D.whFrom)+"»");return false}
   if(!l.unitIds.includes(u.id))l.unitIds.push(u.id);return true;
@@ -439,8 +439,8 @@ function docCheck(){
   if(!D.lines.length)return "Добавьте хотя бы одну строку";
   if(D.type==="transfer"&&D.whFrom===D.whTo)return "Склады отправления и назначения совпадают";
   for(const l of D.lines){const p=App.byId("products",l.productId);if(!p||!p.trackSerial)continue;
-    if(D.type==="in"&&!(l.newUnits||[]).length)return "Отсканируйте IMEI / SN для «"+p.name+"»";
-    if(["transfer","writeoff","supret"].includes(D.type)&&!(l.unitIds||[]).length)return "Отметьте экземпляры (IMEI / SN) для «"+p.name+"»"}
+    if(D.type==="in"&&!(l.newUnits||[]).length)return "Отсканируйте "+App.codeName(p)+" для «"+p.name+"»";
+    if(["transfer","writeoff","supret"].includes(D.type)&&!(l.unitIds||[]).length)return "Отметьте экземпляры ("+App.codeLbl(p)+") для «"+p.name+"»"}
   if(D.type!=="inventory"&&D.lines.some(l=>{const p=App.byId("products",l.productId);return !(p&&p.trackSerial)&&num(l.qty)<=0}))return "Количество должно быть больше нуля";
   return "";
 }

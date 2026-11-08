@@ -6,13 +6,22 @@ const {S,$,esc,num,money,ACT}=App;
 /* ---------- экземпляры ---------- */
 App.UNIT_ST={in_stock:["В наличии","ok"],reserved:["В резерве","info"],in_repair:["В ремонте","warn"],sold:["Продан","mute"],written_off:["Списан","bad"],returned_supplier:["Возвращён поставщику","mute"]};
 App.unitCode=u=>u?(u.imei||u.serialNo||""):"";
+/* IMEI — только у телефонов; у остальной техники серийный номер */
+App.isPhone=p=>{if(typeof p==="string")p=App.byId("products",p);if(!p)return false;
+  const m=p.catalogId&&App.byId("models",p.catalogId);if(m)return m.family==="iPhone";
+  const c=App.cat(p.categoryId),par=c&&App.cat(c.parentId),nm=[c&&c.name,par&&par.name].filter(Boolean).join(" ");
+  if(/аксесс|чехл|стекл|плён|плен|кабел|заряд|наушн|ремешк|сервис|услуг/i.test(nm))return false;
+  return /iphone|телефон|смартфон/i.test(nm)};
+App.codeLbl=p=>App.isPhone(p)?"IMEI":"S/N";
+App.codeName=p=>App.isPhone(p)?"IMEI":"серийный номер";
 App.unitsOf=(pid,{wh="",status="in_stock"}={})=>S.units.filter(u=>u.productId===pid&&(!status||u.status===status)&&(!wh||u.whId===wh));
 App.unitCodes=pid=>S.units.filter(u=>u.productId===pid&&u.status==="in_stock").map(u=>[u.imei,u.imei2,u.serialNo].filter(Boolean).join(" ")).join(" ");
 App.findUnit=code=>{const c=String(code||"").trim().toLowerCase();if(!c)return null;return S.units.find(u=>[u.imei,u.imei2,u.serialNo].some(x=>x&&String(x).toLowerCase()===c))||null};
 App.unitPrice=(u,p)=>u&&u.price!==""&&u.price!=null?num(u.price):num((p||App.byId("products",u.productId)||{}).price);
 App.luhn=s=>{if(!/^\d{15}$/.test(s))return false;let sum=0;for(let i=0;i<15;i++){let d=+s[14-i];if(i%2){d*=2;if(d>9)d-=9}sum+=d}return sum%10===0};
 /* код со сканера → поле: 15 цифр — IMEI, иначе серийный номер */
-App.parseCode=raw=>{const s=String(raw||"").trim().replace(/\s+/g,"");if(!s)return null;
+App.parseCode=(raw,phone=true)=>{const s=String(raw||"").trim().replace(/\s+/g,"");if(!s)return null;
+  if(!phone)return {serial_no:s.toUpperCase(),warn:""};
   return /^\d{15}$/.test(s)?{imei:s,warn:App.luhn(s)?"":"IMEI не проходит проверку контрольной цифры — проверьте"}:{serial_no:s.toUpperCase(),warn:/^\d{14,16}$/.test(s)?"Похоже на IMEI, но не 15 цифр":""}};
 App.unitLabel=u=>{const p=App.byId("products",u.productId);return [App.unitCode(u),u.condition&&p&&u.condition!==p.condition?u.condition:"",u.batteryHealth!=null&&u.batteryHealth!==""?"АКБ "+u.batteryHealth+"%":""].filter(Boolean).join(" · ")};
 App.unitSt=u=>{const s=App.UNIT_ST[u.status]||[u.status,""];return `<span class="pill ${s[1]}">${s[0]}${u.status==="in_stock"&&u.whId?" · "+esc(App.whName(u.whId)):""}</span>`};
@@ -25,7 +34,7 @@ ACT.openUnit=id=>{
   App.openModal(App.head(esc(App.unitCode(u)),App.unitSt(u))+`
     <p class="muted" style="margin-top:-4px">${esc(p.name||"")}</p>
     <div class="form">
-      ${App.fld("uImei","IMEI",App.inp("uImei",u.imei,"text","15 цифр",ed?"":"disabled"))}${App.fld("uImei2","IMEI 2",App.inp("uImei2",u.imei2,"text","",ed?"":"disabled"))}
+      ${App.isPhone(p)||u.imei?App.fld("uImei","IMEI",App.inp("uImei",u.imei,"text","15 цифр",ed?"":"disabled"))+App.fld("uImei2","IMEI 2",App.inp("uImei2",u.imei2,"text","",ed?"":"disabled")):""}
       ${App.fld("uSn","Серийный номер",App.inp("uSn",u.serialNo,"text","",ed?"":"disabled"))}
       ${App.fld("uCond","Состояние",App.sel("uCond",App.CONDS,u.condition||p.condition,ed?"":"disabled"))}
       ${App.fld("uBatt","Ёмкость АКБ, %",App.inp("uBatt",u.batteryHealth==null?"":u.batteryHealth,"number","",ed?"":"disabled"))}
@@ -42,7 +51,7 @@ ACT.openUnit=id=>{
 ACT.saveUnit=async(id,btn)=>{
   const V=App.val,n=v=>v===""?null:num(v);
   const data={imei:V("uImei")||null,imei2:V("uImei2")||null,serial_no:V("uSn")?V("uSn").toUpperCase():null,condition:V("uCond")||null,battery_health:n(V("uBatt")),kit:V("uKit")||null,diagnostics:V("uDiag")||null,note:V("uNote")||null};
-  if(!data.imei&&!data.serial_no)return App.toast("Нужен IMEI или серийный номер");
+  if(!data.imei&&!data.serial_no)return App.toast(document.getElementById("uImei")?"Нужен IMEI или серийный номер":"Нужен серийный номер");
   if(data.imei&&!/^\d{15}$/.test(data.imei))return App.toast("IMEI — это 15 цифр");
   if(App.can("price"))data.price=n(V("uPrice"));
   if(document.getElementById("uu_body")){const r=App.readUsed("uu_");data.attrs=r.attrs;if(r.kit)data.kit=r.kit;const w=App.usedWarn(r.attrs);if(w)App.toast(w)}
@@ -100,7 +109,7 @@ function drawCP(){
       ${App.fld("cpCond","Состояние",App.sel("cpCond",App.CONDS,CP.cond))}
       ${App.can("price")?App.fld("cpPrice","Цена продажи, ₽",App.inp("cpPrice",CP.price,"number","можно позже")):""}
       ${App.fld("cpWarr","Гарантия, мес.",App.inp("cpWarr",CP.warranty,"number","по умолчанию"))}
-      <div class="fld full">${App.chk("cpTrack","Учёт по IMEI / серийным номерам",CP.track)}</div>
+      <div class="fld full">${App.chk("cpTrack","Поштучный учёт (IMEI у телефонов, серийный номер у остальной техники)",CP.track)}</div>
     </div>
     <h3 class="sub-h">Будет создано: ${combos.filter(c=>!exists(c.name)).length}</h3>
     <div class="hist">${combos.map(c=>`<span>${esc(c.name)}${exists(c.name)?' <span class="pill mute">уже есть</span>':""}</span>`).join("")||'<span class="muted">Выберите память и цвет</span>'}</div>

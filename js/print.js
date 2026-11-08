@@ -36,7 +36,7 @@ App.qrSvg=function(text){
 /* ---------- данные продажи для документов ---------- */
 App.saleDocData=function(s){
   const st=App.settings(),pt=s.pointId?App.byId("points",s.pointId):null,c=App.cust(s.customerId);
-  const items=(s.items||[]).map((i,k)=>({n:k+1,name:i.name,spec:[i.model,i.memory,i.color].filter(Boolean).join(", "),model:i.model||"",memory:i.memory||"",color:i.color||"",cond:i.condition||"",serial:i.serial||"",
+  const items=(s.items||[]).map((i,k)=>({n:k+1,name:i.name,spec:[i.model,i.memory,i.color].filter(Boolean).join(", "),model:i.model||"",memory:i.memory||"",color:i.color||"",cond:i.condition||"",serial:i.serial||"",ser:i.productId?App.codeLbl(i.productId):(/^\d{15}$/.test(i.serial||"")?"IMEI":"S/N"),
     qty:num(i.qty),price:num(i.price),disc:num(i.disc),sum:num(i.qty)*num(i.price)-num(i.disc),warranty:num(i.warranty)}));
   const goods=items.reduce((a,i)=>a+i.sum,0);
   return {st,s,c,items,goods,
@@ -119,7 +119,7 @@ function brand(s,cfg){
     <div class="card"><div class="lbl">Магазин</div><b>${esc(D.address||D.pointName||"—")}</b><div class="m">${esc(P.contact)||"&nbsp;"}</div></div>
     <div class="card"><div class="lbl">Покупатель</div><b>${c?esc(c.name):"—"}</b><div class="m">${c&&c.phone?esc(c.phone):"&nbsp;"}</div></div></div>
   <div class="items"><div class="ih"><span>№</span><span>Товар</span><span class="r">Кол-во</span><span class="r">Цена</span><span class="r">Скидка</span><span class="r">Сумма</span></div>
-    ${D.items.map(i=>`<div class="ir"><span class="k">${String(i.n).padStart(2,"0")}</span><div><div class="nm">${esc(i.name)}</div>${i.model&&i.model!==i.name?`<div class="md">${esc(i.model)}</div>`:""}${P.chips(i)?`<div class="chips">${P.chips(i)}</div>`:""}${i.serial?`<div class="imei">IMEI / SN ${esc(i.serial)}</div>`:""}</div>
+    ${D.items.map(i=>`<div class="ir"><span class="k">${String(i.n).padStart(2,"0")}</span><div><div class="nm">${esc(i.name)}</div>${i.model&&i.model!==i.name?`<div class="md">${esc(i.model)}</div>`:""}${P.chips(i)?`<div class="chips">${P.chips(i)}</div>`:""}${i.serial?`<div class="imei">${i.ser} ${esc(i.serial)}</div>`:""}</div>
       <span class="r">${i.qty}</span><span class="r">${rub(i.price)}</span><span class="r">${i.disc?"−"+rub(i.disc):"—"}</span><span class="r sum">${rub(i.sum)}</span></div>`).join("")}</div>
   <div class="bottom"><div>
     ${P.ti?`<div class="card ti"><div class="lbl">Зачёт Trade-in</div><b>${esc(P.ti.device)}</b><div class="m">${P.ti.imei?"IMEI "+esc(P.ti.imei)+" · ":""}зачтено ${rub(P.ti.amount)}</div></div>`:""}
@@ -159,7 +159,7 @@ function classic(s,cfg){
     <div class="req"><b>${esc(st.legalName||st.shopName||"")}</b>${P.reqLine?"<br>"+esc(P.reqLine):""}${D.address?"<br>"+esc(D.address):""}${P.contact?"<br>"+esc(P.contact):""}</div></div>
   <h1>${P.title}</h1><div class="sub">№ ${P.num} от ${P.dt}</div>
   <dl class="meta">${c?`<dt>Покупатель:</dt><dd>${esc(c.name)}${c.phone?", "+esc(c.phone):""}</dd>`:""}${cfg.showStaff?`<dt>Продавец:</dt><dd>${esc(D.staff)}</dd>`:""}</dl>
-  <table><thead><tr><th>№</th><th>Наименование</th><th>Модель, память, цвет</th><th>Состояние</th><th>IMEI / серийный №</th><th>Кол.</th><th>Цена</th><th>Скидка</th><th>Сумма</th></tr></thead><tbody>
+  <table><thead><tr><th>№</th><th>Наименование</th><th>Модель, память, цвет</th><th>Состояние</th><th>IMEI / S/N</th><th>Кол.</th><th>Цена</th><th>Скидка</th><th>Сумма</th></tr></thead><tbody>
   ${D.items.map(i=>`<tr><td class="c">${i.n}</td><td>${esc(i.name)}${cfg.chips&&i.warranty?`<span class="small">гарантия ${i.warranty} мес.</span>`:""}</td><td>${esc(i.spec)||"—"}</td><td>${esc(i.cond)||"—"}</td><td>${esc(i.serial)||"—"}</td>
     <td class="c">${i.qty}</td><td class="n">${rub(i.price)}</td><td class="n">${i.disc?rub(i.disc):"—"}</td><td class="n">${rub(i.sum)}</td></tr>`).join("")}
   </tbody></table>
@@ -202,7 +202,7 @@ function minimal(s,cfg){
   <div class="cols"><div><div class="lbl">Продавец</div><b>${esc(st.legalName||st.shopName||"")}</b><br>${esc(P.reqLine)}</div>
     <div><div class="lbl">Магазин</div>${esc(D.address||"—")}<br>${esc(P.contact)}</div>
     <div><div class="lbl">Покупатель</div>${c?`<b>${esc(c.name)}</b><br>${esc(c.phone||"")}`:"—"}</div></div>
-  ${D.items.map(i=>`<div class="it"><div><div class="nm">${esc(i.name)}</div><div class="ds">${[i.model&&i.model!==i.name?i.model:"",cfg.chips?i.memory:"",cfg.chips?i.color:"",cfg.chips?i.cond:"",i.serial?"IMEI/SN "+i.serial:"",cfg.chips&&i.warranty?"гарантия "+i.warranty+" мес.":""].filter(Boolean).map(esc).join(" · ")}</div></div>
+  ${D.items.map(i=>`<div class="it"><div><div class="nm">${esc(i.name)}</div><div class="ds">${[i.model&&i.model!==i.name?i.model:"",cfg.chips?i.memory:"",cfg.chips?i.color:"",cfg.chips?i.cond:"",i.serial?i.ser+" "+i.serial:"",cfg.chips&&i.warranty?"гарантия "+i.warranty+" мес.":""].filter(Boolean).map(esc).join(" · ")}</div></div>
     <div class="pr"><b>${rub(i.sum)}</b><small>${i.qty} × ${rub(i.price)}${i.disc?" − "+rub(i.disc):""}</small></div></div>`).join("")}
   <div class="sum"><span>Товары</span><span class="r">${rub(D.goods)}</span>${num(s.discount)?`<span>Скидка</span><span class="r">−${rub(s.discount)}</span>`:""}
     ${s.tradeIn?`<span>Trade-in${P.ti?": "+esc(P.ti.device)+(P.ti.imei?", IMEI "+esc(P.ti.imei):""):""}</span><span class="r">−${rub(s.tradeIn.amount)}</span>`:""}<span>Оплата</span><span class="r">${esc(D.pays)}</span></div>
@@ -228,7 +228,7 @@ App.receipt80=function(s,over){
   <div class="c"><div class="logo">${P.logo}</div><div class="small">${esc(D.seller)}${D.address?"<br>"+esc(D.address):""}${D.phone?"<br>Тел. "+esc(D.phone):""}${D.site?"<br>"+esc(siteLabel(D.site)):""}</div></div>
   <hr><h1>${P.title} № ${P.num}</h1><div class="c small">${P.dt}${cfg.showStaff?" · продавец "+esc(D.staff):""}</div>
   ${c?`<div class="small c">Покупатель: ${esc(c.name)}${c.phone?" · "+esc(c.phone):""}</div>`:""}<hr>
-  ${items.map(i=>`<div class="it"><b>${i.n}. ${esc(i.name)}</b>${i.spec?`<div class="small">${esc(i.spec)}</div>`:""}${i.cond||i.serial?`<div class="small">${[i.cond,i.serial?"IMEI/SN "+i.serial:""].filter(Boolean).map(esc).join(" · ")}</div>`:""}
+  ${items.map(i=>`<div class="it"><b>${i.n}. ${esc(i.name)}</b>${i.spec?`<div class="small">${esc(i.spec)}</div>`:""}${i.cond||i.serial?`<div class="small">${[i.cond,i.serial?i.ser+" "+i.serial:""].filter(Boolean).map(esc).join(" · ")}</div>`:""}
     <div class="row"><span>${i.qty} × ${rub(i.price)}${i.disc?" − "+rub(i.disc):""}</span><span>${rub(i.sum)}</span></div>${i.warranty?`<div class="small">Гарантия ${i.warranty} мес.</div>`:""}</div>`).join("")}
   <hr><div class="row"><span>Сумма по товарам</span><span>${rub(D.goods)}</span></div>
   ${num(s.discount)?`<div class="row"><span>Скидка на чек</span><span>−${rub(s.discount)}</span></div>`:""}
@@ -255,7 +255,7 @@ App.demoSale=function(){
    ЦЕННИКИ
    ===================================================================== */
 const TAG_FIELDS=[["shop","Название магазина"],["name","Название товара"],["model","Модель"],["chips","Память и цвет"],["cond","Состояние"],["battery","Ёмкость АКБ"],
-  ["kit","Комплектация"],["used","Б/у: ремонт, детали"],["warranty","Гарантия"],["imei","IMEI / серийный"],["sku","Артикул"],["barcode","Штрихкод"],["price","Цена"],["note","Своя надпись"]];
+  ["kit","Комплектация"],["used","Б/у: ремонт, детали"],["warranty","Гарантия"],["imei","IMEI / серийный №"],["sku","Артикул"],["barcode","Штрихкод"],["price","Цена"],["note","Своя надпись"]];
 App.TAG_FIELDS=TAG_FIELDS;
 const F=(...on)=>Object.fromEntries(TAG_FIELDS.map(([k])=>[k,on.includes(k)]));
 App.TAG_PRESETS=[
@@ -311,7 +311,7 @@ function tagHtml(p,t){
     ${f.shop?`<div class="shop">${esc(st.shopName||"iCase")}${f.sku&&p.sku?`<span>${esc(p.sku)}</span>`:""}</div>`:""}
     <div class="mid">${f.name?`<div class="nm">${esc(p.name)}</div>`:""}${f.model&&p.model?`<div class="md">${esc(p.model)}</div>`:""}
     ${chips?`<div class="ch">${chips}</div>`:""}
-    ${f.kit&&p.kit?`<div class="ln">Комплект: ${esc(p.kit)}</div>`:""}${f.used&&p.uattrs&&(p.uattrs.repair||p.uattrs.parts)?`<div class="ln">${esc([p.uattrs.repair==="Был"?"Был ремонт"+((p.uattrs.repairParts||[]).length?": "+p.uattrs.repairParts.join(", "):""):p.uattrs.repair==="Не было"?"Без ремонта":"",p.uattrs.parts==="Оригинальные"?"детали оригинальные":""].filter(Boolean).join(", "))}</div>`:""}${f.imei&&p.serial?`<div class="ln">IMEI/SN ${esc(p.serial)}</div>`:""}
+    ${f.kit&&p.kit?`<div class="ln">Комплект: ${esc(p.kit)}</div>`:""}${f.used&&p.uattrs&&(p.uattrs.repair||p.uattrs.parts)?`<div class="ln">${esc([p.uattrs.repair==="Был"?"Был ремонт"+((p.uattrs.repairParts||[]).length?": "+p.uattrs.repairParts.join(", "):""):p.uattrs.repair==="Не было"?"Без ремонта":"",p.uattrs.parts==="Оригинальные"?"детали оригинальные":""].filter(Boolean).join(", "))}</div>`:""}${f.imei&&p.serial?`<div class="ln">${App.codeLbl(p)} ${esc(p.serial)}</div>`:""}
     ${!f.shop&&f.sku&&p.sku?`<div class="ln">Арт. ${esc(p.sku)}</div>`:""}
 </div>
     <div class="bt">${f.note&&t.note?`<div class="note">${esc(t.note).replace(/-/g,"\u2011")}</div>`:""}${f.barcode&&code?`<div class="bc">${barcodeSvg(code,Math.max(6,h*.2))}</div>`:""}${f.price?`<div class="pr">${price}<small>₽</small></div>`:""}</div></div>`;

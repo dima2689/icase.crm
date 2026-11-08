@@ -54,11 +54,11 @@ function lineHtml(l,i,{cost,price}){
     ${price?`<label class="mini">Цена продажи, ₽<input type="number" min="0" value="${num(l.price)||""}" data-rl="${i}|price" placeholder="${num(p.price)||0}"></label>`:""}`;
   return `<div class="rline">
     <div class="rhead"><div><b>${esc(p.name)}</b><span class="sub">${esc([App.catName(p),p.condition,p.barcode?"ШК "+p.barcode:"",p.sku?"арт. "+p.sku:""].filter(Boolean).join(" · "))}</span></div>
-      <div class="rq">${ser?`<span class="pill info">IMEI</span> <b>${q}</b> шт`:`<button class="btn sm" data-act="rcvQty" data-id="${i}|-1" aria-label="Меньше">−</button><input type="number" min="1" value="${q}" data-rl="${i}|qty" aria-label="Количество"><button class="btn sm" data-act="rcvQty" data-id="${i}|1" aria-label="Больше">+</button>`}</div>
+      <div class="rq">${ser?`<span class="pill info">${App.codeLbl(p)}</span> <b>${q}</b> шт`:`<button class="btn sm" data-act="rcvQty" data-id="${i}|-1" aria-label="Меньше">−</button><input type="number" min="1" value="${q}" data-rl="${i}|qty" aria-label="Количество"><button class="btn sm" data-act="rcvQty" data-id="${i}|1" aria-label="Больше">+</button>`}</div>
       <div class="rprices">${prices}</div>
       <button class="btn sm ghost danger" data-act="rcvDel" data-id="${i}" aria-label="Убрать">✕</button></div>
-    ${ser?`<div class="runits"><input class="uscan" data-rscan="${i}" placeholder="Сканируйте IMEI / серийный номер и Enter" autocomplete="off" aria-label="IMEI">
-      ${(l.units||[]).length?`<table class="units"><thead><tr><th>IMEI / SN</th><th>Состояние</th><th>АКБ, %</th>${price?"<th>Цена экз., ₽</th>":""}<th></th></tr></thead><tbody>
+    ${ser?`<div class="runits"><input class="uscan" data-rscan="${i}" placeholder="Сканируйте ${App.codeName(p)} и Enter" autocomplete="off" aria-label="${App.codeName(p)}">
+      ${(l.units||[]).length?`<table class="units"><thead><tr><th>${App.codeLbl(p)}</th><th>Состояние</th><th>АКБ, %</th>${price?"<th>Цена экз., ₽</th>":""}<th></th></tr></thead><tbody>
       ${l.units.map((u,j)=>`<tr><td><b>${esc(codeOf(u))}</b>${u.warn?`<span class="sub warn">${esc(u.warn)}</span>`:""}${u.condition&&u.condition!=="Новый"||u.attrs?`<div class="chips usum">${App.usedChips(u.attrs)}<button class="btn sm" data-act="rcvUsed" data-id="${i}|${j}">Параметры б/у</button></div>`:""}</td>
         <td><select data-ru="${i}|${j}|condition" aria-label="Состояние">${App.CONDS.map(c=>`<option${(u.condition||p.condition)===c?" selected":""}>${c}</option>`).join("")}</select></td>
         <td><input type="number" min="0" max="100" value="${esc(u.battery_health||"")}" data-ru="${i}|${j}|battery_health" aria-label="АКБ" style="width:70px"></td>
@@ -75,10 +75,10 @@ function addProduct(p,{focusScan=true}={}){
   save();App.render();setTimeout(()=>focus(p.trackSerial&&focusScan?`[data-rscan="${i}"]`:"#rcvQ"),0);
 }
 function addUnit(p,code,extra={}){
-  const pc=App.parseCode(code);if(!pc)return false;const c=pc.imei||pc.serial_no;
-  if(allCodes().some(x=>x.toLowerCase()===c.toLowerCase())){App.toast("Этот IMEI/SN уже есть в приёмке");return false}
+  const pc=App.parseCode(code,App.isPhone(p));if(!pc)return false;const c=pc.imei||pc.serial_no;
+  if(allCodes().some(x=>x.toLowerCase()===c.toLowerCase())){App.toast(App.codeLbl(p)+" "+c+" уже есть в приёмке");return false}
   const u=App.findUnit(c);
-  if(u&&["in_stock","reserved","in_repair"].includes(u.status)){App.toast("IMEI/SN "+c+" уже на складе «"+App.whName(u.whId)+"»");return false}
+  if(u&&["in_stock","reserved","in_repair"].includes(u.status)){App.toast(App.codeLbl(p)+" "+c+" уже на складе «"+App.whName(u.whId)+"»");return false}
   if(u)App.toast("Это устройство уже было в базе — вернётся на склад");else if(pc.warn)App.toast(pc.warn);
   const i=ensureLine(p);R.lines[i].units.push(Object.assign({imei:pc.imei||"",serial_no:pc.serial_no||"",condition:p.condition,battery_health:"",price:"",warn:pc.warn||""},extra));
   save();return true;
@@ -104,7 +104,7 @@ function bind(){
   const q=$("#rcvQ"),box=$("#rcvPick");if(!q)return;
   q.addEventListener("input",()=>{const s=q.value.trim();if(!s){box.hidden=true;return}
     const list=App.searchProducts(s,{limit:8});
-    box.innerHTML=list.map(p=>`<button type="button" data-rpick="${esc(p.id)}"><span>${esc(p.name)}<small> · ${esc(App.catName(p))}${p.trackSerial?" · по IMEI":""} · в наличии ${App.qtyTotal(p)}</small></span><b>${money(p.price)}</b></button>`).join("")
+    box.innerHTML=list.map(p=>`<button type="button" data-rpick="${esc(p.id)}"><span>${esc(p.name)}<small> · ${esc(App.catName(p))}${p.trackSerial?" · по "+App.codeLbl(p):""} · в наличии ${App.qtyTotal(p)}</small></span><b>${money(p.price)}</b></button>`).join("")
       +`<button type="button" data-rpick="__dev"><span>+ Новое устройство Apple…</span></button><button type="button" data-rpick="__item"><span>+ Новый товар «${esc(s)}»</span></button>`;
     box.hidden=false});
   q.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();const v=q.value;q.value="";box.hidden=true;handleCode(v)}});
@@ -132,7 +132,7 @@ ACT.rcvTags=()=>{if(!last)return;App.tagsAdd(last.productIds);App.ui.printTab="t
 ACT.rcvPost=async(_,btn)=>{
   if(!App.can("stock"))return App.toast("Нет права принимать товар");
   if(!R.wh)return App.toast("Выберите склад");
-  for(const l of R.lines){const p=P(l.productId);if(p.trackSerial&&!(l.units||[]).length)return App.toast("Отсканируйте IMEI для «"+p.name+"»");if(!p.trackSerial&&num(l.qty)<1)return App.toast("Количество для «"+p.name+"»")}
+  for(const l of R.lines){const p=P(l.productId);if(p.trackSerial&&!(l.units||[]).length)return App.toast("Отсканируйте "+App.codeName(p)+" для «"+p.name+"»");if(!p.trackSerial&&num(l.qty)<1)return App.toast("Количество для «"+p.name+"»")}
   if(btn.disabled)return;btn.disabled=true;btn.textContent="Проводим…";
   let doc=null;
   try{
@@ -169,7 +169,7 @@ ACT.rcvNewItem=(barcode="",name="")=>{
     ${App.fld("niBar","Штрихкод",App.inp("niBar",barcode,"text","отсканируйте"))}${App.fld("niSku","Артикул",App.inp("niSku"))}
     ${App.can("cost")?App.fld("niCost","Закупка, ₽",App.inp("niCost","","number")):""}${App.can("price")?App.fld("niPrice","Цена продажи, ₽",App.inp("niPrice","","number")):""}
     ${App.fld("niQty","Количество",App.inp("niQty","1","number"))}${App.fld("niCond","Состояние",App.sel("niCond",App.CONDS,"Новый"))}
-    <div class="fld full">${App.chk("niSer","Учёт по IMEI / серийным номерам (техника)",false)}</div></div>
+    <div class="fld full">${App.chk("niSer","Поштучный учёт (IMEI у телефонов, серийный номер у остальной техники)",false)}</div></div>
     <div class="acts"><button class="btn pri" data-act="rcvNewItemSave">Создать и добавить</button></div>`);
   if(!cats.length){const s=$("#niCat");if(s)s.value="__new"}
   setTimeout(()=>focus(name?"#niCost":"#niName"),0);
@@ -217,7 +217,7 @@ function drawDP(){
       ${App.can("cost")?App.fld("dpCost","Закупка, ₽",App.inp("dpCost",DP.cost,"number")):""}
       ${App.can("price")?App.fld("dpPrice",DP.cond==="Новый"?"Цена продажи, ₽":"Цена этого экземпляра, ₽",App.inp("dpPrice",DP.price,"number",ex?String(num(ex.price)):"")):""}
       ${DP.cond!=="Новый"?`<div class="fld full">${App.usedForm("dpu_",DP.ua||{})}</div>`:""}
-      ${App.fld("dpCode","IMEI или серийный номер",App.inp("dpCode",DP.code,"text","сканируйте",'autocomplete="off" class="mono"'),"full")}
+      ${App.fld("dpCode",DP.family==="iPhone"?"IMEI":"Серийный номер",App.inp("dpCode",DP.code,"text","сканируйте",'autocomplete="off" class="mono"'),"full")}
     </div>
     <div class="dpname">${name?`<b>${esc(name)}</b> · ${esc(DP.cond)} ${ex?'<span class="pill">товар уже есть</span>':'<span class="pill info">будет создан</span>'}`:'<span class="muted">Выберите модель, память и цвет</span>'}</div>
     ${DP.count?`<p class="muted">Добавлено в приёмку: ${DP.count}. Сканируйте следующий IMEI той же модели или меняйте параметры.</p>`:""}
