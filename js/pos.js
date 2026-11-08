@@ -91,7 +91,7 @@ VIEWS.pos={
     return `${shiftBar}
     <div class="pos">
       <section class="card">
-        <div class="row-f"><div class="fld grow"><label for="posQ">Товар: название, артикул, штрихкод или IMEI (сканер + Enter)</label><input id="posQ" type="search" autocomplete="off" placeholder="Начните вводить или отсканируйте"><div class="pick" id="posPick" hidden></div></div>
+        <div class="row-f"><div class="fld grow"><label for="posQ">Товар или сканер</label><input id="posQ" type="search" autocomplete="off" placeholder="Название, артикул, штрихкод, IMEI / S/N"><div class="pick" id="posPick" hidden></div></div>
         ${App.fld("posWh","Склад продажи",App.sel("posWh",App.pointWhOpts(),wh,'data-pos="whId"'))}</div>
         <div class="chips" style="margin:12px 0"><button class="chip ${!App.ui.posCat?"on":""}" data-act="posCat" data-id="">Все</button>${cats.map(cg=>`<button class="chip ${App.ui.posCat===cg.id?"on":""}" data-act="posCat" data-id="${esc(cg.id)}">${esc(cg.name)}</button>`).join("")}</div>
         <div class="tilegrid">${quick.map(p=>`<button class="ptile" data-act="posAdd" data-id="${esc(p.id)}"><span>${esc(p.name)}</span><small>${esc(p.condition||"")} · ${App.qtyIn(p,wh)} шт</small><b>${money(p.price)}</b></button>`).join("")||'<div class="empty">На этом складе нет товаров в наличии</div>'}</div>
@@ -103,14 +103,15 @@ VIEWS.pos={
           ${App.fld("posName","Имя",App.inp("posName",P.name,"text","",'data-pos="name"'))}
         </div>
         ${c?`<div class="hint ${c.blacklisted?"bad":"ok"}" style="margin-top:6px">${c.blacklisted?'<span class="pill bad">Чёрный список</span> '+esc(c.blackReason||"")+" · ":""}${esc(c.name)} · покупок ${S.sales.filter(s=>s.customerId===c.id).length}${num(c.discount)?" · скидка "+num(c.discount)+"%":""}${(c.tags||[]).length?" · "+esc(c.tags.join(", ")):""}</div>`:App.phoneKey(P.phone).length===10?'<div class="hint" style="margin-top:6px">Новый клиент, добавится при продаже</div>':""}
-        <div class="tbl-wrap" style="margin-top:10px"><table class="cart"><thead><tr><th>Товар</th><th class="n">Кол-во</th><th class="n">Цена</th><th class="n">Скидка</th><th class="n">Сумма</th><th></th></tr></thead><tbody>
+        <div class="clist">
         ${P.cart.length?P.cart.map((i,k)=>{const p=App.byId("products",i.productId);const below=p&&num(i.price)-num(i.disc)/Math.max(1,num(i.qty))<num(i.unitId?i.cost:p.cost);
-          return `<tr><td>${esc(i.name)}${i.serial?'<span class="sub">'+App.codeLbl(i.productId)+" "+esc(i.serial)+(i.battery!=null&&i.battery!==""?" · АКБ "+i.battery+"%":"")+"</span>":""}${below?'<span class="sub bad">ниже закупки</span>':""}</td>
-          <td class="n"><input type="number" min="1" value="${num(i.qty)}" data-cart="${k}" data-f="qty" id="cq${k}" aria-label="Количество" ${i.serial?"disabled":""}></td>
-          <td class="n"><input type="number" min="0" value="${num(i.price)}" data-cart="${k}" data-f="price" id="cp${k}" aria-label="Цена" ${App.can("price")?"":"disabled"}></td>
-          <td class="n"><input type="number" min="0" value="${num(i.disc)||""}" data-cart="${k}" data-f="disc" id="cd${k}" aria-label="Скидка на строку" placeholder="0"></td>
-          <td class="n">${money(num(i.qty)*num(i.price)-num(i.disc))}</td><td class="n"><button class="btn sm ghost danger" data-act="posDel" data-id="${k}" aria-label="Убрать">✕</button></td></tr>`}).join(""):'<tr><td colspan="6" class="empty">Добавьте товар поиском, сканером или плиткой слева</td></tr>'}
-        </tbody></table></div>
+          return `<div class="cline"><div class="cl-top"><div class="cl-name"><b>${esc(i.name)}</b>${i.serial?'<span class="sub">'+App.codeLbl(i.productId)+" "+esc(i.serial)+(i.battery!=null&&i.battery!==""?" · АКБ "+i.battery+"%":"")+"</span>":""}${below?'<span class="sub bad">ниже закупки</span>':""}</div>
+            <button class="btn sm ghost danger" data-act="posDel" data-id="${k}" aria-label="Убрать">✕</button></div>
+            <div class="cl-row"><label>Кол-во<input type="number" min="1" value="${num(i.qty)}" data-cart="${k}" data-f="qty" id="cq${k}" ${i.serial?"disabled":""}></label>
+            <label>Цена<input type="number" min="0" value="${num(i.price)}" data-cart="${k}" data-f="price" id="cp${k}" ${App.can("price")?"":"disabled"}></label>
+            <label>Скидка<input type="number" min="0" value="${num(i.disc)||""}" data-cart="${k}" data-f="disc" id="cd${k}" placeholder="0"></label>
+            <div class="cl-sum"><span>Сумма</span><b>${money(num(i.qty)*num(i.price)-num(i.disc))}</b></div></div></div>`}).join(""):'<div class="empty">Добавьте товар поиском, сканером или нажмите на плитку товара</div>'}
+        </div>
         <details class="more" ${P.discPct||P.discSum||P.tiDev?"open":""}><summary>Скидка на чек и trade-in</summary>
           <div class="form">
             ${App.fld("posPct","Скидка, %",App.inp("posPct",P.discPct||"","number","0",'data-pos="discPct"'))}

@@ -167,7 +167,10 @@ td .sub.bad{color:var(--bad)}td .sub.warn{color:var(--warn)}
 .shiftbar{padding:10px 14px;border-radius:12px;background:#ECE9DE;font-size:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .shiftbar.ok{background:var(--ok-soft);color:var(--ok)}
 .shiftbar.bad{background:var(--bad-soft);color:var(--bad)}
-.pos{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(360px,1fr);gap:16px;align-items:start}
+.pos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:stretch}
+.pos>.card{min-height:calc(100vh - 190px)}
+.cartcard{display:flex;flex-direction:column}.cartcard .clist{flex:1}
+.cartcard>.btn.big{margin-top:12px}
 .cartcard{position:sticky;top:0}
 .tilegrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;max-height:520px;overflow-y:auto}
 .ptile{display:flex;flex-direction:column;gap:3px;text-align:left;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;cursor:pointer;font:inherit;color:inherit}
@@ -213,7 +216,7 @@ pre.receipt{background:#fff;border:1px dashed var(--line);border-radius:10px;pad
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#F3F0E6;padding:10px 18px;border-radius:14px;font-weight:600;z-index:60;font-size:14px;max-width:calc(100% - 32px);text-align:center}
 .toast[hidden]{display:none}
 
-@media (max-width:1100px){.pos{grid-template-columns:1fr}.cartcard{position:static}}
+@media (max-width:760px){.pos{grid-template-columns:1fr}.pos>.card{min-height:0}.cartcard{position:static}}
 @media (max-width:900px){.g2,.g3{grid-template-columns:1fr}}
 @media (max-width:760px){
   .app{grid-template-columns:1fr}
@@ -363,3 +366,25 @@ details>summary{padding-right:8px}
 th.wh{line-height:1.15;white-space:nowrap}
 th.wh small{display:block;font-weight:500;opacity:.7;font-size:11px}
 @media (max-width:1180px){.tbl-wrap td .sub{white-space:normal}}
+
+/* касса: строки чека карточками — помещаются в узкую колонку */
+.clist{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.clist>.empty{border:1px dashed var(--line);border-radius:12px;padding:28px 12px}
+.cline{border:1px solid var(--line);border-radius:12px;background:#fff;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.cl-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.cl-name{display:flex;flex-direction:column;gap:2px;min-width:0}.cl-name b{font-size:14px;line-height:1.3}
+.cl-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:8px;align-items:end}
+.cl-row label{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--muted);min-width:0}
+.cl-row input{width:100%;padding:6px 8px;text-align:right}
+.cl-sum{display:flex;flex-direction:column;align-items:flex-end;gap:3px;min-width:84px}.cl-sum span{font-size:11px;color:var(--muted)}.cl-sum b{font-size:15px;padding:6px 0;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cartcard{container-type:inline-size}
+.cl-name .sub{font-size:12px;color:var(--muted);line-height:1.35;word-break:break-word}.cl-name .sub.bad{color:var(--bad)}
+.cl-row{grid-template-columns:minmax(0,.8fr) minmax(0,1.3fr) minmax(0,1fr) auto}
+.cl-row input{font-size:14px;min-width:0}
+@container (max-width:420px){
+  .cartcard .form{grid-template-columns:1fr}
+  .cl-row{grid-template-columns:minmax(0,.8fr) minmax(0,1.3fr) minmax(0,1fr)}
+  .cl-sum{grid-column:1/-1;flex-direction:row;justify-content:space-between;align-items:baseline;border-top:1px dashed var(--line);padding-top:6px}
+  .cl-sum b{padding:0}
+}
+.pos .tilegrid{grid-template-columns:repeat(auto-fill,minmax(135px,1fr))}
