@@ -37,7 +37,7 @@ VIEWS.stock={
       <td><b>${esc(p.name)}</b>${p.condition&&p.condition!=="Новый"?` <span class="pill">${esc(p.condition)}</span>`:""}<span class="sub">${esc(App.catName(p))}${p.sku?" · "+esc(p.sku):""}${p.serial?" · IMEI "+esc(p.serial):""}</span></td>
       ${u.stockWh?`<td class="n">${qtyCell(App.qtyIn(p,u.stockWh),p)}</td>`:whs.map(w=>`<td class="n">${App.qtyIn(p,w.id)||'<span class="muted">·</span>'}</td>`).join("")+`<td class="n">${qtyCell(App.qtyTotal(p),p)}</td>`}
       ${showCost?`<td class="n">${money(p.cost)}</td>`:""}<td class="n"><b>${money(p.price)}</b></td>
-      ${showCost?`<td class="n">${App.markupBad(p)?`<span class="pill warn" title="Меньше ${money(App.settings().minMarkup)}">${money(mk)}</span>`:mk<0?`<span class="pill bad">${money(mk)}</span>`:money(mk)}</td>`:""}
+      ${showCost?`<td class="n">${mk<0?`<span class="pill bad">${money(mk)}</span>`:money(mk)}</td>`:""}
       <td><div class="chips">${p.onSite?'<span class="pill info">Сайт</span>':""}${p.onAvito?'<span class="pill info">Авито</span>':""}</div></td></tr>`}).join("")||`<tr><td colspan="9" class="empty">Ничего не найдено${roots.length?"":". Сначала создайте категории в настройках"}</td></tr>`}
     </tbody></table></div>${list.length>shown.length?`<div class="acts" style="justify-content:center;margin-top:10px"><button class="btn" data-act="moreStock">Показать ещё (${list.length-shown.length})</button></div>`:""}</section>`;
   }
@@ -73,7 +73,7 @@ function productForm(id){
     ${App.fld("pDiag","Результат диагностики",App.inp("pDiag",p.diagnostics,"text","Всё исправно, замен не было",edit?"":"disabled"),"full")}
     ${App.fld("pKit","Комплектация",App.inp("pKit",p.kit,"text","Коробка, кабель",edit?"":"disabled"),"full")}
     ${!id&&edit?App.fld("pQty","Начальный остаток",App.inp("pQty","","number","0"))+App.fld("pWh","На склад",App.sel("pWh",App.whs().map(w=>[w.id,w.name]),App.cashWh())):""}
-    <div class="fld full"><label>Где продаём</label><div class="chips">${App.chk("pSite","Сайт icase52.ru",p.onSite)}${App.chk("pOnAvito","Авито",p.onAvito)}</div></div>
+    <div class="fld full"><label>Где продаём</label><div class="chips">${App.chk("pSite","Сайт",p.onSite)}${App.chk("pOnAvito","Авито",p.onAvito)}</div></div>
     ${App.fld("pNote","Описание / заметка",App.area("pNote",p.note||""),"full")}
   </div>
   ${id?`<section><h3 class="sub-h">Движение</h3><div class="tbl-wrap"><table><tbody>${moves.map(m=>`<tr><td>${App.dtt(m.at)}</td><td>${esc(App.MOVE[m.type]||m.type)}</td><td>${esc(App.whName(m.whId))}</td><td class="n"><span class="pill ${num(m.qty)>0?"ok":"mute"}">${num(m.qty)>0?"+":""}${num(m.qty)}</span></td><td>${esc(m.ref)}${m.note?'<span class="sub">'+esc(m.note)+"</span>":""}</td></tr>`).join("")||'<tr><td class="empty">Движений нет</td></tr>'}</tbody></table></div></section>`:""}
@@ -83,8 +83,8 @@ function productForm(id){
     ${edit||price?`<button class="btn pri" data-act="saveProduct" data-id="${esc(id||"")}">Сохранить</button>`:""}
   </div>`,{wide:true});
   const mk=()=>{const h=$("#pMk");if(!h||!cost)return;const c=num(App.val("pCost")),pr=num(App.val("pPrice"));if(!c||!pr){h.textContent="";return}
-    const tmp={categoryId:App.val("pCat"),cost:c,price:pr};const d=pr-c,bad=App.isDevice(tmp)&&d<st.minMarkup;
-    h.textContent="Наценка "+money(d)+" ("+Math.round(d/c*100)+"%)"+(bad?" · меньше правила "+money(st.minMarkup)+" для устройств":"")+(d<0?" · ниже закупки":"");h.className="hint "+(bad||d<0?"bad":"ok")};
+    const d=pr-c;
+    h.textContent="Наценка "+money(d)+" ("+Math.round(d/c*100)+"%)"+(d<0?" · ниже закупки":"");h.className="hint "+(d<0?"bad":"ok")};
   ["pCost","pPrice","pCat"].forEach(i=>{const el=document.getElementById(i);if(el)el.addEventListener("input",mk)});mk();
 }
 ACT.saveProduct=async(id,btn)=>{

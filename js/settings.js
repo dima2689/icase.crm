@@ -21,7 +21,7 @@ function shop(){
   return `<section class="card"><div class="card-h"><h2>Магазин и правила</h2></div><div class="form">
     ${App.fld("sName","Название",App.inp("sName",s.shopName))}${App.fld("sCity","Город",App.inp("sCity",s.city))}
     ${App.fld("sAddr","Адрес (по умолчанию для чеков)",App.inp("sAddr",s.address))}${App.fld("sPhone","Телефон",App.inp("sPhone",s.phone))}
-    ${App.fld("sInn","ИНН ИП (для чеков)",App.inp("sInn",s.inn))}${App.fld("sMk","Мин. наценка на устройства, ₽",App.inp("sMk",s.minMarkup,"number"))}
+    ${App.fld("sInn","ИНН ИП (для чеков)",App.inp("sInn",s.inn))}
     ${App.fld("sWarr","Гарантия на устройства, мес.",App.inp("sWarr",s.deviceWarrantyMonths,"number"))}${App.fld("sRw","Гарантия на ремонт, дней",App.inp("sRw",s.repairWarrantyDays,"number"))}
     ${App.fld("sStore","Бесплатное хранение готовых ремонтов, дней",App.inp("sStore",s.storageDays,"number"))}${App.fld("sDead","Товар «залежался» через, дней",App.inp("sDead",s.deadDays,"number"))}
     ${App.fld("sFoot","Подпись в чеке",App.inp("sFoot",s.receiptFooter),"full")}
@@ -30,7 +30,7 @@ function shop(){
 }
 ACT.saveSettings=(_,btn)=>run(btn,async()=>{
   const V=App.val;
-  await App.api.update("settings",1,{shop_name:V("sName")||"iCase",city:V("sCity"),address:V("sAddr")||null,phone:V("sPhone")||null,inn:V("sInn")||null,min_markup:num(V("sMk")),
+  await App.api.update("settings",1,{shop_name:V("sName")||"iCase",city:V("sCity"),address:V("sAddr")||null,phone:V("sPhone")||null,inn:V("sInn")||null,
     device_warranty_months:num(V("sWarr")),repair_warranty_days:num(V("sRw")),storage_days:num(V("sStore"))||30,dead_days:num(V("sDead"))||60,receipt_footer:V("sFoot")||null,require_shift:App.checked("sShift")});
   await App.api.audit("Настройки изменены","","");App.toast("Настройки сохранены");
 });
@@ -98,7 +98,7 @@ function categories(){
   const cnt=id=>S.products.filter(p=>!p.archived&&App.inCat(p,id)).length;
   const row=(c,lvl)=>`<tr class="rowlink" data-act="catForm" data-id="${esc(c.id)}"><td style="padding-left:${10+lvl*22}px">${lvl?"— ":""}<b>${esc(c.name)}</b></td><td>${c.isDevice?'<span class="pill dark">устройство</span>':""}</td><td class="n">${cnt(c.id)}</td></tr>`;
   return `<section class="card"><div class="card-h"><h2>Категории</h2>${App.can("settings")?'<button class="btn pri sm" data-act="catForm">+ Категория</button>':""}</div>
-  <p class="muted">Флажок «устройство» включает правило минимальной наценки и гарантию на устройства. Подкатегории наследуют его.</p>
+  <p class="muted">Флажок «устройство» включает гарантию на устройства из настроек магазина. Подкатегории наследуют его.</p>
   <div class="tbl-wrap"><table><thead><tr><th>Название</th><th>Тип</th><th class="n">Товаров</th></tr></thead><tbody>
   ${App.catChildren("").map(c=>row(c,0)+App.catChildren(c.id).map(s=>row(s,1)).join("")).join("")||'<tr><td colspan="3" class="empty">Категорий нет</td></tr>'}
   </tbody></table></div></section>`;
@@ -108,7 +108,7 @@ ACT.catForm=id=>{
   const c=id?App.cat(id):{parentId:"",isDevice:false};
   App.openModal(App.head(id?"Категория":"Новая категория",id&&App.can("del")?`<button class="btn sm danger" data-act="catDel" data-id="${esc(id)}">Удалить</button>`:"")+`<div class="form">
   ${App.fld("kName","Название",App.inp("kName",c.name))}${App.fld("kParent","Родительская",App.sel("kParent",[["","— верхний уровень —"],...App.catChildren("").filter(x=>x.id!==id).map(x=>[x.id,x.name])],c.parentId||""))}
-  <div class="fld full">${App.chk("kDev","Устройство (правило наценки, гарантия)",c.isDevice)}</div></div>
+  <div class="fld full">${App.chk("kDev","Устройство (гарантия на устройства)",c.isDevice)}</div></div>
   <div class="acts"><button class="btn pri" data-act="catSave" data-id="${esc(id||"")}">Сохранить</button></div>`);
 };
 ACT.catSave=(id,btn)=>run(btn,async()=>{

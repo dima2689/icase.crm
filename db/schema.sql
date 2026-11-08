@@ -1,6 +1,6 @@
 -- =====================================================================
 -- iCase · единая база данных v3: сеть точек (Supabase / PostgreSQL 15+)
--- Одна база для CRM, приложения сотрудников и сайта icase52.ru.
+-- Одна база для CRM, приложения сотрудников и сайта.
 -- Склады, документы, кассовые смены, возвраты, ремонт, роли, журнал.
 -- Запуск: Supabase → SQL Editor → вставить файл целиком → Run.
 -- =====================================================================
@@ -19,9 +19,8 @@ create type sale_channel    as enum ('store','site','avito','phone');
 -- ---------- настройки ----------
 create table settings (
   id int primary key default 1 check (id = 1),
-  shop_name text not null default 'iCase', city text default 'Дзержинск', address text, phone text, inn text,
-  min_markup numeric(12,2) not null default 5000,
-  device_warranty_months int not null default 6,
+  shop_name text not null default 'iCase', city text, address text, phone text, inn text,
+  device_warranty_months int not null default 0,
   repair_warranty_days int not null default 90,
   require_shift boolean not null default true,
   storage_days int not null default 30,
@@ -338,7 +337,7 @@ begin
   if p_tradein_device is not null then
     select id into v_cat from categories where is_device and parent_id is null order by name limit 1;
     insert into products(name,category_id,condition,serial,cost,price,description)
-      values (p_tradein_device,v_cat,'Б/у хорошее',p_tradein_imei,p_tradein_amount,p_tradein_amount+st.min_markup,'Trade-in по '||v_num) returning id into v_ti;
+      values (p_tradein_device,v_cat,'Б/у хорошее',p_tradein_imei,p_tradein_amount,p_tradein_amount,'Trade-in по '||v_num) returning id into v_ti;
     insert into stock_movements(product_id,warehouse_id,type,qty,ref) values (v_ti,p_wh,'tradein',1,v_num);
   end if;
   insert into integration_jobs(target,action,payload) values ('kassa','sale_receipt',jsonb_build_object('sale_id',v_sale));
@@ -505,10 +504,6 @@ create view v_point_revenue with (security_invoker = true) as                   
 create view v_low_stock with (security_invoker = true) as
   select p.id, p.name, p.min_qty, coalesce(sum(s.qty),0) as qty from products p left join stock s on s.product_id=p.id
   where not p.is_archived and p.min_qty > 0 group by p.id having coalesce(sum(s.qty),0) <= p.min_qty;
-create view v_markup_violations with (security_invoker = true) as
-  select p.id, p.name, p.cost, p.price, p.price-p.cost as markup from products p
-  join categories c on c.id=p.category_id left join categories pc on pc.id=c.parent_id
-  where (c.is_device or coalesce(pc.is_device,false)) and p.cost > 0 and p.price - p.cost < (select min_markup from settings where id=1);
 create view v_daily_revenue with (security_invoker = true) as
   select d as day, sum(amount) as revenue from (
     select created_at::date as d, total as amount from sales

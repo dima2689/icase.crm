@@ -30,7 +30,7 @@ async function all(table,select="*",mod){
 
 /* ---------- преобразование строк базы в объекты интерфейса ---------- */
 const M={
-  settings:r=>({id:"main",shopName:r.shop_name,city:r.city,address:r.address||"",phone:r.phone||"",inn:r.inn||"",minMarkup:num(r.min_markup),
+  settings:r=>({id:"main",shopName:r.shop_name,city:r.city||"",address:r.address||"",phone:r.phone||"",inn:r.inn||"",
     deviceWarrantyMonths:r.device_warranty_months,repairWarrantyDays:r.repair_warranty_days,requireShift:r.require_shift,storageDays:r.storage_days,deadDays:r.dead_days,receiptFooter:r.receipt_footer||""}),
   points:r=>({id:r.id,name:r.name,address:r.address||"",phone:r.phone||"",patentNo:r.patent_no||"",evotorStoreId:r.evotor_store_id||"",cashWh:r.cash_wh,serviceWh:r.service_wh,order:r.sort,active:r.is_active}),
   warehouses:r=>({id:r.id,name:r.name,kind:r.kind||"",address:r.address||"",pointId:r.point_id,order:r.sort,active:r.is_active}),

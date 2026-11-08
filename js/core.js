@@ -38,8 +38,8 @@ const PERMS = {
 };
 App.can = a => (PERMS[a]||[]).includes(App.me.role);
 
-App.DEFAULTS = {shopName:"iCase", city:"Дзержинск", address:"", phone:"", inn:"", minMarkup:5000, deviceWarrantyMonths:6,
-  repairWarrantyDays:90, requireShift:true, storageDays:30, deadDays:60, receiptFooter:"Спасибо за покупку! Устройство проверено при покупателе."};
+App.DEFAULTS = {shopName:"iCase", city:"", address:"", phone:"", inn:"", deviceWarrantyMonths:0,
+  repairWarrantyDays:90, requireShift:true, storageDays:30, deadDays:60, receiptFooter:"Спасибо за покупку!"};
 
 /* ---------- состояние ---------- */
 App.COLS = ["settings","points","warehouses","categories","suppliers","services","products","customers","sales","returns","docs","movements","shifts","cashops","staff","staffreq","log","repairs"];
@@ -94,7 +94,6 @@ App.inCat = (p,catId)=>{if(!catId)return true;if(p.categoryId===catId)return tru
 App.qtyIn = (p,wh)=>p&&p.stock?num(p.stock[wh]):0;
 App.qtyTotal = p=>p&&p.stock?Object.values(p.stock).reduce((a,v)=>a+num(v),0):0;
 App.isLow = p=>!p.archived&&num(p.minQty)>0&&App.qtyTotal(p)<=num(p.minQty);
-App.markupBad = p=>App.isDevice(p)&&num(p.cost)>0&&num(p.price)-num(p.cost)<App.settings().minMarkup;
 App.whereElse = (p,except)=>App.whs().filter(w=>w.id!==except&&App.qtyIn(p,w.id)>0).map(w=>w.name+": "+App.qtyIn(p,w.id)).join(", ");
 App.findByCode = code=>{const c=String(code||"").trim().toLowerCase();if(!c)return null;
   return S.products.find(p=>!p.archived&&[p.barcode,p.sku,p.serial].some(x=>x&&String(x).toLowerCase()===c))||null};

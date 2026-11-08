@@ -103,8 +103,8 @@ VIEWS.pos={
         </div>
         ${c?`<div class="hint ${c.blacklisted?"bad":"ok"}" style="margin-top:6px">${c.blacklisted?'<span class="pill bad">Чёрный список</span> '+esc(c.blackReason||"")+" · ":""}${esc(c.name)} · покупок ${S.sales.filter(s=>s.customerId===c.id).length}${num(c.discount)?" · скидка "+num(c.discount)+"%":""}${(c.tags||[]).length?" · "+esc(c.tags.join(", ")):""}</div>`:App.phoneKey(P.phone).length===10?'<div class="hint" style="margin-top:6px">Новый клиент, добавится при продаже</div>':""}
         <div class="tbl-wrap" style="margin-top:10px"><table class="cart"><thead><tr><th>Товар</th><th class="n">Кол-во</th><th class="n">Цена</th><th class="n">Скидка</th><th class="n">Сумма</th><th></th></tr></thead><tbody>
-        ${P.cart.length?P.cart.map((i,k)=>{const p=App.byId("products",i.productId);const bad=p&&App.isDevice(p)&&num(i.price)-num(p.cost)-num(i.disc)/Math.max(1,num(i.qty))<st.minMarkup&&num(p.cost)>0;const below=p&&num(i.price)-num(i.disc)/Math.max(1,num(i.qty))<num(p.cost);
-          return `<tr><td>${esc(i.name)}${i.serial?'<span class="sub">IMEI '+esc(i.serial)+"</span>":""}${below?'<span class="sub bad">ниже закупки</span>':bad?'<span class="sub warn">наценка меньше '+money(st.minMarkup)+"</span>":""}</td>
+        ${P.cart.length?P.cart.map((i,k)=>{const p=App.byId("products",i.productId);const below=p&&num(i.price)-num(i.disc)/Math.max(1,num(i.qty))<num(p.cost);
+          return `<tr><td>${esc(i.name)}${i.serial?'<span class="sub">IMEI '+esc(i.serial)+"</span>":""}${below?'<span class="sub bad">ниже закупки</span>':""}</td>
           <td class="n"><input type="number" min="1" value="${num(i.qty)}" data-cart="${k}" data-f="qty" id="cq${k}" aria-label="Количество" ${i.serial?"disabled":""}></td>
           <td class="n"><input type="number" min="0" value="${num(i.price)}" data-cart="${k}" data-f="price" id="cp${k}" aria-label="Цена" ${App.can("price")?"":"disabled"}></td>
           <td class="n"><input type="number" min="0" value="${num(i.disc)||""}" data-cart="${k}" data-f="disc" id="cd${k}" aria-label="Скидка на строку" placeholder="0"></td>
@@ -193,7 +193,7 @@ ACT.posConfirm=async(_,btn)=>{
 App.saleText=function(s){
   const st=App.settings(),c=App.cust(s.customerId)||{};
   const lines=(s.items||[]).map(i=>`${i.name}${i.serial?" (IMEI "+i.serial+")":""}\n   ${i.qty} × ${money(i.price)}${num(i.disc)?" − "+money(i.disc):""} = ${money(i.qty*i.price-num(i.disc))}${i.warranty?"  гарантия "+i.warranty+" мес.":""}`).join("\n");
-  return [`${st.shopName} · ${st.city}${st.address?", "+st.address:""}${st.phone?" · "+st.phone:""}`,st.inn?"ИНН "+st.inn:"",
+  return [`${st.shopName}${st.city?" · "+st.city:""}${st.address?", "+st.address:""}${st.phone?" · "+st.phone:""}`,st.inn?"ИНН "+st.inn:"",
     `ТОВАРНЫЙ ЧЕК № ${s.num} от ${App.dtt(s.createdAt)}`,c.name?`Покупатель: ${c.name} ${c.phone||""}`:"","",lines,"",
     num(s.discount)?`Скидка: −${money(s.discount)}`:"",s.tradeIn?`Trade-in (${s.tradeIn.device}): −${money(s.tradeIn.amount)}`:"",
     `ИТОГО: ${money(s.total)}`,`Оплата: ${App.paysText(s.payments)||"—"}`,`Продавец: ${App.nameOf(s.by)}`,"",st.receiptFooter].filter((x,i,a)=>x!==""||a[i-1]!=="").join("\n");
