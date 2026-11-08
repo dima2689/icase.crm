@@ -43,7 +43,7 @@ App.DEFAULTS = {shopName:"iCase", city:"", address:"", phone:"", inn:"", deviceW
   receiptAck:"Устройство осмотрено, проверено, претензий к внешнему виду и комплектации не имею."};
 
 /* ---------- состояние ---------- */
-App.COLS = ["settings","points","warehouses","categories","suppliers","services","products","customers","sales","returns","docs","movements","shifts","cashops","staff","staffreq","log","repairs","units","models","siteorders"];
+App.COLS = ["settings","points","warehouses","categories","suppliers","services","products","customers","sales","returns","docs","movements","shifts","cashops","staff","staffreq","log","repairs","units","models","siteorders","sprices"];
 const S = App.S = {}; App.COLS.forEach(c=>S[c]=[]);
 App.ui = {view:"dashboard"};
 App.me = {id:null, role:null, pointId:null, name:"", email:""};
@@ -157,7 +157,8 @@ App.toCSV = rows=>"﻿"+rows.map(r=>r.map(v=>{const s=String(v==null?"":v);retur
 App.parseCSV = function(text){
   text=String(text).replace(/^﻿/,"");
   const first=text.split(/\r?\n/)[0]||"";
-  const d=(first.match(/;/g)||[]).length>=(first.match(/,/g)||[]).length?";":(first.includes("\t")?"\t":",");
+  const tabs=(first.match(/\t/g)||[]).length,semi=(first.match(/;/g)||[]).length,comma=(first.match(/,/g)||[]).length;
+  const d=tabs&&tabs>=semi&&tabs>=comma?"\t":semi>=comma&&semi?";":comma?",":(tabs?"\t":";");
   const rows=[];let row=[],f="",q=false;
   for(let i=0;i<text.length;i++){const ch=text[i];
     if(q){if(ch==='"'){if(text[i+1]==='"'){f+='"';i++}else q=false}else f+=ch}

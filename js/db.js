@@ -35,7 +35,9 @@ const M={
   points:r=>({id:r.id,name:r.name,address:r.address||"",phone:r.phone||"",patentNo:r.patent_no||"",evotorStoreId:r.evotor_store_id||"",cashWh:r.cash_wh,serviceWh:r.service_wh,order:r.sort,active:r.is_active}),
   warehouses:r=>({id:r.id,name:r.name,kind:r.kind||"",address:r.address||"",pointId:r.point_id,order:r.sort,active:r.is_active}),
   categories:r=>({id:r.id,name:r.name,parentId:r.parent_id||"",isDevice:r.is_device,isUsed:!!r.is_used}),
-  suppliers:r=>({id:r.id,name:r.name,inn:r.inn||"",contact:r.contact||"",phone:r.phone||"",note:r.note||""}),
+  suppliers:r=>({id:r.id,name:r.name,inn:r.inn||"",contact:r.contact||"",phone:r.phone||"",note:r.note||"",priceUpdatedAt:r.price_updated_at||""}),
+  sprices:r=>({id:r.id,supplierId:r.supplier_id,name:r.name,sku:r.sku||"",brand:r.brand||"",price:num(r.price),stock:r.stock||"",note:r.note||"",productId:r.product_id||"",updatedAt:r.updated_at,
+    _s:[r.name,r.sku,r.brand,r.note].join(" ").toLowerCase().replace(/ё/g,"е").replace(/[^a-zа-я0-9]+/g," ")}),
   services:r=>({id:r.id,name:r.name,group:r.grp||"",price:num(r.price)}),
   customers:r=>({id:r.id,name:r.name,phone:App.fmtPhone(r.phone),phone2:r.phone2?App.fmtPhone(r.phone2):"",email:r.email||"",birthday:r.birthday||"",source:r.source||"",
     discount:num(r.discount),tags:r.tags||[],blacklisted:r.blacklisted,blackReason:r.black_reason||"",note:r.note||"",mergedInto:r.merged_into,createdAt:r.created_at}),
@@ -88,13 +90,14 @@ const L={
   units:async()=>(await all("units")).map(M.units),
   models:async()=>(await all("apple_models","*",r=>r.order("sort"))).map(M.models),
   siteorders:async()=>(await all("site_orders","*",r=>r.order("created_at",{ascending:false}))).map(M.siteorders),
+  sprices:async()=>App.can("cost")?(await all("supplier_prices")).map(M.sprices):[],
   log:async()=>(await q(sb.from("audit_log").select("*").order("created_at",{ascending:false}).limit(500),"log")).map(M.log)
 };
 /* таблица базы → разделы, которые нужно перечитать */
 const T={settings:["settings"],points:["points"],warehouses:["warehouses"],categories:["categories"],suppliers:["suppliers"],services:["services"],
   customers:["customers"],products:["products"],stock:["products"],stock_movements:["movements"],stock_docs:["docs"],stock_doc_lines:["docs"],
   sales:["sales"],sale_items:["sales"],sale_payments:["sales"],returns:["returns"],return_items:["returns"],shifts:["shifts"],cash_ops:["cashops"],
-  staff:["staff"],staff_requests:["staffreq"],audit_log:["log"],units:["units"],apple_models:["models"],site_orders:["siteorders"]};
+  staff:["staff"],staff_requests:["staffreq"],audit_log:["log"],units:["units"],apple_models:["models"],site_orders:["siteorders"],supplier_prices:["sprices"]};
 
 App.reload = async function(cols){
   cols=[...new Set(cols)].filter(c=>L[c]);

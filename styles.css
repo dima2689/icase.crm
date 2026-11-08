@@ -482,3 +482,8 @@ button.tile{font:inherit;color:inherit;text-align:left;cursor:pointer}button.til
 .cnm small.bad,.whr-main small.bad{color:var(--bad)}
 .cav.mute{background:#ECE9DE;color:var(--muted)}
 label.chip{cursor:pointer}
+/* поставщики */
+.spc .row-f{margin-top:6px;gap:6px}.spc{cursor:default}
+.sprow .cnm small.ok{color:var(--ok)}
+.offers{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:10px 0 4px;font-size:13px}.offers .pill{border:0;cursor:pointer;font:inherit;font-size:12px}
+.crow.sprow{grid-template-columns:minmax(0,1fr) auto}.sprow .cnm b{white-space:normal}
