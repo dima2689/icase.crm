@@ -429,5 +429,5 @@ th.wh small{display:block;font-weight:500;opacity:.7;font-size:11px}
 .plist.open .pl-trig{position:relative;z-index:41}
 .pl-pop{z-index:42;animation:plfade .15s ease-out}
 @keyframes plfade{from{opacity:0}to{opacity:1}}
-.shiftbottom{margin-top:16px;display:flex;gap:10px;align-items:stretch}.shiftbottom .shiftbar{flex:1}.shiftbottom>.btn{flex:none}
-@media (max-width:560px){.shiftbottom{flex-direction:column}}
+.shiftbottom{margin-top:16px;display:flex;flex-direction:column;gap:10px}
+.sb-acts{display:flex;gap:8px;flex-wrap:wrap}.sb-acts .btn{flex:1 1 auto}
