@@ -50,4 +50,4 @@
 ## Файлы
 - `db/mig_site.sql` — таблицы, функции, расписание (применено в Supabase как `icase_v3_site_*`).
 - `supabase/functions/site-sync/` — выгрузка на сайт; `supabase/functions/site-api/` — приём заказов и фид.
-- `supabase/functions/tests/local_test.ts` — проверка на поддельном WooCommerce (27 проверок).
+- `supabase/functions/tests/local_test.ts` — проверка на поддельном WooCommerce и на поддельном сайте Next.js (44 проверки).
