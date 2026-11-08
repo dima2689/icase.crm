@@ -75,9 +75,12 @@ App.posToday=pid=>{const now=new Date(),r={cash:0,non:0,n:0,ret:0};
   S.sales.filter(x=>x.pointId===pid&&App.sameDay(x.createdAt,now)).forEach(x=>{r.n++;(x.payments||[]).forEach(p=>{if(p.method==="cash")r.cash+=p.amount;else r.non+=p.amount})});
   S.returns.filter(x=>App.sameDay(x.createdAt,now)&&((App.byId("sales",x.saleId)||{}).pointId===pid)).forEach(x=>{r.ret+=x.amount;if(x.method==="cash")r.cash-=x.amount;else r.non-=x.amount});
   r.total=r.cash+r.non;return r};
-function posToday(){const pt=App.point();if(!pt)return "";const t=App.posToday(pt.id),sh=App.openShift();
-  return `<section class="card todaybox"><div class="tb-h"><b>Сегодня в кассе</b><span class="muted">${esc(pt.name)} · ${t.n} ${t.n%10===1&&t.n%100!==11?"чек":t.n%10>=2&&t.n%10<=4&&(t.n%100<10||t.n%100>=20)?"чека":"чеков"}${t.ret?" · возвраты "+money(t.ret):""}</span></div>
-    <div class="tb-row"><div><span>Наличные</span><b>${money(t.cash)}</b>${sh?`<small>в ящике ${money(App.shiftTotals(sh).expectedCash)}</small>`:""}</div><div><span>Безналичные</span><b>${money(t.non)}</b><small>карта, СБП, перевод</small></div><div class="tb-tot"><span>Всего</span><b>${money(t.total)}</b></div></div></section>`}
+function posToday(){const pt=App.point();if(!pt)return "";const t=App.posToday(pt.id),sh=App.openShift(),open=!!App.ui.posTodayOpen;
+  const nw=t.n%10===1&&t.n%100!==11?"чек":t.n%10>=2&&t.n%10<=4&&(t.n%100<10||t.n%100>=20)?"чека":"чеков";
+  return `<div class="totbox todaybox ${open?"open":""}"><button class="fsh" data-act="posTodayT" aria-expanded="${open}"><span class="ft">Сегодня</span><span class="fsum">${money(t.total)} · нал. ${money(t.cash)} · безнал ${money(t.non)}</span><span class="car"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform:rotate(${open?180:0}deg);transition:transform .15s"><path d="M6 9l6 6 6-6"/></svg></span><span class="totbtn">${open?"Свернуть":"Развернуть"}</span></button>
+    ${open?`<div class="tb-body"><div class="tb-h muted">${esc(pt.name)} · ${t.n} ${nw}${t.ret?" · возвраты "+money(t.ret):""}</div>
+    <div class="tb-row"><div><span>Наличные</span><b>${money(t.cash)}</b>${sh?`<small>в ящике ${money(App.shiftTotals(sh).expectedCash)}</small>`:""}</div><div><span>Безналичные</span><b>${money(t.non)}</b><small>карта, СБП, перевод</small></div><div class="tb-tot"><span>Всего</span><b>${money(t.total)}</b></div></div></div>`:""}</div>`}
+ACT.posTodayT=()=>{App.ui.posTodayOpen=!App.ui.posTodayOpen;App.render()};
 function posTotals(){
   const sub=P.cart.reduce((a,i)=>a+num(i.qty)*num(i.price)-num(i.disc),0);
   const disc=Math.round(sub*num(P.discPct)/100)+num(P.discSum);

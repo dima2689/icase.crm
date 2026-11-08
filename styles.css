@@ -396,8 +396,8 @@ th.wh small{display:block;font-weight:500;opacity:.7;font-size:11px}
   .cartcard .form{grid-template-columns:repeat(2,minmax(0,280px))}
 }
 /* касса: итоги дня */
-.todaybox{margin:14px 0 0;padding:14px 18px}
-.tb-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px}.tb-h .muted{font-size:13px}
+.todaybox{margin:14px 0 0}.tb-body{padding:0 2px 14px}
+.tb-h{font-size:13px;margin-bottom:10px}
 .tb-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .tb-row>div{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}
 .tb-row span{font-size:12px;color:var(--muted)}.tb-row b{font-size:20px;font-variant-numeric:tabular-nums;white-space:nowrap}.tb-row small{font-size:12px;color:var(--muted)}
