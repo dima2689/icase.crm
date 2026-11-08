@@ -43,7 +43,7 @@ App.DEFAULTS = {shopName:"iCase", city:"", address:"", phone:"", inn:"", deviceW
   receiptAck:"Устройство осмотрено, проверено, претензий к внешнему виду и комплектации не имею."};
 
 /* ---------- состояние ---------- */
-App.COLS = ["settings","points","warehouses","categories","suppliers","services","products","customers","sales","returns","docs","movements","shifts","cashops","staff","staffreq","log","repairs","units","models"];
+App.COLS = ["settings","points","warehouses","categories","suppliers","services","products","customers","sales","returns","docs","movements","shifts","cashops","staff","staffreq","log","repairs","units","models","siteorders"];
 const S = App.S = {}; App.COLS.forEach(c=>S[c]=[]);
 App.ui = {view:"dashboard"};
 App.me = {id:null, role:null, pointId:null, name:"", email:""};

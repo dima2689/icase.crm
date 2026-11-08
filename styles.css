@@ -474,3 +474,11 @@ th.wh small{display:block;font-weight:500;opacity:.7;font-size:11px}
 button.tile{font:inherit;color:inherit;text-align:left;cursor:pointer}button.tile:hover{border-color:var(--sage);background:var(--sage-soft)}
 .whtop{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}.whtop .fld{flex:1 1 260px}.whbox .tiles{margin-top:12px}
 .whsum{margin-top:10px;border-top:1px solid var(--line);padding-top:12px}
+/* обмен с сайтом */
+.steps{margin:0 0 14px;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:14px;line-height:1.45}
+.kvcopy{display:grid;grid-template-columns:220px minmax(0,1fr) auto auto;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--line);font-size:13px}
+.kvcopy>span{color:var(--muted)}.kvcopy code{background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+@media (max-width:760px){.kvcopy{grid-template-columns:1fr auto}.kvcopy>span{grid-column:1/-1}}
+.cnm small.bad,.whr-main small.bad{color:var(--bad)}
+.cav.mute{background:#ECE9DE;color:var(--muted)}
+label.chip{cursor:pointer}

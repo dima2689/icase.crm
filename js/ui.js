@@ -12,6 +12,7 @@ App.NAV = [
   ["pos","Касса",'<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M7 20h10M12 16v4M7 8h4M7 11h7"/>',"sale"],
   ["repairs","Ремонт",'<path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3 17.8V21h3.2l6.3-6.3a4 4 0 0 0 5.2-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>',"repair"],
   ["sales","Продажи",'<path d="M4 4h16v16l-3-2-3 2-2-2-2 2-3-2-3 2z"/><path d="M8 9h8M8 13h5"/>',"sale"],
+  ["orders","Заказы",'<path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H2"/><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/>',"sale"],
   ["stock","Товары",'<path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7M12 11v10"/>',null],
   ["receive","Приёмка",'<path d="M3 9l9-5 9 5v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M12 9v7M9 13l3 3 3-3"/>',"stock"],
   ["docs","Склад",'<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>',"stock"],
@@ -22,7 +23,7 @@ App.NAV = [
 ];
 App.navAllowed = v=>{const n=App.NAV.find(x=>x[0]===v);return n&&App.VIEWS[v]&&(!n[3]||App.can(n[3]))};
 function drawNav(){
-  const counts={repairs:S.repairs.filter(r=>App.ACTIVE.includes(r.status)).length,stock:S.products.filter(App.isLow).length};
+  const counts={orders:S.siteorders.filter(o=>o.status==="new").length,repairs:S.repairs.filter(r=>App.ACTIVE.includes(r.status)).length,stock:S.products.filter(App.isLow).length};
   const items=App.NAV.filter(n=>App.VIEWS[n[0]]&&(!n[3]||App.can(n[3])));
   $("#navlist").innerHTML=items.map(([v,l,ic])=>`<a class="nav ${App.ui.view===v?"on":""}" href="#${v}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">${ic}</svg><span>${l}</span>${counts[v]?`<span class="cnt">${counts[v]}</span>`:""}</a>`).join("");
   const sh=App.openShift(),pts=App.myPoints(),cur=App.point();

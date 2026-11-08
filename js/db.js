@@ -31,7 +31,7 @@ async function all(table,select="*",mod){
 /* ---------- преобразование строк базы в объекты интерфейса ---------- */
 const M={
   settings:r=>({id:"main",shopName:r.shop_name,city:r.city||"",address:r.address||"",phone:r.phone||"",inn:r.inn||"",
-    deviceWarrantyMonths:r.device_warranty_months,repairWarrantyDays:r.repair_warranty_days,requireShift:r.require_shift,storageDays:r.storage_days,deadDays:r.dead_days,receiptFooter:r.receipt_footer||"",legalName:r.legal_name||"",ogrnip:r.ogrnip||"",siteUrl:r.site_url||"",reviewUrl:r.review_url||"",receiptAck:r.receipt_ack||"",docConfig:r.doc_config||{},tagTemplates:Array.isArray(r.tag_templates)?r.tag_templates:[]}),
+    deviceWarrantyMonths:r.device_warranty_months,repairWarrantyDays:r.repair_warranty_days,requireShift:r.require_shift,storageDays:r.storage_days,deadDays:r.dead_days,receiptFooter:r.receipt_footer||"",legalName:r.legal_name||"",ogrnip:r.ogrnip||"",siteUrl:r.site_url||"",reviewUrl:r.review_url||"",receiptAck:r.receipt_ack||"",docConfig:r.doc_config||{},siteSync:!!r.site_sync,siteOrders:!!r.site_orders,siteWarehouses:r.site_warehouses||[],siteNewStatus:r.site_new_status||"draft",siteReserveWh:r.site_reserve_wh||"",siteLastSync:r.site_last_sync||"",siteLastError:r.site_last_error||"",tagTemplates:Array.isArray(r.tag_templates)?r.tag_templates:[]}),
   points:r=>({id:r.id,name:r.name,address:r.address||"",phone:r.phone||"",patentNo:r.patent_no||"",evotorStoreId:r.evotor_store_id||"",cashWh:r.cash_wh,serviceWh:r.service_wh,order:r.sort,active:r.is_active}),
   warehouses:r=>({id:r.id,name:r.name,kind:r.kind||"",address:r.address||"",pointId:r.point_id,order:r.sort,active:r.is_active}),
   categories:r=>({id:r.id,name:r.name,parentId:r.parent_id||"",isDevice:r.is_device,isUsed:!!r.is_used}),
@@ -54,7 +54,7 @@ const M={
     by:r.created_by,createdAt:r.created_at,postedAt:r.posted_at,cancelledAt:r.cancelled_at,
     lines:(r.stock_doc_lines||[]).sort((a,b)=>a.id-b.id).map(l=>({productId:l.product_id,name:(App.byId("products",l.product_id)||{}).name||"Товар",qty:l.qty,expected:l.expected,counted:l.counted==null?"":l.counted,cost:num(l.cost),newUnits:l.new_units||[],unitIds:l.unit_ids||[],foundCodes:l.found_codes||[],unitLog:l.unit_log||[]}))}),
   units:r=>({id:r.id,productId:r.product_id,imei:r.imei||"",imei2:r.imei2||"",serialNo:r.serial_no||"",whId:r.warehouse_id||"",status:r.status,condition:r.condition||"",batteryHealth:r.battery_health,
-    diagnostics:r.diagnostics||"",kit:r.kit||"",cost:num(r.cost),price:r.price==null?"":num(r.price),note:r.note||"",saleItemId:r.sale_item_id,lastRef:r.last_ref||"",attrs:r.attrs||{},createdAt:r.created_at,updatedAt:r.updated_at}),
+    diagnostics:r.diagnostics||"",kit:r.kit||"",cost:num(r.cost),price:r.price==null?"":num(r.price),note:r.note||"",saleItemId:r.sale_item_id,lastRef:r.last_ref||"",attrs:r.attrs||{},createdAt:r.created_at,updatedAt:r.updated_at,onSite:r.on_site!==false,wooId:r.woo_id||null}),
   models:r=>({id:r.id,family:r.family,name:r.name,year:r.year,memories:r.memories||[],colors:r.colors||[],options:r.options||{},order:r.sort,active:r.is_active}),
   movements:r=>({id:r.id,productId:r.product_id,productName:(App.byId("products",r.product_id)||{}).name||"Товар",whId:r.warehouse_id,qty:r.qty,type:r.type,ref:r.ref||"",note:r.note||"",by:r.staff_id,at:r.created_at}),
   shifts:r=>({id:r.id,num:r.num,pointId:r.point_id,status:r.status,openedAt:r.opened_at,openedBy:r.opened_by,openCash:num(r.open_cash),closedAt:r.closed_at,closedBy:r.closed_by,
@@ -62,6 +62,8 @@ const M={
   cashops:r=>({id:r.id,shiftId:r.shift_id,pointId:r.point_id,type:r.type,method:r.method,amount:num(r.amount),ref:r.ref||"",note:r.note||"",by:r.staff_id,at:r.created_at}),
   staff:r=>({id:r.id,fullName:r.full_name,role:r.role,pointId:r.point_id,phone:r.phone||"",active:r.is_active}),
   staffreq:r=>({id:r.id,email:r.email||"",fullName:r.full_name||"",at:r.created_at}),
+  siteorders:r=>({id:r.id,wooId:r.woo_id,num:r.num,status:r.status,wooStatus:r.woo_status||"",customerId:r.customer_id||"",name:r.name||"",phone:r.phone||"",email:r.email||"",address:r.address||"",delivery:r.delivery||"",payment:r.payment||"",paid:!!r.paid,total:num(r.total),note:r.note||"",problems:r.problems||"",saleId:r.sale_id||"",createdAt:r.created_at,
+    items:(r.items||[]).map(i=>({productId:i.product_id||"",unitId:i.unit_id||"",name:i.name||"",sku:i.sku||"",qty:num(i.qty),price:num(i.price),from:i.from||[],problem:i.problem||""}))}),
   log:r=>({id:r.id,at:r.created_at,by:r.staff_id,action:r.action,ref:r.ref||"",details:r.details||""})
 };
 /* что загружать для каждого раздела */
@@ -85,13 +87,14 @@ const L={
   staffreq:async()=>(await all("staff_requests")).map(M.staffreq),
   units:async()=>(await all("units")).map(M.units),
   models:async()=>(await all("apple_models","*",r=>r.order("sort"))).map(M.models),
+  siteorders:async()=>(await all("site_orders","*",r=>r.order("created_at",{ascending:false}))).map(M.siteorders),
   log:async()=>(await q(sb.from("audit_log").select("*").order("created_at",{ascending:false}).limit(500),"log")).map(M.log)
 };
 /* таблица базы → разделы, которые нужно перечитать */
 const T={settings:["settings"],points:["points"],warehouses:["warehouses"],categories:["categories"],suppliers:["suppliers"],services:["services"],
   customers:["customers"],products:["products"],stock:["products"],stock_movements:["movements"],stock_docs:["docs"],stock_doc_lines:["docs"],
   sales:["sales"],sale_items:["sales"],sale_payments:["sales"],returns:["returns"],return_items:["returns"],shifts:["shifts"],cash_ops:["cashops"],
-  staff:["staff"],staff_requests:["staffreq"],audit_log:["log"],units:["units"],apple_models:["models"]};
+  staff:["staff"],staff_requests:["staffreq"],audit_log:["log"],units:["units"],apple_models:["models"],site_orders:["siteorders"]};
 
 App.reload = async function(cols){
   cols=[...new Set(cols)].filter(c=>L[c]);
@@ -150,6 +153,7 @@ App.api = {
   insertMany:async(table,rows)=>{if(!rows.length)return[];const d=await q(sb.from(table).insert(rows.map(snake)).select(),table);App.refresh(table);return d},
   update:async(table,id,patch,key="id")=>{const d=await q(sb.from(table).update(snake(patch)).eq(key,id).select(),table);if(!d.length)throw new Error("Нет прав на изменение или запись не найдена");App.refresh(table);return d[0]},
   remove:async(table,id,key="id")=>{await q(sb.from(table).delete().eq(key,id),table);App.refresh(table)},
+  invoke:async(fn,body)=>{const {data,error}=await sb.functions.invoke(fn,{body:body||{}});if(error){let m=error.message;try{const j=await error.context.json();m=j.error||m}catch(e){}throw new Error(m)}return data},
   rpc:async(fn,args,refresh=[])=>{const d=await q(sb.rpc(fn,args),fn);App.refresh(...refresh);return d},
   audit:async(action,ref,details)=>{try{await sb.from("audit_log").insert({staff_id:App.me.id,action,ref:ref||"",details:details||""});App.refresh("audit_log")}catch(e){}},
   /* найти или создать клиента по телефону */

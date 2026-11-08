@@ -42,6 +42,7 @@ ACT.openUnit=id=>{
       ${cost?App.fld("uCost","Закупка",`<input id="uCost" value="${money(u.cost)}" disabled>`):""}
       ${App.fld("uKit","Комплектация",App.inp("uKit",u.kit,"text","",ed?"":"disabled"),"full")}
       ${App.fld("uDiag","Диагностика",App.inp("uDiag",u.diagnostics,"text","",ed?"":"disabled"),"full")}
+      ${p.onSite&&App.isUsedUnit(u,p)?`<div class="fld full">${App.chk("uSite","Показывать этот экземпляр на сайте отдельной карточкой",u.onSite!==false)}</div>`:""}
       ${App.fld("uNote","Заметка",`<textarea id="uNote" ${ed?"":"disabled"}>${esc(u.note)}</textarea>`,"full")}
     </div>
     ${App.isUsedUnit(u,p)?App.usedForm("uu_",u.attrs,{ro:!ed}):`<details class="more"><summary>Параметры б/у</summary>${App.usedForm("uu_",u.attrs,{ro:!ed})}</details>`}
@@ -51,6 +52,7 @@ ACT.openUnit=id=>{
 ACT.saveUnit=async(id,btn)=>{
   const V=App.val,n=v=>v===""?null:num(v);
   const data={imei:V("uImei")||null,imei2:V("uImei2")||null,serial_no:V("uSn")?V("uSn").toUpperCase():null,condition:V("uCond")||null,battery_health:n(V("uBatt")),kit:V("uKit")||null,diagnostics:V("uDiag")||null,note:V("uNote")||null};
+  if(document.getElementById("uSite"))data.on_site=App.checked("uSite");
   if(!data.imei&&!data.serial_no)return App.toast(document.getElementById("uImei")?"Нужен IMEI или серийный номер":"Нужен серийный номер");
   if(data.imei&&!/^\d{15}$/.test(data.imei))return App.toast("IMEI — это 15 цифр");
   if(App.can("price"))data.price=n(V("uPrice"));
