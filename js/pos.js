@@ -70,6 +70,14 @@ App.pos={cart:[],phone:"",name:"",discPct:0,discSum:0,tiDev:"",tiAmt:0,tiImei:""
 const P=App.pos;
 App.pointWhOpts=()=>{const p=App.point();const ws=App.whs().filter(w=>p&&w.pointId===p.id);return (ws.length?ws:App.whs()).map(w=>[w.id,w.name])};
 const posWh=()=>App.cashWh(); // продажа всегда со склада кассы текущей точки
+/* выручка точки за сегодня: продажи минус возвраты, по способам оплаты */
+App.posToday=pid=>{const now=new Date(),r={cash:0,non:0,n:0,ret:0};
+  S.sales.filter(x=>x.pointId===pid&&App.sameDay(x.createdAt,now)).forEach(x=>{r.n++;(x.payments||[]).forEach(p=>{if(p.method==="cash")r.cash+=p.amount;else r.non+=p.amount})});
+  S.returns.filter(x=>App.sameDay(x.createdAt,now)&&((App.byId("sales",x.saleId)||{}).pointId===pid)).forEach(x=>{r.ret+=x.amount;if(x.method==="cash")r.cash-=x.amount;else r.non-=x.amount});
+  r.total=r.cash+r.non;return r};
+function posToday(){const pt=App.point();if(!pt)return "";const t=App.posToday(pt.id),sh=App.openShift();
+  return `<section class="card todaybox"><div class="tb-h"><b>Сегодня в кассе</b><span class="muted">${esc(pt.name)} · ${t.n} ${t.n%10===1&&t.n%100!==11?"чек":t.n%10>=2&&t.n%10<=4&&(t.n%100<10||t.n%100>=20)?"чека":"чеков"}${t.ret?" · возвраты "+money(t.ret):""}</span></div>
+    <div class="tb-row"><div><span>Наличные</span><b>${money(t.cash)}</b>${sh?`<small>в ящике ${money(App.shiftTotals(sh).expectedCash)}</small>`:""}</div><div><span>Безналичные</span><b>${money(t.non)}</b><small>карта, СБП, перевод</small></div><div class="tb-tot"><span>Всего</span><b>${money(t.total)}</b></div></div></section>`}
 function posTotals(){
   const sub=P.cart.reduce((a,i)=>a+num(i.qty)*num(i.price)-num(i.disc),0);
   const disc=Math.round(sub*num(P.discPct)/100)+num(P.discSum);
@@ -89,6 +97,7 @@ VIEWS.pos={
     const quick=S.products.filter(p=>!p.archived&&App.qtyIn(p,wh)>0&&(!App.ui.posCat||App.inCat(p,App.ui.posCat))).sort((a,b)=>String(a.name).localeCompare(b.name)).slice(0,40);
     const cats=App.catChildren("").filter(cg=>S.products.some(p=>App.inCat(p,cg.id)&&App.qtyIn(p,wh)>0));
     return `${shiftBar}
+    ${posToday()}
     <div class="pos">
       <section class="card">
         <div class="row-f"><div class="fld grow"><label for="posQ">Товар или сканер</label><input id="posQ" type="search" autocomplete="off" placeholder="Название, артикул, штрихкод, IMEI / S/N"><div class="pick" id="posPick" hidden></div></div><button class="btn" data-act="posCustom" style="align-self:flex-end">+ Услуга / товар вне каталога</button>
