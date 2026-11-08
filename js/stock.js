@@ -155,6 +155,7 @@ document.addEventListener("input",e=>{const t=e.target;if(t.dataset&&t.dataset.u
   clearTimeout(sfT);sfT=setTimeout(()=>App.render(),k==="pmin"||k==="pmax"?400:0)});
 document.addEventListener("change",e=>{const t=e.target;if(t.dataset&&(t.dataset.sf||t.dataset.ub)&&(t.tagName==="SELECT"||t.type==="checkbox"))t.dispatchEvent(new Event("input",{bubbles:true}))});
 function qtyCell(q,p){return App.isLow(p)?`<span class="pill bad">${q}</span>`:q<=0?'<span class="pill mute">0</span>':`<b>${q}</b>`}
+ACT.whStock=id=>{App.ui.stockWh=id;location.hash="stock";App.render()};
 ACT.moreStock=()=>{App.ui.stockLimit=(App.ui.stockLimit||300)+300;App.render()};
 
 /* ---------- карточка товара ---------- */
@@ -258,7 +259,11 @@ VIEWS.docs={
     const u=App.ui,q=u.docQ.toLowerCase();
     const list=App.sortDesc(S.docs.filter(d=>(!u.docType||d.type===u.docType)&&(!u.docStatus||d.status===u.docStatus)&&(!q||[d.num,d.note,(App.byId("suppliers",d.supplierId)||{}).name,(d.lines||[]).map(l=>l.name).join(" ")].join(" ").toLowerCase().includes(q))));
     const moves=App.sortDesc(S.movements,"at").slice(0,40);
-    return `<div class="chips"><button class="chip ${!u.docType?"on":""}" data-act="docType" data-id="">Все<b>${S.docs.length}</b></button>${Object.entries(App.DOCT).map(([k,d])=>`<button class="chip ${u.docType===k?"on":""}" data-act="docType" data-id="${k}">${d.label}<b>${S.docs.filter(x=>x.type===k).length}</b></button>`).join("")}</div>
+    const whBox=`<section class="card whbox"><div class="card-h"><h2>Склады</h2>${App.can("settings")?'<button class="btn pri sm" data-act="whForm">+ Склад</button>':""}</div>
+      <div class="whgrid">${App.whs(true).map(w=>{const ps=S.products.filter(p=>App.qtyIn(p,w.id)>0),qn=ps.reduce((a,p)=>a+App.qtyIn(p,w.id),0),pt=w.pointId?App.byId("points",w.pointId):null;
+        const role=pt&&pt.cashWh===w.id?"касса":pt&&pt.serviceWh===w.id?"сервис":"";
+        return `<button type="button" class="whc ${w.active===false?"off":""}" data-act="${App.can("settings")?"whForm":"whStock"}" data-id="${esc(w.id)}"><b>${esc(w.name)}</b><small>${pt?esc(pt.name):"общий"}${role?" · "+role:""}${w.active===false?" · отключён":""}</small><span>${qn} шт · ${ps.length} поз.</span></button>`}).join("")||'<div class="empty">Складов пока нет</div>'}</div></section>`;
+    return `${whBox}<div class="chips"><button class="chip ${!u.docType?"on":""}" data-act="docType" data-id="">Все<b>${S.docs.length}</b></button>${Object.entries(App.DOCT).map(([k,d])=>`<button class="chip ${u.docType===k?"on":""}" data-act="docType" data-id="${k}">${d.label}<b>${S.docs.filter(x=>x.type===k).length}</b></button>`).join("")}</div>
     <div class="row-f"><input id="docQ" type="search" placeholder="№, поставщик, товар" value="${esc(u.docQ)}" data-filter="docQ" aria-label="Поиск документа" style="flex:1 1 260px">${App.sel("docStatus",[["","Любой статус"],["draft","Черновики"],["posted","Проведённые"],["cancelled","Отменённые"]],u.docStatus,'data-filter-sel="docStatus" aria-label="Статус"')}</div>
     <section class="card"><div class="tbl-wrap"><table><thead><tr><th>Документ</th><th>Дата</th><th>Склад</th><th>Основание</th><th class="n">Строк</th><th class="n">Кол-во</th>${App.can("cost")?'<th class="n">Сумма</th>':""}<th>Статус</th></tr></thead><tbody>
     ${list.map(d=>{const D=App.DOCT[d.type];const qty=(d.lines||[]).reduce((a,l)=>a+num(d.type==="inventory"?(num(l.counted)-num(l.expected)):l.qty),0);

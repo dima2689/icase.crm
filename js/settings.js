@@ -84,7 +84,8 @@ ACT.whForm=id=>{
   App.openModal(App.head(id?"Склад":"Новый склад")+`<div class="form">${App.fld("wName","Название",App.inp("wName",w.name,"text","Основной склад"))}${App.fld("wKind","Тип",App.sel("wKind",["Торговый зал","Склад","Сервис","Другое"],w.kind))}
   ${App.fld("wPoint","Точка",App.sel("wPoint",[["","Общий (без точки)"],...App.points(true).map(p=>[p.id,p.name])],w.pointId||""))}${App.fld("wOrder","Порядок",App.inp("wOrder",w.order||0,"number"))}
   ${App.fld("wAddr","Адрес",App.inp("wAddr",w.address),"full")}<div class="fld">${App.chk("wAct","Работает",w.active!==false)}</div></div>
-  <div class="acts"><button class="btn pri" data-act="whSave" data-id="${esc(id||"")}">Сохранить</button></div>`);
+  ${id?"":`<p class="muted" style="margin:10px 0 0">Склад можно привязать к точке или оставить общим (например, основной склад или склад в офисе). Товар на новый склад попадает через приёмку или перемещение.</p>`}
+  <div class="acts">${id?`<button class="btn" data-act="whStock" data-id="${esc(id)}">Товары на складе</button>`:""}<button class="btn" data-act="close">Отмена</button><button class="btn pri" data-act="whSave" data-id="${esc(id||"")}">${id?"Сохранить":"Создать склад"}</button></div>`);
 };
 ACT.whSave=(id,btn)=>run(btn,async()=>{
   if(!App.val("wName"))return App.toast("Укажите название");
