@@ -99,7 +99,7 @@ VIEWS.stock={
       <td><div class="chips">${p.onSite?'<span class="pill info">Сайт</span>':""}${p.onAvito?'<span class="pill info">Авито</span>':""}</div></td></tr>`});
     const curCat=App.cat(f.cat),catLabel=f.cat==="__none"?"Без категории":curCat?App.catName({categoryId:curCat.id}):"";
     const nOn=(ubOn(f)?1:0)+(f.cat?1:0)+f.brands.length+(f.avail!=="all"?1:0)+f.conds.length+f.mems.length+f.colors.length+(f.track?1:0)+(f.chan?1:0)+(f.pmin!==""||f.pmax!==""?1:0)+(f.arch?1:0);
-    const allOpen=Object.values(f.sec||{}).every(Boolean);
+    const allOpen=["cat","brand","avail","used","params"].every(k=>(f.sec||{})[k]);
     return `<div class="smain" data-nodirty>
       <div class="row-f stop">
         <input id="stockQ" type="search" placeholder="Название, артикул, штрихкод, IMEI, модель, цвет" value="${esc(u.stockQ)}" data-filter="stockQ" aria-label="Поиск товара">
@@ -127,7 +127,7 @@ VIEWS.stock={
             <label class="chk"><input type="checkbox" data-sf="arch" ${f.arch?"checked":""}> Архив</label></div></div>`)}
       </div>
       ${active.length?`<div class="chips activef">${active.map(([k,v,l])=>`<button class="chip on" data-act="sfDrop" data-id="${esc(k+"|"+v)}">${esc(l)} ✕</button>`).join("")}<button class="btn sm ghost" data-act="sfReset">Сбросить всё</button></div>`:""}
-      <div class="tiles"><div class="tile"><span>Позиций</span><b>${list.length}</b><small>${totQty} шт</small></div>${showCost?`<div class="tile"><span>В закупке</span><b>${money(totCost)}</b></div>`:""}<div class="tile"><span>В рознице</span><b>${money(totPrice)}</b></div>${showCost?`<div class="tile"><span>Потенциальная наценка</span><b>${money(totPrice-totCost)}</b></div>`:""}</div>
+      ${(()=>{const open=!!(f.sec||{}).totals;return `<div class="totbox ${open?"open":""}"><button class="fsh" data-act="sfSec" data-id="totals" aria-expanded="${open}"><span class="ft">Итоги</span><span class="fsum">${list.length} поз. · ${totQty} шт · в рознице ${money(totPrice)}</span><span class="car"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform:rotate(${open?180:0}deg);transition:transform .15s"><path d="M6 9l6 6 6-6"/></svg></span><span class="totbtn">${open?"Свернуть":"Развернуть"}</span></button>${open?`<div class="totbody"><div class="tiles"><div class="tile"><span>Позиций</span><b>${list.length}</b><small>${totQty} шт</small></div>${showCost?`<div class="tile"><span>В закупке</span><b>${money(totCost)}</b></div>`:""}<div class="tile"><span>В рознице</span><b>${money(totPrice)}</b></div>${showCost?`<div class="tile"><span>Потенциальная наценка</span><b>${money(totPrice-totCost)}</b></div>`:""}</div></div>`:""}</div>`})()}
       ${mob?`<section class="card mlist"><label class="chk"><input type="checkbox" data-act="tagPickAll" ${shown.length&&shown.every(p=>App.ui.tagPick.has(p.id))?"checked":""}> выбрать все для ценников</label>${rows||`<div class="empty">${S.products.length?"Ничего не найдено — измените фильтры":"Товаров пока нет. Начните с «Приёмки»"}</div>`}
         ${list.length>shown.length?`<div class="acts" style="justify-content:center"><button class="btn" data-act="moreStock">Показать ещё (${list.length-shown.length})</button></div>`:""}</section>`:`
       <section class="card"><div class="tbl-wrap"><table><thead><tr><th class="tagsel"><input type="checkbox" data-act="tagPickAll" aria-label="Выбрать все для ценников" ${shown.length&&shown.every(p=>App.ui.tagPick.has(p.id))?"checked":""}></th><th>Товар</th>${u.stockWh?"<th class=\"n\">Остаток</th>":whs.map(w=>`<th class="n">${esc(w.name)}</th>`).join("")+'<th class="n">Всего</th>'}${showCost?'<th class="n">Закупка</th>':""}<th class="n">Цена</th>${showCost?'<th class="n">Наценка</th>':""}<th>Каналы</th></tr></thead><tbody>
@@ -138,7 +138,7 @@ VIEWS.stock={
 };
 ACT.sfCat=id=>{App.ui.sf.cat=id;sfSave();App.render()};
 ACT.sfSec=k=>{const f=App.ui.sf;f.sec=Object.assign({},f.sec);f.sec[k]=!f.sec[k];sfSave();App.render()};
-ACT.sfSecAll=()=>{const f=App.ui.sf,v=!Object.values(f.sec||{}).every(Boolean);f.sec={cat:v,brand:v,avail:v,used:v,params:v};sfSave();App.render()};
+ACT.sfSecAll=()=>{const f=App.ui.sf,v=!["cat","brand","avail","used","params"].every(k=>(f.sec||{})[k]);f.sec=Object.assign({},f.sec,{cat:v,brand:v,avail:v,used:v,params:v});sfSave();App.render()};
 ACT.sfToggle=v=>{const [k,val]=v.split(/\|(.*)/s),a=App.ui.sf[k];const i=a.indexOf(val);i>=0?a.splice(i,1):a.push(val);sfSave();App.render()};
 ACT.sfSet=v=>{const [k,val]=v.split("|");App.ui.sf[k]=val;sfSave();App.render()};
 ACT.sfDrop=v=>{const [k,val]=v.split(/\|(.*)/s),f=App.ui.sf;

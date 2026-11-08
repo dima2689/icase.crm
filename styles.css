@@ -350,3 +350,8 @@ select[multiple]{background-image:none;padding-right:11px}
 .fsh .car{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;margin-right:4px;border-radius:8px;flex:none}
 .fsh:hover .car{background:var(--surface-2,#efece2)}
 details>summary{padding-right:8px}
+.totbox{border:1px solid var(--line);border-radius:14px;background:var(--surface,#fbfaf6);padding:0 16px}
+.totbox .fsh{padding:12px 2px}
+.totbtn{font-size:13px;font-weight:600;color:var(--muted,#666);flex:none}
+.totbody{padding:0 0 14px}
+@media (max-width:760px){.totbox{padding:0 12px}.totbox .fsum{font-size:13px}.totbtn{display:none}}
