@@ -429,3 +429,4 @@ th.wh small{display:block;font-weight:500;opacity:.7;font-size:11px}
 .plist.open .pl-trig{position:relative;z-index:41}
 .pl-pop{z-index:42;animation:plfade .15s ease-out}
 @keyframes plfade{from{opacity:0}to{opacity:1}}
+.shiftbottom{margin-top:16px}

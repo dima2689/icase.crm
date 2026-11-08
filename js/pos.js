@@ -100,7 +100,7 @@ VIEWS.pos={
     const inStock=S.products.filter(p=>!p.archived&&App.qtyIn(p,wh)>0).sort((a,b)=>App.catName(a).localeCompare(App.catName(b))||String(a.name).localeCompare(b.name));
     const groups={};inStock.forEach(p=>{const k=App.catName(p);(groups[k]=groups[k]||[]).push(p)});
 
-    return `${shiftBar}
+    return `${sh?"":shiftBar}
     ${posToday()}
     <div class="pos">
       <section class="card">
@@ -132,7 +132,7 @@ VIEWS.pos={
             <div class="cl-row"><label>Кол-во<input type="number" min="1" value="${num(i.qty)}" data-cart="${k}" data-f="qty" id="cq${k}" ${i.serial?"disabled":""}></label>
             <label>Цена<input type="number" min="0" value="${num(i.price)}" data-cart="${k}" data-f="price" id="cp${k}" ${App.can("price")?"":"disabled"}></label>
             <label>Скидка<input type="number" min="0" value="${num(i.disc)||""}" data-cart="${k}" data-f="disc" id="cd${k}" placeholder="0"></label>
-            <div class="cl-sum"><span>Сумма</span><b>${money(num(i.qty)*num(i.price)-num(i.disc))}</b></div></div></div>`}).join(""):'<div class="empty">Добавьте товар поиском, сканером или нажмите на плитку товара</div>'}
+            <div class="cl-sum"><span>Сумма</span><b>${money(num(i.qty)*num(i.price)-num(i.disc))}</b></div></div></div>`}).join(""):'<div class="empty">Добавьте товар поиском, сканером или выберите из списка</div>'}
         </div>
         <details class="more" ${P.discPct||P.discSum||P.tiDev?"open":""}><summary>Скидка на чек и trade-in</summary>
           <div class="form">
@@ -146,7 +146,8 @@ VIEWS.pos={
         <div class="total"><span>К оплате</span><b id="posTotal">${money(t.total)}</b></div>
         <button class="btn pri big" data-act="posPay" ${P.cart.length?"":"disabled"}>Оплата</button>
       </section>
-    </div>`;
+    </div>
+    ${sh?`<div class="shiftbottom">${shiftBar}</div>`:""}`;
   },
   after(){
     const box=document.getElementById("plist");
