@@ -90,7 +90,7 @@ function posTotals(){
 TITLES.pos="Касса";
 VIEWS.pos={
   ownSearch:true,
-  actions(){const sh=App.openShift();return sh?`<button class="btn" data-act="cashMove" data-id="in">Внесение</button>${App.can("cashout")?'<button class="btn" data-act="cashMove" data-id="out">Изъятие</button>':""}<button class="btn" data-act="xReport">X-отчёт</button><button class="btn" data-act="closeShift">Закрыть смену</button>`:`<button class="btn pri" data-act="openShiftDlg">Открыть смену</button>`},
+  actions(){const sh=App.openShift();return sh?`<button class="btn" data-act="cashMove" data-id="in">Внесение</button>${App.can("cashout")?'<button class="btn" data-act="cashMove" data-id="out">Изъятие</button>':""}<button class="btn" data-act="xReport">X-отчёт</button>`:`<button class="btn pri" data-act="openShiftDlg">Открыть смену</button>`},
   render(){
     const sh=App.openShift(),wh=posWh(),t=posTotals(),c=App.findCustomerByPhone(P.phone);
     const st=App.settings();
@@ -147,7 +147,7 @@ VIEWS.pos={
         <button class="btn pri big" data-act="posPay" ${P.cart.length?"":"disabled"}>Оплата</button>
       </section>
     </div>
-    ${sh?`<div class="shiftbottom">${shiftBar}</div>`:""}`;
+    ${sh?`<div class="shiftbottom">${shiftBar}<button class="btn" data-act="closeShift">Закрыть смену</button></div>`:""}`;
   },
   after(){
     const box=document.getElementById("plist");
