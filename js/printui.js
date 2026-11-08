@@ -11,6 +11,7 @@ const canTpl=()=>App.can("price")||App.can("settings");
 
 const TABS=()=>[["tags","Ценники",true],["tagtpl","Шаблоны ценников",canTpl()],["receipt","Товарный чек",App.can("settings")]].filter(t=>t[2]);
 VIEWS.print={
+  ownSearch:true,
   render(){
     if(!TABS().some(t=>t[0]===App.ui.printTab))App.ui.printTab="tags";
     const t=App.ui.printTab;

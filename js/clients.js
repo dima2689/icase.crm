@@ -11,6 +11,7 @@ function stat(c){
   return{s,r,ret,spent,last};
 }
 VIEWS.clients={
+  ownSearch:true,
   actions:()=>(App.can("io")?'<button class="btn" data-act="exportDlg" data-id="customers">Экспорт</button><button class="btn" data-act="importDlg" data-id="customers">Импорт</button>':"")+'<button class="btn pri" data-act="newClient">+ Клиент</button>',
   render(){
     const u=App.ui,q=u.clientQ.toLowerCase(),qk=App.phoneKey(u.clientQ);

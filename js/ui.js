@@ -42,6 +42,8 @@ App.render = function(){
   const V=App.VIEWS[App.ui.view];
   $("#title").textContent=App.TITLES[App.ui.view]||"";
   $("#top-acts").innerHTML=V&&V.actions?V.actions():"";
+  // один поиск на экране: где у раздела свой поиск, общий скрываем
+  const gs=document.querySelector(".top .search");if(gs){gs.style.display=V&&V.ownSearch?"none":"";if(V&&V.ownSearch)$("#gresults").hidden=true}
   // сохраняем фокус и курсор в полях фильтров
   const a=document.activeElement,fid=a&&a.id&&$("#view").contains(a)?a.id:null;let pos=null;try{pos=fid?a.selectionStart:null}catch(e){}
   // формы в разделе (настройки и т.п.) не теряют введённое при обновлении данных
@@ -199,7 +201,7 @@ document.addEventListener("input",e=>{
 document.addEventListener("change",e=>{const t=e.target;if(t.dataset&&t.dataset.filterSel){App.ui[t.dataset.filterSel]=t.type==="checkbox"?t.checked:t.value;App.render()}});
 document.addEventListener("keydown",e=>{
   if(e.key==="Escape"&&!$("#scrim").hidden)App.closeModal();
-  if(e.key==="/"&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){e.preventDefault();$("#gsearch").focus()}
+  if(e.key==="/"&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){e.preventDefault();const own=$("#view input[type=search]");(own&&own.offsetParent?own:$("#gsearch")).focus()}
 });
 window.addEventListener("hashchange",()=>{if(App.me.role)App.route()});
 })();

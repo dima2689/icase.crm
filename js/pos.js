@@ -78,6 +78,7 @@ function posTotals(){
 }
 TITLES.pos="Касса";
 VIEWS.pos={
+  ownSearch:true,
   actions(){const sh=App.openShift();return sh?`<button class="btn" data-act="cashMove" data-id="in">Внесение</button>${App.can("cashout")?'<button class="btn" data-act="cashMove" data-id="out">Изъятие</button>':""}<button class="btn" data-act="xReport">X-отчёт</button><button class="btn" data-act="closeShift">Закрыть смену</button>`:`<button class="btn pri" data-act="openShiftDlg">Открыть смену</button>`},
   render(){
     const sh=App.openShift(),wh=posWh(),t=posTotals(),c=App.findCustomerByPhone(P.phone);
@@ -284,6 +285,7 @@ App.periodRange=function(p,from,to){
 };
 App.PERIODS=[["today","Сегодня"],["yesterday","Вчера"],["7d","7 дней"],["month","Этот месяц"],["prev","Прошлый месяц"],["all","Всё время"]];
 VIEWS.sales={
+  ownSearch:true,
   actions:()=>(App.can("sale")?'<a class="btn pri" href="#pos">+ Новая продажа</a>':""),
   render(){
     const u=App.ui,[from,to]=App.periodRange(u.salesPeriod);

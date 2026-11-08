@@ -15,6 +15,7 @@ const codeOf=u=>u.imei||u.serial_no||"";
 const allCodes=()=>R.lines.flatMap(l=>(l.units||[]).map(codeOf));
 
 VIEWS.receive={
+  ownSearch:true,
   actions:()=>`<button class="btn" data-act="rcvNewItem">+ Новый товар</button><button class="btn pri" data-act="rcvDevice">+ Устройство Apple</button>`,
   render(){
     if(!R.wh||!App.byId("warehouses",R.wh))R.wh=App.cashWh()||((App.whs()[0]||{}).id||"");
