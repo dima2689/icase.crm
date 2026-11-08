@@ -50,44 +50,44 @@ const siteLabel=u=>String(u||"").replace(/^https?:\/\//,"").replace(/\/$/,"");
 /* ---------- товарный чек A4 ---------- */
 const CSS_A4=`@page{size:A4;margin:0}
 *{box-sizing:border-box}html,body{margin:0}
-body{font:9.6pt/1.45 "Helvetica Neue",Helvetica,Arial,sans-serif;color:#17170F;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.page{width:210mm;min-height:297mm;padding:14mm 15mm 12mm;background:#F6F3EA;display:flex;flex-direction:column}
+body{font:9.6pt/1.45 "Helvetica Neue",Helvetica,Arial,sans-serif;color:#000000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.page{width:210mm;min-height:297mm;padding:14mm 15mm 12mm;background:#FFFFFF;display:flex;flex-direction:column}
 .top{display:flex;justify-content:space-between;align-items:flex-start}
 .logo{font:800 26pt/1 "Helvetica Neue",Helvetica,Arial,sans-serif;letter-spacing:-1px}
-.logo span{display:inline-block;vertical-align:middle;margin-left:8px;font:700 7.5pt/1 Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;background:#3B4A2A;color:#F6F3EA;border-radius:99px;padding:5px 10px}
+.logo span{display:inline-block;vertical-align:middle;margin-left:8px;font:700 7.5pt/1 Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;background:#111111;color:#FFFFFF;border-radius:99px;padding:5px 10px}
 .doc{text-align:right}.doc .t{font:800 20pt/1.05 "Helvetica Neue",Helvetica,Arial,sans-serif;letter-spacing:-.5px}
-.doc .n{display:inline-block;margin-top:6px;background:#DCE4D2;color:#2E3A20;border-radius:99px;padding:4px 11px;font-weight:700;font-size:9pt}
-.lbl{font:700 6.8pt/1.2 Arial,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:#6B705F;margin-bottom:4px}
+.doc .n{display:inline-block;margin-top:6px;background:#EDEDED;color:#111111;border-radius:99px;padding:4px 11px;font-weight:700;font-size:9pt}
+.lbl{font:700 6.8pt/1.2 Arial,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:#666666;margin-bottom:4px}
 .info{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:8px;margin-top:12mm}
-.card{background:#FFFDF7;border:1px solid #E4DFCF;border-radius:10px;padding:9px 11px}
-.card b{font-size:9.8pt}.card .m{color:#4A4D40;font-size:8.6pt}
-.items{margin-top:7mm;background:#FFFDF7;border:1px solid #E4DFCF;border-radius:12px;overflow:hidden}
+.card{background:#FFFFFF;border:1px solid #CFCFCF;border-radius:10px;padding:9px 11px}
+.card b{font-size:9.8pt}.card .m{color:#444444;font-size:8.6pt}
+.items{margin-top:7mm;background:#FFFFFF;border:1px solid #CFCFCF;border-radius:12px;overflow:hidden}
 .ih,.ir{display:grid;grid-template-columns:7mm 1fr 14mm 25mm 23mm 26mm;gap:6px;align-items:start;padding:8px 12px}
-.ih{background:#3B4A2A;color:#F6F3EA;font:700 6.8pt/1.2 Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;padding:7px 12px}
-.ir+.ir{border-top:1px solid #ECE7D8}.r{text-align:right}.k{color:#8A8D7E;font-weight:700}
+.ih{background:#111111;color:#FFFFFF;font:700 6.8pt/1.2 Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;padding:7px 12px}
+.ir+.ir{border-top:1px solid #E2E2E2}.r{text-align:right}.k{color:#888888;font-weight:700}
 .nm{font-weight:800;font-size:10.4pt;line-height:1.25}
 .chips{margin-top:4px;display:flex;flex-wrap:wrap;gap:4px}
-.chip{background:#EEF1E6;color:#3B4A2A;border-radius:99px;padding:2px 8px;font-size:7.6pt;font-weight:600;white-space:nowrap}
-.chip.d{background:#3B4A2A;color:#F6F3EA}
-.imei{margin-top:4px;font:8pt/1.2 "SF Mono",Menlo,Consolas,monospace;color:#4A4D40}
-.sum{font-weight:800;font-size:10.4pt}.old{color:#8A8D7E;font-size:8pt}
+.chip{background:#FFFFFF;color:#111111;border:1px solid #999999;border-radius:99px;padding:2px 8px;font-size:7.6pt;font-weight:600;white-space:nowrap}
+.chip.d{background:#111111;color:#FFFFFF;border-color:#111111}
+.imei{margin-top:4px;font:8pt/1.2 "SF Mono",Menlo,Consolas,monospace;color:#444444}
+.sum{font-weight:800;font-size:10.4pt}.old{color:#888888;font-size:8pt}
 .bottom{display:grid;grid-template-columns:1fr 74mm;gap:10px;margin-top:7mm;align-items:start}
-.tot{background:#DCE4D2;border-radius:12px;padding:11px 13px}
-.tl{display:flex;justify-content:space-between;padding:3px 0;font-size:9.2pt;color:#2E3A20}
-.big{border-top:1.5px solid #3B4A2A;margin-top:6px;padding-top:8px;display:flex;justify-content:space-between;align-items:baseline}
+.tot{background:#EDEDED;border-radius:12px;padding:11px 13px}
+.tl{display:flex;justify-content:space-between;padding:3px 0;font-size:9.2pt;color:#111111}
+.big{border-top:1.5px solid #111111;margin-top:6px;padding-top:8px;display:flex;justify-content:space-between;align-items:baseline}
 .big span{font-weight:700;font-size:10pt}.big b{font:800 19pt/1 "Helvetica Neue",Helvetica,Arial,sans-serif;letter-spacing:-.5px}
-.words{margin-top:7px;font-size:7.8pt;color:#2E3A20;line-height:1.35}
-.ti{border-left:3px solid #3B4A2A}
-.ack{margin-top:7mm;border:1.5px dashed #9AA88A;border-radius:12px;padding:11px 13px;background:#FFFDF7}
+.words{margin-top:7px;font-size:7.8pt;color:#111111;line-height:1.35}
+.ti{border-left:3px solid #111111}
+.ack{margin-top:7mm;border:1.5px dashed #999999;border-radius:12px;padding:11px 13px;background:#FFFFFF}
 .ack p{margin:0 0 16px;font-weight:600}
 .sigs{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-.sg{font-size:8.4pt;color:#4A4D40}.sg .ln{border-bottom:1px solid #17170F;height:20px;margin-bottom:3px;display:flex;align-items:flex-end;justify-content:flex-end;font-size:8.6pt;color:#17170F;padding-bottom:2px}
+.sg{font-size:8.4pt;color:#444444}.sg .ln{border-bottom:1px solid #000000;height:20px;margin-bottom:3px;display:flex;align-items:flex-end;justify-content:flex-end;font-size:8.6pt;color:#000000;padding-bottom:2px}
 .foot{margin-top:auto;padding-top:8mm;display:flex;justify-content:space-between;align-items:flex-end;gap:14px}
 .thanks{font:800 15pt/1.15 "Helvetica Neue",Helvetica,Arial,sans-serif;letter-spacing:-.3px;max-width:105mm}
-.legal{margin-top:6px;font-size:7.2pt;color:#6B705F;line-height:1.4}
-.qrs{display:flex;gap:8px}.qr{background:#FFFDF7;border:1px solid #E4DFCF;border-radius:10px;padding:7px 7px 5px;text-align:center;font-size:7pt;font-weight:700;color:#3B4A2A;width:27mm}
+.legal{margin-top:6px;font-size:7.2pt;color:#666666;line-height:1.4}
+.qrs{display:flex;gap:8px}.qr{background:#FFFFFF;border:1px solid #CFCFCF;border-radius:10px;padding:7px 7px 5px;text-align:center;font-size:7pt;font-weight:700;color:#111111;width:27mm}
 .qr svg{width:21mm;height:21mm;display:block;margin:0 auto 4px}
-@media screen{body{background:#d9d6cc}.page{margin:0 auto}}`;
+@media screen{body{background:#d0d0d0}.page{margin:0 auto}}`;
 
 App.receiptA4=function(s){
   const D=App.saleDocData(s),{st,c,items}=D;
@@ -104,7 +104,7 @@ App.receiptA4=function(s){
   <div class="items">
     <div class="ih"><span>№</span><span>Товар</span><span class="r">Кол-во</span><span class="r">Цена</span><span class="r">Скидка</span><span class="r">Сумма</span></div>
     ${items.map(i=>`<div class="ir"><span class="k">${String(i.n).padStart(2,"0")}</span>
-      <div><div class="nm">${esc(i.name)}</div>${i.model&&i.model!==i.name?`<div style="font-size:8.4pt;color:#4A4D40">${esc(i.model)}</div>`:""}<div class="chips">${chips(i)}</div>${i.serial?`<div class="imei">IMEI / SN ${esc(i.serial)}</div>`:""}</div>
+      <div><div class="nm">${esc(i.name)}</div>${i.model&&i.model!==i.name?`<div style="font-size:8.4pt;color:#444444">${esc(i.model)}</div>`:""}<div class="chips">${chips(i)}</div>${i.serial?`<div class="imei">IMEI / SN ${esc(i.serial)}</div>`:""}</div>
       <span class="r">${i.qty}</span><span class="r">${rub(i.price)}</span><span class="r">${i.disc?"−"+rub(i.disc):"—"}</span><span class="r sum">${rub(i.sum)}</span></div>`).join("")}
   </div>
   <div class="bottom"><div>
