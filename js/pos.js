@@ -97,16 +97,18 @@ VIEWS.pos={
     if(!App.point())return '<div class="card empty">Нет торговых точек. Владелец добавляет их в «Настройки → Точки и склады».</div>';
     const shiftBar=sh?`<div class="shiftbar ok"><b>Смена ${esc(sh.num)}</b> открыта ${App.dtt(sh.openedAt)} · ${esc(App.nameOf(sh.openedBy))} · наличных в кассе ≈ <b>${money(App.shiftTotals(sh).expectedCash)}</b>${!App.sameDay(sh.openedAt,new Date())?' <span class="pill warn">открыта не сегодня, закройте её</span>':""}</div>`
       :`<div class="shiftbar ${st.requireShift?"bad":""}"><b>Смена закрыта.</b> ${st.requireShift?"Продажи и наличные операции недоступны, пока смена не открыта.":"Продажи без смены разрешены настройками, но наличные операции требуют смены."} <button class="btn sm pri" data-act="openShiftDlg">Открыть смену</button></div>`;
-    const quick=S.products.filter(p=>!p.archived&&App.qtyIn(p,wh)>0&&(!App.ui.posCat||App.inCat(p,App.ui.posCat))).sort((a,b)=>String(a.name).localeCompare(b.name)).slice(0,40);
-    const cats=App.catChildren("").filter(cg=>S.products.some(p=>App.inCat(p,cg.id)&&App.qtyIn(p,wh)>0));
+    const inStock=S.products.filter(p=>!p.archived&&App.qtyIn(p,wh)>0).sort((a,b)=>App.catName(a).localeCompare(App.catName(b))||String(a.name).localeCompare(b.name));
+    const groups={};inStock.forEach(p=>{const k=App.catName(p);(groups[k]=groups[k]||[]).push(p)});
+
     return `${shiftBar}
     ${posToday()}
     <div class="pos">
       <section class="card">
         <div class="row-f"><div class="fld grow"><label for="posQ">Товар или сканер</label><input id="posQ" type="search" autocomplete="off" placeholder="Название, артикул, штрихкод, IMEI / S/N"><div class="pick" id="posPick" hidden></div></div><button class="btn" data-act="posCustom" style="align-self:flex-end">+ Услуга / товар вне каталога</button>
 </div>
-        <div class="chips" style="margin:12px 0"><button class="chip ${!App.ui.posCat?"on":""}" data-act="posCat" data-id="">Все</button>${cats.map(cg=>`<button class="chip ${App.ui.posCat===cg.id?"on":""}" data-act="posCat" data-id="${esc(cg.id)}">${esc(cg.name)}</button>`).join("")}</div>
-        <div class="tilegrid">${quick.map(p=>`<button class="ptile" data-act="posAdd" data-id="${esc(p.id)}"><span>${esc(p.name)}</span><small>${esc(p.condition||"")} · ${App.qtyIn(p,wh)} шт</small><b>${money(p.price)}</b></button>`).join("")||'<div class="empty">На этом складе нет товаров в наличии</div>'}</div>
+        <div class="fld" style="margin-top:12px"><label for="posList">Или выберите из списка товаров в наличии (${inStock.length})</label>
+          <select id="posList" data-nodirty>${inStock.length?`<option value="">— выберите товар —</option>${Object.keys(groups).map(g=>`<optgroup label="${esc(g)}">${groups[g].map(p=>`<option value="${esc(p.id)}">${esc(p.name)}${p.condition&&p.condition!=="Новый"?" ("+esc(p.condition)+")":""} — ${money(p.price)} · ${App.qtyIn(p,wh)} шт</option>`).join("")}</optgroup>`).join("")}`:'<option value="">На этом складе нет товаров в наличии</option>'}</select></div>
+
       </section>
       <section class="card cartcard">
         <div class="card-h"><h2>Чек</h2>${P.cart.length?'<button class="btn sm ghost danger" data-act="posClear">Очистить</button>':""}</div>
@@ -139,6 +141,7 @@ VIEWS.pos={
     </div>`;
   },
   after(){
+    const pl=document.getElementById("posList");if(pl)pl.addEventListener("change",()=>{const v=pl.value;pl.value="";if(v)posAdd(v)});
     App.productPicker("posQ","posPick",{wh:posWh,inStock:false,onPick:(p,u)=>posAdd(p.id,u)});
     document.querySelectorAll("[data-pos]").forEach(el=>el.addEventListener("input",()=>{const f=el.dataset.pos;P[f]=["discPct","discSum","tiAmt"].includes(f)?num(el.value):el.value;
       if(f==="phone"){const c=App.findCustomerByPhone(P.phone);if(c){if(!P.name)P.name=c.name;if(!P.manualPct)P.discPct=num(c.discount)}}
