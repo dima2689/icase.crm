@@ -106,8 +106,16 @@ VIEWS.pos={
       <section class="card">
         <div class="row-f"><div class="fld grow"><label for="posQ">Товар или сканер</label><input id="posQ" type="search" autocomplete="off" placeholder="Название, артикул, штрихкод, IMEI / S/N"><div class="pick" id="posPick" hidden></div></div><button class="btn" data-act="posCustom" style="align-self:flex-end">+ Услуга / товар вне каталога</button>
 </div>
-        <div class="fld" style="margin-top:12px"><label for="posList">Или выберите из списка товаров в наличии (${inStock.length})</label>
-          <select id="posList" data-nodirty>${inStock.length?`<option value="">— выберите товар —</option>${Object.keys(groups).map(g=>`<optgroup label="${esc(g)}">${groups[g].map(p=>`<option value="${esc(p.id)}">${esc(p.name)}${p.condition&&p.condition!=="Новый"?" ("+esc(p.condition)+")":""} — ${money(p.price)} · ${App.qtyIn(p,wh)} шт</option>`).join("")}</optgroup>`).join("")}`:'<option value="">На этом складе нет товаров в наличии</option>'}</select></div>
+        <div class="plist ${App.ui.posListOpen?"open":""}" id="plist">
+          <button type="button" class="pl-trig" data-act="posListT" aria-expanded="${!!App.ui.posListOpen}"><span class="pl-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span><span class="pl-t">Выбрать из списка</span><span class="pl-n">${inStock.length} в наличии</span><svg class="pl-car" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+          ${App.ui.posListOpen?`<div class="pl-pop">
+            <div class="pl-head"><input type="search" id="plQ" placeholder="Фильтр по названию" autocomplete="off" data-nodirty aria-label="Фильтр списка">
+              <div class="chips">${[["","Все"],...[...new Set(Object.keys(groups).map(g=>g.split(" / ")[0]))].map(g=>[g,g])].map(([k,l])=>`<button type="button" class="chip ${k?"":"on"}" data-plg="${esc(k)}">${esc(l)}</button>`).join("")}</div></div>
+            <div class="pl-body">${inStock.length?Object.keys(groups).map(g=>`<div class="pl-grp" data-g="${esc(g)}"><div class="pl-gh">${esc(g)}<span>${groups[g].length}</span></div>${groups[g].map(p=>{const q=App.qtyIn(p,wh);return `<button type="button" class="pl-row" data-act="posPickL" data-id="${esc(p.id)}" data-s="${esc((p.name+" "+(p.brand||"")+" "+(p.sku||"")).toLowerCase())}">
+                <span class="pl-nm"><b>${esc(p.name)}</b><small>${[p.brand?esc(p.brand):"",p.condition&&p.condition!=="Новый"?`<span class="pill warn">${esc(p.condition)}</span>`:"",p.trackSerial?`<span class="pill info">${App.codeLbl(p)}</span>`:""].filter(Boolean).join(" ")}</small></span>
+                <span class="pl-q ${q<=num(p.minQty)?"low":""}">${q} шт</span><span class="pl-pr">${money(p.price)}</span></button>`}).join("")}</div>`).join("")+'<div class="pl-empty" hidden>Ничего не найдено</div>':'<div class="pl-empty">На этом складе нет товаров в наличии</div>'}</div>
+          </div>`:""}
+        </div>
 
       </section>
       <section class="card cartcard">
@@ -141,7 +149,15 @@ VIEWS.pos={
     </div>`;
   },
   after(){
-    const pl=document.getElementById("posList");if(pl)pl.addEventListener("change",()=>{const v=pl.value;pl.value="";if(v)posAdd(v)});
+    const box=document.getElementById("plist");
+    if(box&&App.ui.posListOpen){let grp="";const q=document.getElementById("plQ");
+      const apply=()=>{const t=(q.value||"").trim().toLowerCase();let any=false;
+        box.querySelectorAll(".pl-grp").forEach(g=>{let n=0;g.querySelectorAll(".pl-row").forEach(r=>{const ok=(!grp||g.dataset.g===grp||g.dataset.g.startsWith(grp+" / "))&&(!t||t.split(/\s+/).every(w=>r.dataset.s.includes(w)));r.hidden=!ok;if(ok)n++});g.hidden=!n;if(n)any=true});
+        const e=box.querySelector(".pl-empty");if(e&&box.querySelector(".pl-grp"))e.hidden=any};
+      q.addEventListener("input",apply);
+      box.querySelectorAll("[data-plg]").forEach(c=>c.addEventListener("click",()=>{grp=c.dataset.plg;box.querySelectorAll("[data-plg]").forEach(x=>x.classList.toggle("on",x===c));apply()}));
+      q.addEventListener("keydown",e=>{if(e.key==="Escape"){App.ui.posListOpen=false;App.render()}});
+      if(!App.ui._plFocus){App.ui._plFocus=1;setTimeout(()=>q.focus(),0)}}
     App.productPicker("posQ","posPick",{wh:posWh,inStock:false,onPick:(p,u)=>posAdd(p.id,u)});
     document.querySelectorAll("[data-pos]").forEach(el=>el.addEventListener("input",()=>{const f=el.dataset.pos;P[f]=["discPct","discSum","tiAmt"].includes(f)?num(el.value):el.value;
       if(f==="phone"){const c=App.findCustomerByPhone(P.phone);if(c){if(!P.name)P.name=c.name;if(!P.manualPct)P.discPct=num(c.discount)}}
@@ -171,6 +187,9 @@ function posAdd(pid,unit){
   App.schedule();
 }
 ACT.posAdd=id=>posAdd(id);
+ACT.posListT=()=>{App.ui.posListOpen=!App.ui.posListOpen;App.ui._plFocus=0;App.render()};
+ACT.posPickL=id=>{App.ui.posListOpen=false;App.render();posAdd(id)};
+document.addEventListener("click",e=>{if(App.ui.posListOpen&&!e.target.closest("#plist")&&!e.target.closest(".scrim")){App.ui.posListOpen=false;App.render()}});
 /* произвольная позиция: услуга или товар, которого нет в справочнике (без списания со склада) */
 const PC={kind:"service"};
 ACT.posCustom=()=>{
