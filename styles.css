@@ -248,7 +248,7 @@ pre.receipt{background:#fff;border:1px dashed var(--line);border-radius:10px;pad
 .prevbox.doc{height:640px;position:relative}
 .prevbox.doc iframe{width:794px;height:1123px;transform:scale(.56);transform-origin:0 0;position:absolute;left:calc(50% - 222px);top:8px;box-shadow:0 2px 12px rgba(0,0,0,.15);background:#fff}
 .prevbox.doc.tape iframe{width:302px;height:1100px;transform:scale(1);left:calc(50% - 151px)}
-th.pick,td.pick{width:34px;text-align:center}td.pick input,th.pick input{width:18px;height:18px;margin:0;cursor:pointer}
+th.tagsel,td.tagsel{width:34px;text-align:center}td.tagsel input,th.tagsel input{width:18px;height:18px;margin:0;cursor:pointer}
 .tplpick{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
 .tplbtn{border:1.5px solid var(--line,#ddd);background:#fff;border-radius:12px;padding:10px;font:inherit;font-weight:600;cursor:pointer;display:flex;flex-direction:column;gap:8px;align-items:center}
 .tplbtn.on{border-color:#111;box-shadow:0 0 0 2px #111 inset}
