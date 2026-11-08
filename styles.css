@@ -431,3 +431,11 @@ th.wh small{display:block;font-weight:500;opacity:.7;font-size:11px}
 @keyframes plfade{from{opacity:0}to{opacity:1}}
 .shiftbottom{margin-top:16px;display:flex;flex-direction:column;gap:10px}
 .sb-acts{display:flex;gap:8px;flex-wrap:wrap}.sb-acts .btn{flex:1 1 auto}
+/* мобильное меню: затемнение фона, по нему меню закрывается */
+.rail-dim{display:none}
+@media (max-width:760px){
+  .rail{z-index:61}
+  .rail-dim{display:block;position:fixed;inset:0;z-index:60;background:rgba(22,23,15,.35);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity .2s}
+  .rail-dim.on{opacity:1;pointer-events:auto}
+  body.menu-open{overflow:hidden}
+}

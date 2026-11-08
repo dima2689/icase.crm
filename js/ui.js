@@ -54,7 +54,7 @@ App.render = function(){
   if(fid){const n=document.getElementById(fid);if(n){n.focus();try{if(pos!=null)n.setSelectionRange(pos,pos)}catch(e){}}}
   if(V&&V.after)V.after();
 };
-App.route = function(){const h=location.hash.slice(1);App.ui.view=App.VIEWS[h]?h:"dashboard";App.render();$("#main").scrollTop=0;$("#rail").classList.remove("open")};
+App.route = function(){const h=location.hash.slice(1);App.ui.view=App.VIEWS[h]?h:"dashboard";App.render();$("#main").scrollTop=0;App.menuSet(false)};
 
 /* ---------- модальные окна ---------- */
 App.modalRefresh=null;
@@ -92,7 +92,15 @@ App.textModal = function(title,text,hint){
 App.ACT.copy = async ()=>{const t=$("#copytext").textContent;try{await navigator.clipboard.writeText(t);App.toast("Скопировано")}catch(e){const r=document.createRange();r.selectNodeContents($("#copytext"));const s=getSelection();s.removeAllRanges();s.addRange(r);App.toast("Текст выделен: нажмите Ctrl+C")}};
 App.ACT.close = App.closeModal;
 App.ACT.nav = v=>{location.hash=v};
-App.ACT.menu = ()=>$("#rail").classList.toggle("open");
+/* мобильное меню: открыть/закрыть, закрывается по фону, пункту меню (даже текущему), Esc и свайпу влево */
+App.menuSet = on=>{const r=$("#rail");if(!r)return;r.classList.toggle("open",on);let d=document.getElementById("railDim");
+  if(!d){d=document.createElement("div");d.id="railDim";d.className="rail-dim";d.addEventListener("click",()=>App.menuSet(false));document.body.appendChild(d)}
+  d.classList.toggle("on",on);document.body.classList.toggle("menu-open",on)};
+App.ACT.menu = ()=>App.menuSet(!$("#rail").classList.contains("open"));
+document.addEventListener("click",e=>{const r=$("#rail");if(r&&r.classList.contains("open")&&e.target.closest("#rail a[href]"))App.menuSet(false)});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("#rail")&&$("#rail").classList.contains("open"))App.menuSet(false)});
+(()=>{let x0=null;document.addEventListener("touchstart",e=>{const r=$("#rail");x0=r&&r.classList.contains("open")?e.touches[0].clientX:null},{passive:true});
+  document.addEventListener("touchend",e=>{if(x0!=null&&e.changedTouches[0].clientX-x0<-60)App.menuSet(false);x0=null},{passive:true})})();
 
 /* ---------- поле клиента с поиском по телефону ---------- */
 App.customerFields = function(prefix,c){
