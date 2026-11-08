@@ -459,3 +459,16 @@ th.wh small{display:block;font-weight:500;opacity:.7;font-size:11px}
 .whc:hover{border-color:var(--sage);background:var(--sage-soft)}
 .whc b{font-size:14px}.whc small{font-size:12px;color:var(--muted)}.whc span{font-size:13px;font-variant-numeric:tabular-nums;margin-top:2px}
 .whc.off{opacity:.55}
+/* карточка склада */
+.whacts{margin-top:12px;gap:8px;flex-wrap:wrap}
+.whlist{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;background:#fff;max-height:min(460px,50vh);overflow-y:auto}
+.whr{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;align-items:center;gap:12px;padding:8px 10px 8px 4px}
+.whr+.whr{border-top:1px solid var(--line)}.whr[hidden]{display:none}
+.whr-main{display:flex;flex-direction:column;gap:2px;min-width:0;border:0;background:none;font:inherit;color:inherit;text-align:left;cursor:pointer;padding:4px 8px;border-radius:8px}
+.whr-main:hover{background:var(--sage-soft)}
+.whr-main b{font-size:14px;font-weight:600}.whr-main small{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.whr-q{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}.whr-q.bad{color:var(--bad)}
+.whr-p{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--muted);min-width:80px;text-align:right}
+.whr-a{display:flex;gap:2px}.whr-a .btn{min-width:32px;justify-content:center}
+@media (max-width:560px){.whr{grid-template-columns:minmax(0,1fr) auto;row-gap:2px}.whr-main{grid-row:1/3}.whr-p{display:none}.whr-a{grid-column:2}}
+button.tile{font:inherit;color:inherit;text-align:left;cursor:pointer}button.tile:hover{border-color:var(--sage);background:var(--sage-soft)}
