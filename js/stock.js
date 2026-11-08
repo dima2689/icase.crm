@@ -9,7 +9,7 @@ Object.assign(App.ui,{stockQ:"",stockCat:"",stockWh:"",stockLow:false,stockArch:
 function lastMove(p){let m="";S.movements.forEach(x=>{if(x.productId===p.id&&x.at>m)m=x.at});return m||p.createdAt}
 App.isDead = p=>App.qtyTotal(p)>0&&App.days(lastMove(p))>App.settings().deadDays;
 VIEWS.stock={
-  actions:()=>`<button class="btn" data-act="tagsFromPick">${App.ui.tagPick.size?"Ценники ("+App.ui.tagPick.size+")":"Ценники"}</button>`+(App.can("io")?'<button class="btn" data-act="exportDlg" data-id="products">Экспорт</button><button class="btn" data-act="importDlg">Импорт</button>':"")+(App.can("stock")?'<button class="btn pri" data-act="newProduct">+ Товар</button>':""),
+  actions:()=>(App.can("stock")?'<button class="btn" data-act="catalogNew">Из каталога Apple</button>':"")+`<button class="btn" data-act="tagsFromPick">${App.ui.tagPick.size?"Ценники ("+App.ui.tagPick.size+")":"Ценники"}</button>`+(App.can("io")?'<button class="btn" data-act="exportDlg" data-id="products">Экспорт</button><button class="btn" data-act="importDlg">Импорт</button>':"")+(App.can("stock")?'<button class="btn pri" data-act="newProduct">+ Товар</button>':""),
   render(){
     const u=App.ui,q=u.stockQ.trim().toLowerCase(),words=q?q.split(/\s+/):[];
     const whs=App.whs(),showCost=App.can("cost");
@@ -48,11 +48,14 @@ ACT.moreStock=()=>{App.ui.stockLimit=(App.ui.stockLimit||200)+200;App.render()};
 /* ---------- карточка товара ---------- */
 ACT.newProduct=()=>productForm(null);
 ACT.openProduct=id=>productForm(id);
+ACT.unitAll=()=>{App.ui.unitAll=!App.ui.unitAll;if(App.ui.prodOpen)productForm(App.ui.prodOpen)};
 function productForm(id){
   const p=id?App.byId("products",id):{condition:"Новый",onSite:true,onAvito:false,minQty:0,categoryId:(App.catChildren("")[0]||{}).id||""};
-  if(!p)return;
+  if(!p)return;App.ui.prodOpen=id||"";
   const edit=App.can("stock"),price=App.can("price"),cost=App.can("cost"),st=App.settings();
   const moves=id?App.sortDesc(S.movements.filter(m=>m.productId===id),"at").slice(0,15):[];
+  const units=id&&p.trackSerial?App.sortDesc(S.units.filter(u=>u.productId===id&&(App.ui.unitAll||u.status==="in_stock")),"createdAt"):[];
+  const attrs=Object.entries(p.attrs||{}).filter(([k,v])=>v);
   App.openModal(App.head(id?esc(p.name):"Новый товар",id&&p.archived?'<span class="pill mute">архив</span>':"")+`
   ${id?`<div class="tiles">${App.whs().map(w=>`<div class="tile"><span>${esc(w.name)}</span><b>${App.qtyIn(p,w.id)}</b></div>`).join("")}<div class="tile"><span>Всего</span><b>${App.qtyTotal(p)}</b></div></div>`:""}
   <div class="form">
@@ -65,7 +68,9 @@ function productForm(id){
     ${App.fld("pBrand","Бренд",App.inp("pBrand",p.brand,"text","Apple",edit?"":"disabled"))}
     ${App.fld("pSku","Артикул",App.inp("pSku",p.sku,"text","",edit?"":"disabled"))}
     ${App.fld("pBar","Штрихкод",App.inp("pBar",p.barcode,"text","отсканируйте",edit?"":"disabled"))}
-    ${App.fld("pSerial","IMEI / серийный (поштучный товар)",App.inp("pSerial",p.serial,"text","",edit?"":"disabled"))}
+    <div class="fld full">${App.chk("pTrack","Учёт по IMEI / серийным номерам — каждый экземпляр отдельно",p.trackSerial).replace("<input",edit?"<input":"<input disabled")}</div>
+    ${p.trackSerial?"":App.fld("pSerial","IMEI / серийный (если товар один)",App.inp("pSerial",p.serial,"text","",edit?"":"disabled"))}
+    ${attrs.length?`<div class="fld full"><label>Параметры</label><div class="chips">${attrs.map(([k,v])=>`<span class="pill">${esc(k)}: ${esc(v)}</span>`).join("")}</div></div>`:""}
     ${cost?App.fld("pCost","Закупка, ₽",App.inp("pCost",p.cost||"","number","",price?"":"disabled")):""}
     ${App.fld("pPrice","Цена продажи, ₽",App.inp("pPrice",p.price||"","number","",price?"":"disabled"))}
     <div class="fld full"><span class="hint" id="pMk"></span></div>
@@ -75,10 +80,15 @@ function productForm(id){
     ${App.fld("pAvito","Цена на Авито, ₽",App.inp("pAvito",p.avitoPrice,"number","как розничная",price?"":"disabled"))}
     ${App.fld("pDiag","Результат диагностики",App.inp("pDiag",p.diagnostics,"text","Всё исправно, замен не было",edit?"":"disabled"),"full")}
     ${App.fld("pKit","Комплектация",App.inp("pKit",p.kit,"text","Коробка, кабель",edit?"":"disabled"),"full")}
-    ${!id&&edit?App.fld("pQty","Начальный остаток",App.inp("pQty","","number","0"))+App.fld("pWh","На склад",App.sel("pWh",App.whs().map(w=>[w.id,w.name]),App.cashWh())):""}
+    ${!id&&edit&&!p.trackSerial?App.fld("pQty","Начальный остаток (для товара без IMEI)",App.inp("pQty","","number","0"))+App.fld("pWh","На склад",App.sel("pWh",App.whs().map(w=>[w.id,w.name]),App.cashWh())):""}
     <div class="fld full"><label>Где продаём</label><div class="chips">${App.chk("pSite","Сайт",p.onSite)}${App.chk("pOnAvito","Авито",p.onAvito)}</div></div>
     ${App.fld("pNote","Описание / заметка",App.area("pNote",p.note||""),"full")}
   </div>
+  ${id&&p.trackSerial?`<section><div class="card-h"><h3 class="sub-h">Экземпляры (${App.unitsOf(id).length} в наличии)</h3><label class="chk"><input type="checkbox" data-act="unitAll" ${App.ui.unitAll?"checked":""}> показать проданные и списанные</label></div>
+    <div class="tbl-wrap"><table><thead><tr><th>IMEI / SN</th><th>Состояние</th><th class="n">АКБ</th><th class="n">Цена</th>${cost?'<th class="n">Закупка</th>':""}<th>Где</th></tr></thead><tbody>
+    ${units.map(u=>`<tr class="rowlink" data-act="openUnit" data-id="${esc(u.id)}"><td><b>${esc(App.unitCode(u))}</b>${u.imei2?'<span class="sub">IMEI 2 '+esc(u.imei2)+"</span>":""}${u.imei&&u.serialNo?'<span class="sub">SN '+esc(u.serialNo)+"</span>":""}</td><td>${esc(u.condition||"")}</td>
+      <td class="n">${u.batteryHealth!=null&&u.batteryHealth!==""?u.batteryHealth+"%":"—"}</td><td class="n">${money(App.unitPrice(u,p))}</td>${cost?`<td class="n">${money(u.cost)}</td>`:""}<td>${App.unitSt(u)}</td></tr>`).join("")||`<tr><td colspan="6" class="empty">Нет экземпляров. Оформите приход и отсканируйте IMEI</td></tr>`}
+    </tbody></table></div></section>`:""}
   ${id?`<section><h3 class="sub-h">Движение</h3><div class="tbl-wrap"><table><tbody>${moves.map(m=>`<tr><td>${App.dtt(m.at)}</td><td>${esc(App.MOVE[m.type]||m.type)}</td><td>${esc(App.whName(m.whId))}</td><td class="n"><span class="pill ${num(m.qty)>0?"ok":"mute"}">${num(m.qty)>0?"+":""}${num(m.qty)}</span></td><td>${esc(m.ref)}${m.note?'<span class="sub">'+esc(m.note)+"</span>":""}</td></tr>`).join("")||'<tr><td class="empty">Движений нет</td></tr>'}</tbody></table></div></section>`:""}
   <div class="acts">
     ${id&&App.can("del")?`<button class="btn danger" data-act="delProduct" data-id="${esc(id)}">${moves.length?(p.archived?"Вернуть из архива":"В архив"):"Удалить"}</button>`:""}
@@ -96,10 +106,13 @@ ACT.saveProduct=async(id,btn)=>{
   const old=id?App.byId("products",id):null;
   const n=v=>v===""?null:num(v);
   const data={name:V("pName"),category_id:V("pCat")||null,condition:V("pCond"),brand:V("pBrand")||null,sku:V("pSku")||null,barcode:V("pBar")||null,serial:V("pSerial")||null,
-    price:num(V("pPrice")),min_qty:num(V("pMin")),warranty_months:num(V("pWarr")),battery_health:n(V("pBatt")),diagnostics:V("pDiag")||null,kit:V("pKit")||null,model:V("pModel")||null,memory:V("pMem")||null,color:V("pColor")||null,
+    track_serial:App.checked("pTrack"),price:num(V("pPrice")),min_qty:num(V("pMin")),warranty_months:num(V("pWarr")),battery_health:n(V("pBatt")),diagnostics:V("pDiag")||null,kit:V("pKit")||null,model:V("pModel")||null,memory:V("pMem")||null,color:V("pColor")||null,
     avito_price:n(V("pAvito")),on_site:App.checked("pSite"),on_avito:App.checked("pOnAvito"),description:V("pNote")||null};
   if(data.battery_health!=null&&(data.battery_health<0||data.battery_health>100))return App.toast("Ёмкость АКБ — от 0 до 100%");
   if(App.can("cost")&&document.getElementById("pCost"))data.cost=num(V("pCost"));
+  if(old&&old.trackSerial&&!data.track_serial&&S.units.some(u=>u.productId===id))return App.toast("У товара есть экземпляры с IMEI — учёт по серийным номерам отключить нельзя");
+  if(old&&!old.trackSerial&&data.track_serial&&App.qtyTotal(old)>0)return App.toast("Сначала спишите или продайте остаток без IMEI, потом включите учёт по серийным номерам");
+  if(!document.getElementById("pSerial"))delete data.serial;
   if(!App.can("price")){delete data.price;delete data.avito_price}
   if(btn.disabled)return;btn.disabled=true;
   try{
@@ -162,7 +175,7 @@ ACT.newDoc=(type,prefill)=>{
   docEditor();
 };
 ACT.quickDoc=arg=>{const [type,pid]=arg.split("|"),p=App.byId("products",pid);App.closeModal();
-  ACT.newDoc(type,{productId:pid,name:p.name,qty:1,cost:num(p.cost)});
+  ACT.newDoc(type,{productId:pid,name:p.name,qty:p.trackSerial?0:1,cost:num(p.cost),newUnits:[],unitIds:[],foundCodes:[]});
   if(type!=="in"){const w=App.whs().find(w=>App.qtyIn(p,w.id)>0);if(w){D.whFrom=w.id;D.whTo=type==="transfer"?(App.whs().find(x=>x.id!==w.id)||w).id:w.id}docEditor()}};
 ACT.openDoc=id=>{const d=App.byId("docs",id);if(!d)return;D=App.clean(d);docEditor()};
 function docWh(){return D.type==="transfer"||D.type==="writeoff"||D.type==="supret"?D.whFrom:D.whTo}
@@ -178,6 +191,7 @@ function docEditor(){
   const wh=docWh();
   let sumQ=0,sumC=0,plusC=0,minusC=0;
   const rows=D.lines.map((l,k)=>{const p=App.byId("products",l.productId);const have=p?App.qtyIn(p,wh):0;
+    if(p&&p.trackSerial){const R=serialRow(l,k,p,{ro,cost,inv,wh});sumQ+=R.q;sumC+=R.c;if(R.c>0)plusC+=R.c;else minusC+=R.c;return R.html}
     if(inv){const diff=num(l.counted)-num(l.expected);sumQ+=diff;const c=diff*num(l.cost);if(c>0)plusC+=c;else minusC+=c;
       return `<tr class="${l.counted===""||l.counted==null?"":diff?"diffrow":""}"><td>${esc(l.name)}${p&&p.serial?'<span class="sub">IMEI '+esc(p.serial)+"</span>":""}</td><td class="n">${num(l.expected)}</td>
       <td class="n"><input type="number" min="0" id="lc${k}" data-line="${k}" data-lf="counted" value="${l.counted==null?"":esc(l.counted)}" placeholder="?" ${ro?"disabled":""} aria-label="Фактически"></td>
@@ -210,23 +224,98 @@ function bindDoc(){
   document.querySelectorAll("#modal [data-d]").forEach(el=>el.addEventListener("change",()=>{D[el.dataset.d]=el.value;if(["whFrom","whTo","catId"].includes(el.dataset.d)){if(D.type==="inventory"&&D.lines.length&&el.dataset.d!=="catId"){D.lines=[];App.toast("Склад изменён: строки очищены")}docEditor()}}));
   document.querySelectorAll("#modal [data-d]").forEach(el=>{if(el.tagName==="INPUT")el.addEventListener("input",()=>D[el.dataset.d]=el.value)});
   document.querySelectorAll("#modal [data-line]").forEach(el=>el.addEventListener("change",()=>{const l=D.lines[+el.dataset.line];l[el.dataset.lf]=el.dataset.lf==="counted"&&el.value===""?"":num(el.value);docEditor()}));
-  if(D.status==="draft")App.productPicker("dQ","dPick",{wh:docWh,inStock:false,showCost:App.can("cost"),onPick:p=>{
+  document.querySelectorAll("#modal [data-uscan]").forEach(el=>el.addEventListener("keydown",e=>{if(e.key!=="Enter")return;e.preventDefault();const v=el.value;el.value="";
+    if(lineScan(+el.dataset.uscan,v)){docEditor();setTimeout(()=>{const x=document.querySelector(`#modal [data-uscan="${el.dataset.uscan}"]`);if(x)x.focus()},0)}}));
+  document.querySelectorAll("#modal [data-unf]").forEach(el=>el.addEventListener("change",()=>{const [k,j,f]=el.dataset.unf.split("|");const u=D.lines[+k].newUnits[+j];if(u)u[f]=el.value}));
+  document.querySelectorAll("#modal [data-upick]").forEach(el=>el.addEventListener("change",()=>{const [k,id]=el.dataset.upick.split("|");const l=D.lines[+k];
+    l.unitIds=el.checked?[...new Set([...(l.unitIds||[]),id])]:(l.unitIds||[]).filter(x=>x!==id);docEditor()}));
+  if(D.status==="draft")App.productPicker("dQ","dPick",{wh:docWh,inStock:false,showCost:App.can("cost"),onPick:(p,u)=>{
+    if(p.trackSerial){pickSerial(p,u);return}
     const ex=D.lines.find(l=>l.productId===p.id);
     if(D.type==="inventory"){if(ex)ex.counted=num(ex.counted)+1;else D.lines.push({productId:p.id,name:p.name,expected:App.qtyIn(p,D.whTo),counted:1,cost:num(p.cost)})}
     else if(ex)ex.qty=num(ex.qty)+1;else D.lines.push({productId:p.id,name:p.name,qty:1,cost:num(p.cost)});
     docEditor();setTimeout(()=>{const q=document.getElementById("dQ");if(q)q.focus()},0)}});
 }
 ACT.docDelLine=k=>{D.lines.splice(+k,1);docEditor()};
+ACT.docUnitDel=v=>{const [k,j]=v.split("|").map(Number),l=D.lines[k];if(!l)return;if(D.type==="in")l.newUnits.splice(j,1);else if(D.type==="inventory")l.foundCodes.splice(j,1);docEditor()};
+
+/* ---------- строки с серийным учётом ---------- */
+function serialRow(l,k,p,{ro,cost,inv,wh}){
+  l.newUnits=l.newUnits||[];l.unitIds=l.unitIds||[];l.foundCodes=l.foundCodes||[];
+  const scan=ro?"":`<input class="uscan" data-uscan="${k}" placeholder="Сканируйте IMEI / SN и нажмите Enter" autocomplete="off" aria-label="IMEI или серийный номер">`;
+  const tag='<span class="pill info">IMEI</span> ';
+  if(inv){
+    const inWh=App.unitsOf(p.id,{wh:D.whTo}),found=l.foundCodes,exp=ro?num(l.expected):inWh.length,cnt=found.length,diff=cnt-exp,c=diff*num(l.cost);
+    const missing=ro?[]:inWh.filter(u=>!found.some(x=>[u.imei,u.imei2,u.serialNo].some(y=>y&&y.toLowerCase()===String(x).toLowerCase())));
+    return {q:diff,c,html:`<tr class="${diff?"diffrow":""}"><td>${tag}${esc(l.name)}</td><td class="n">${exp}</td><td class="n"><b>${cnt}</b></td>
+      <td class="n">${diff?`<span class="pill ${diff>0?"ok":"bad"}">${diff>0?"+":""}${diff}</span>`:'<span class="pill">0</span>'}</td>${cost?`<td class="n">${money(c)}</td>`:""}</tr>
+      <tr class="subrow"><td colspan="${cost?5:4}">${scan}<div class="chips">${found.map((x,j)=>`<span class="pill ok">${esc(x)}${ro?"":` <button class="x" data-act="docUnitDel" data-id="${k}|${j}" aria-label="Убрать">✕</button>`}</span>`).join("")}</div>
+      ${missing.length?`<div class="sub bad" style="margin-top:4px">Не найдены (будут списаны как недостача): ${missing.map(u=>esc(App.unitCode(u))).join(", ")}</div>`:""}</td></tr>`};
+  }
+  if(D.type==="in"){
+    const n=l.newUnits.length,c=n*num(l.cost);
+    return {q:n,c,html:`<tr><td>${tag}${esc(l.name)}</td><td class="n"><b>${n}</b></td>
+      ${cost?`<td class="n"><input type="number" min="0" id="lk${k}" data-line="${k}" data-lf="cost" value="${num(l.cost)}" ${ro?"disabled":""} aria-label="Закупка"></td><td class="n">${money(c)}</td>`:""}
+      <td class="n">${ro?"":`<button class="btn sm ghost danger" data-act="docDelLine" data-id="${k}" aria-label="Убрать">✕</button>`}</td></tr>
+      <tr class="subrow"><td colspan="${cost?5:3}">${scan}
+      ${n?`<table class="units"><thead><tr><th>IMEI / SN</th><th>Состояние</th><th>АКБ, %</th>${App.can("price")?"<th>Цена экз., ₽</th>":""}<th></th></tr></thead><tbody>
+      ${l.newUnits.map((u,j)=>`<tr><td><b>${esc(u.imei||u.serial_no)}</b>${u.warn?`<span class="sub warn">${esc(u.warn)}</span>`:""}</td>
+        <td>${ro?esc(u.condition||""):`<select data-unf="${k}|${j}|condition" aria-label="Состояние">${App.CONDS.map(x=>`<option${(u.condition||p.condition)===x?" selected":""}>${x}</option>`).join("")}</select>`}</td>
+        <td><input type="number" min="0" max="100" value="${esc(u.battery_health||"")}" data-unf="${k}|${j}|battery_health" ${ro?"disabled":""} aria-label="АКБ" style="width:70px"></td>
+        ${App.can("price")?`<td><input type="number" min="0" value="${esc(u.price||"")}" data-unf="${k}|${j}|price" ${ro?"disabled":""} placeholder="${num(p.price)}" aria-label="Цена экземпляра" style="width:100px"></td>`:""}
+        <td class="n">${ro?"":`<button class="btn sm ghost" data-act="docUnitDel" data-id="${k}|${j}" aria-label="Убрать">✕</button>`}</td></tr>`).join("")}</tbody></table>`:'<div class="muted">Отсканируйте каждый экземпляр — количество посчитается само</div>'}</td></tr>`};
+  }
+  // перемещение, списание, возврат поставщику
+  const avail=ro?[]:App.unitsOf(p.id,{wh:D.whFrom}),sel=l.unitIds,n=sel.length,c=n*num(l.cost);
+  const shown=ro?sel.map(id=>App.byId("units",id)).filter(Boolean):avail.concat(sel.map(id=>App.byId("units",id)).filter(u=>u&&!avail.includes(u)));
+  return {q:n,c,html:`<tr><td>${tag}${esc(l.name)}</td><td class="n">${ro?"":avail.length}</td><td class="n"><b>${n}</b></td>
+    ${cost?`<td class="n">${money(l.cost)}</td><td class="n">${money(c)}</td>`:""}<td class="n">${ro?"":`<button class="btn sm ghost danger" data-act="docDelLine" data-id="${k}" aria-label="Убрать">✕</button>`}</td></tr>
+    <tr class="subrow"><td colspan="${cost?6:4}">${scan}<div class="chips">${shown.map(u=>{const bad=!ro&&!avail.includes(u);
+      return `<label class="chk ${bad?"bad":""}"><input type="checkbox" data-upick="${k}|${esc(u.id)}" ${sel.includes(u.id)?"checked":""} ${ro?"disabled":""}> ${esc(App.unitLabel(u))}${bad?" — нет на складе":""}</label>`}).join("")||'<span class="muted">Нет экземпляров на складе «'+esc(App.whName(D.whFrom))+'»</span>'}</div></td></tr>`};
+}
+function lineScan(k,raw){
+  const l=D.lines[k],p=l&&App.byId("products",l.productId);if(!p)return false;
+  const pc=App.parseCode(raw);if(!pc)return false;const code=pc.imei||pc.serial_no;
+  const u=App.findUnit(code);
+  if(D.type==="in"){
+    if(D.lines.some(x=>(x.newUnits||[]).some(n=>(n.imei||n.serial_no)===code))){App.toast("Этот код уже есть в документе");return false}
+    if(u&&["in_stock","reserved","in_repair"].includes(u.status)){App.toast("IMEI/SN "+code+" уже числится на складе: «"+(App.byId("products",u.productId)||{}).name+"»");return false}
+    if(u)App.toast("Этот экземпляр уже был в базе ("+(App.UNIT_ST[u.status]||[u.status])[0].toLowerCase()+") — вернётся на склад");
+    else if(pc.warn)App.toast(pc.warn);
+    l.newUnits.push({imei:pc.imei||"",serial_no:pc.serial_no||"",condition:p.condition,battery_health:"",price:"",warn:pc.warn||""});return true;
+  }
+  if(D.type==="inventory"){
+    if(l.foundCodes.some(x=>x.toLowerCase()===code.toLowerCase())){App.toast("Уже отсканирован");return false}
+    if(!u){App.toast("IMEI/SN "+code+" не числится в базе — оформите приход");return false}
+    if(u.productId!==p.id){App.toast("Это «"+(App.byId("products",u.productId)||{}).name+"»");return false}
+    if(u.status!=="in_stock"){App.toast("Числится как «"+(App.UNIT_ST[u.status]||[u.status])[0]+"»");return false}
+    l.foundCodes.push(App.unitCode(u));return true;
+  }
+  if(!u){App.toast("IMEI/SN "+code+" не найден");return false}
+  if(u.productId!==p.id){App.toast("Это «"+(App.byId("products",u.productId)||{}).name+"»");return false}
+  if(u.status!=="in_stock"||u.whId!==D.whFrom){App.toast("Этого экземпляра нет на складе «"+App.whName(D.whFrom)+"»");return false}
+  if(!l.unitIds.includes(u.id))l.unitIds.push(u.id);return true;
+}
+function pickSerial(p,u){
+  let k=D.lines.findIndex(l=>l.productId===p.id);
+  if(k<0){D.lines.push({productId:p.id,name:p.name,qty:0,cost:num(p.cost),expected:D.type==="inventory"?App.unitsOf(p.id,{wh:D.whTo}).length:0,counted:"",newUnits:[],unitIds:[],foundCodes:[]});k=D.lines.length-1}
+  if(u)lineScan(k,App.unitCode(u));
+  docEditor();setTimeout(()=>{const x=document.querySelector(`#modal [data-uscan="${k}"]`);if(x&&!u)x.focus();else{const q=document.getElementById("dQ");if(q)q.focus()}},0);
+}
 ACT.invFill=()=>{
   const ex=new Set(D.lines.map(l=>l.productId));
   S.products.filter(p=>!p.archived&&App.inCat(p,D.catId)&&(App.qtyIn(p,D.whTo)!==0)&&!ex.has(p.id)).sort((a,b)=>String(a.name).localeCompare(b.name))
-    .forEach(p=>D.lines.push({productId:p.id,name:p.name,expected:App.qtyIn(p,D.whTo),counted:"",cost:num(p.cost)}));
-  D.lines.forEach(l=>{const p=App.byId("products",l.productId);if(p)l.expected=App.qtyIn(p,D.whTo)});
+    .forEach(p=>D.lines.push({productId:p.id,name:p.name,expected:App.qtyIn(p,D.whTo),counted:"",cost:num(p.cost),foundCodes:[],newUnits:[],unitIds:[]}));
+  D.lines.forEach(l=>{const p=App.byId("products",l.productId);if(p)l.expected=p.trackSerial?App.unitsOf(p.id,{wh:D.whTo}).length:App.qtyIn(p,D.whTo)});
   docEditor();
 };
-ACT.invZero=()=>{D.lines.forEach(l=>{if(l.counted===""||l.counted==null)l.counted=0});docEditor()};
+ACT.invZero=()=>{D.lines.forEach(l=>{const p=App.byId("products",l.productId);if(!(p&&p.trackSerial)&&(l.counted===""||l.counted==null))l.counted=0});docEditor()};
 function docHead(){return{type:D.type,wh_from:D.whFrom||null,wh_to:D.whTo||null,supplier_id:D.supplierId||null,invoice:D.invoice||null,reason:D.reason||null,category_id:D.catId||null,note:D.note||null}}
-function docLines(){return D.lines.map(l=>D.type==="inventory"?{product_id:l.productId,expected:num(l.expected),counted:l.counted===""||l.counted==null?null:num(l.counted),cost:num(l.cost)}:{product_id:l.productId,qty:num(l.qty),cost:num(l.cost)})}
+function docLines(){return D.lines.map(l=>{const p=App.byId("products",l.productId),ser=!!(p&&p.trackSerial);
+  const extra={new_units:ser&&D.type==="in"?(l.newUnits||[]).map(cleanUnit):[],unit_ids:ser?(l.unitIds||[]):[],found_codes:ser&&D.type==="inventory"?(l.foundCodes||[]):[]};
+  if(D.type==="inventory")return Object.assign({product_id:l.productId,expected:num(l.expected),counted:ser?(l.foundCodes||[]).length:(l.counted===""||l.counted==null?null:num(l.counted)),cost:num(l.cost)},extra);
+  return Object.assign({product_id:l.productId,qty:ser?(D.type==="in"?(l.newUnits||[]).length:(l.unitIds||[]).length):num(l.qty),cost:num(l.cost)},extra)})}
+const cleanUnit=u=>{const o={};["imei","imei2","serial_no","condition","battery_health","price","kit","diagnostics"].forEach(k=>{if(u[k]!==""&&u[k]!=null)o[k]=String(u[k]).trim()});return o};
 async function persistDraft(){
   if(!D.id){const d=await App.api.doc(docHead(),docLines(),false);D.id=d.id;D.num=d.num;return}
   await App.api.update("stock_docs",D.id,docHead());
@@ -236,7 +325,10 @@ async function persistDraft(){
 function docCheck(){
   if(!D.lines.length)return "Добавьте хотя бы одну строку";
   if(D.type==="transfer"&&D.whFrom===D.whTo)return "Склады отправления и назначения совпадают";
-  if(D.type!=="inventory"&&D.lines.some(l=>num(l.qty)<=0))return "Количество должно быть больше нуля";
+  for(const l of D.lines){const p=App.byId("products",l.productId);if(!p||!p.trackSerial)continue;
+    if(D.type==="in"&&!(l.newUnits||[]).length)return "Отсканируйте IMEI / SN для «"+p.name+"»";
+    if(["transfer","writeoff","supret"].includes(D.type)&&!(l.unitIds||[]).length)return "Отметьте экземпляры (IMEI / SN) для «"+p.name+"»"}
+  if(D.type!=="inventory"&&D.lines.some(l=>{const p=App.byId("products",l.productId);return !(p&&p.trackSerial)&&num(l.qty)<=0}))return "Количество должно быть больше нуля";
   return "";
 }
 ACT.docSave=async(_,btn)=>{
@@ -245,17 +337,17 @@ ACT.docSave=async(_,btn)=>{
 };
 ACT.docPost=async(_,btn)=>{
   const e=docCheck();if(e)return App.toast(e);
-  if(D.type==="inventory"&&D.lines.some(l=>l.counted===""||l.counted==null))return App.toast("Не все строки посчитаны. Введите факт или нажмите «Непосчитанные = 0»");
+  if(D.type==="inventory"&&D.lines.some(l=>{const p=App.byId("products",l.productId);return !(p&&p.trackSerial)&&(l.counted===""||l.counted==null)}))return App.toast("Не все строки посчитаны. Введите факт или нажмите «Непосчитанные = 0»");
   if(btn.disabled)return;btn.disabled=true;
   try{
     await persistDraft();
-    await App.api.rpc("post_doc",{p_doc:D.id},["stock_docs","stock","stock_movements","products","audit_log"]);
+    await App.api.rpc("post_doc",{p_doc:D.id},["stock_docs","stock","stock_movements","products","audit_log","units"]);
     App.toast("Документ "+D.num+" проведён");App.closeModal();
   }catch(x){btn.disabled=false;App.toast(x.message+(D.id?". Документ сохранён как черновик":""))}
 };
 ACT.docCancel=async(_,el)=>{
   if(!App.confirm2(el,"Откатить все движения? Нажмите ещё раз"))return;
-  try{await App.api.rpc("cancel_doc",{p_doc:D.id},["stock_docs","stock","stock_movements","products","audit_log"]);App.toast("Проведение отменено");App.closeModal()}
+  try{await App.api.rpc("cancel_doc",{p_doc:D.id},["stock_docs","stock","stock_movements","products","audit_log","units"]);App.toast("Проведение отменено");App.closeModal()}
   catch(x){App.toast("Нельзя отменить: "+x.message+". Часть товара уже продана или перемещена")}
 };
 ACT.docDelete=async(_,el)=>{if(!App.confirm2(el,"Удалить черновик? Нажмите ещё раз"))return;try{await App.api.remove("stock_docs",D.id);App.closeModal();App.toast("Черновик удалён")}catch(x){App.toast(x.message)}};

@@ -43,7 +43,7 @@ App.DEFAULTS = {shopName:"iCase", city:"", address:"", phone:"", inn:"", deviceW
   receiptAck:"Устройство осмотрено, проверено, претензий к внешнему виду и комплектации не имею."};
 
 /* ---------- состояние ---------- */
-App.COLS = ["settings","points","warehouses","categories","suppliers","services","products","customers","sales","returns","docs","movements","shifts","cashops","staff","staffreq","log","repairs"];
+App.COLS = ["settings","points","warehouses","categories","suppliers","services","products","customers","sales","returns","docs","movements","shifts","cashops","staff","staffreq","log","repairs","units","models"];
 const S = App.S = {}; App.COLS.forEach(c=>S[c]=[]);
 App.ui = {view:"dashboard"};
 App.me = {id:null, role:null, pointId:null, name:"", email:""};
@@ -97,12 +97,13 @@ App.qtyTotal = p=>p&&p.stock?Object.values(p.stock).reduce((a,v)=>a+num(v),0):0;
 App.isLow = p=>!p.archived&&num(p.minQty)>0&&App.qtyTotal(p)<=num(p.minQty);
 App.whereElse = (p,except)=>App.whs().filter(w=>w.id!==except&&App.qtyIn(p,w.id)>0).map(w=>w.name+": "+App.qtyIn(p,w.id)).join(", ");
 App.findByCode = code=>{const c=String(code||"").trim().toLowerCase();if(!c)return null;
+  const u=App.findUnit?App.findUnit(c):null;if(u){const p=App.byId("products",u.productId);if(p)return p}
   return S.products.find(p=>!p.archived&&[p.barcode,p.sku,p.serial].some(x=>x&&String(x).toLowerCase()===c))||null};
 App.searchProducts = (q,{wh=null,inStock=false,limit=10}={})=>{
   const s=String(q||"").trim().toLowerCase();if(!s)return [];
   const words=s.split(/\s+/);
   return S.products.filter(p=>!p.archived&&(!inStock||(wh?App.qtyIn(p,wh):App.qtyTotal(p))>0)&&
-    words.every(w=>[p.name,p.sku,p.barcode,p.serial,p.brand,App.catName(p)].join(" ").toLowerCase().includes(w))).slice(0,limit);
+    words.every(w=>[p.name,p.sku,p.barcode,p.serial,p.brand,App.catName(p),App.unitCodes?App.unitCodes(p.id):""].join(" ").toLowerCase().includes(w))).slice(0,limit);
 };
 
 /* ---------- клиенты ---------- */

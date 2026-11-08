@@ -257,3 +257,13 @@ th.pick,td.pick{width:34px;text-align:center}td.pick input,th.pick input{width:1
 .tpl-classic{background:linear-gradient(#111,#111) 50% 12%/60% 2px no-repeat,linear-gradient(#111,#111) 50% 22%/30% 5px no-repeat,repeating-linear-gradient(#fff 0 9px,#999 9px 10px) 50% 62%/82% 40px no-repeat!important}
 .tpl-minimal{background:linear-gradient(#111,#111) 12% 10%/22% 5px no-repeat,linear-gradient(#bbb,#bbb) 12% 30%/50% 10px no-repeat,repeating-linear-gradient(#fff 0 11px,#ddd 11px 12px) 50% 64%/82% 30px no-repeat,linear-gradient(#111,#111) 88% 90%/30% 8px no-repeat!important}
 .seg{display:inline-flex;border:1px solid var(--line,#ddd);border-radius:99px;overflow:hidden}.seg button{border:0;background:transparent;padding:5px 12px;font:inherit;font-size:13px;cursor:pointer}.seg button.on{background:#111;color:#fff}
+
+/* ---------- серийный учёт ---------- */
+tr.subrow td{background:var(--surface-2,#f6f3ea);padding:8px 12px 12px;border-top:0}
+input.uscan{width:100%;max-width:420px;margin-bottom:8px;font-family:"SF Mono",Menlo,Consolas,monospace}
+table.units{width:auto;min-width:60%;margin-top:4px}table.units th,table.units td{padding:4px 8px;font-size:13px}
+label.chk.bad{border-color:#c0392b;color:#c0392b}
+.pill .x{border:0;background:transparent;cursor:pointer;font:inherit;padding:0 0 0 4px;color:inherit}
+table.cart input.uscan{width:100%;max-width:420px;text-align:left}
+table.cart input[type=checkbox]{width:auto;height:auto}
+table.cart table.units input{text-align:right}

@@ -41,18 +41,21 @@ const M={
     discount:num(r.discount),tags:r.tags||[],blacklisted:r.blacklisted,blackReason:r.black_reason||"",note:r.note||"",mergedInto:r.merged_into,createdAt:r.created_at}),
   products:r=>({id:r.id,name:r.name,categoryId:r.category_id||"",brand:r.brand||"",condition:r.condition,sku:r.sku||"",barcode:r.barcode||"",serial:r.serial||"",
     cost:num(r.cost),lastCost:num(r.last_cost),price:num(r.price),minQty:r.min_qty,warrantyMonths:r.warranty_months,batteryHealth:r.battery_health,diagnostics:r.diagnostics||"",
-    kit:r.kit||"",model:r.model||"",memory:r.memory||"",color:r.color||"",avitoPrice:r.avito_price==null?"":num(r.avito_price),ownership:r.ownership,onSite:r.on_site,onAvito:r.on_avito,archived:r.is_archived,note:r.description||"",
+    kit:r.kit||"",trackSerial:!!r.track_serial,attrs:r.attrs||{},catalogId:r.catalog_id||"",model:r.model||"",memory:r.memory||"",color:r.color||"",avitoPrice:r.avito_price==null?"":num(r.avito_price),ownership:r.ownership,onSite:r.on_site,onAvito:r.on_avito,archived:r.is_archived,note:r.description||"",
     createdAt:r.created_at,stock:{}}),
   sales:r=>({id:r.id,num:r.num,pointId:r.point_id,whId:r.warehouse_id,shiftId:r.shift_id,customerId:r.customer_id,channel:r.channel,subtotal:num(r.subtotal),discount:num(r.discount),
     tradeIn:r.tradein_device?{device:r.tradein_device,amount:num(r.tradein_amount),imei:r.tradein_imei||""}:null,total:num(r.total),status:r.status,by:r.staff_id,createdAt:r.created_at,
-    items:(r.sale_items||[]).sort((a,b)=>a.id-b.id).map(i=>({line:i.id,productId:i.product_id,name:i.name,serial:i.serial||"",qty:i.qty,price:num(i.price),disc:num(i.line_discount),cost:num(i.cost),warranty:i.warranty_months,model:i.model||"",memory:i.memory||"",color:i.color||"",condition:i.condition||"",battery:i.battery_health,kit:i.kit||""})),
+    items:(r.sale_items||[]).sort((a,b)=>a.id-b.id).map(i=>({line:i.id,productId:i.product_id,name:i.name,serial:i.serial||"",qty:i.qty,price:num(i.price),disc:num(i.line_discount),cost:num(i.cost),warranty:i.warranty_months,model:i.model||"",memory:i.memory||"",color:i.color||"",condition:i.condition||"",battery:i.battery_health,kit:i.kit||"",unitId:i.unit_id||""})),
     payments:(r.sale_payments||[]).map(p=>({method:p.method,amount:num(p.amount)}))}),
   returns:r=>({id:r.id,num:r.num,saleId:r.sale_id,customerId:r.customer_id,amount:num(r.amount),method:r.method,reason:r.reason,note:r.note||"",whId:r.warehouse_id,defect:r.is_defect,
     shiftId:r.shift_id,by:r.staff_id,createdAt:r.created_at,
     items:(r.return_items||[]).map(i=>({line:i.sale_item_id,qty:i.qty,productId:i.sale_items&&i.sale_items.product_id,name:i.sale_items&&i.sale_items.name,price:num(i.sale_items&&i.sale_items.price),cost:num(i.sale_items&&i.sale_items.cost)}))}),
   docs:r=>({id:r.id,num:r.num,type:r.type,status:r.status,whFrom:r.wh_from||"",whTo:r.wh_to||"",supplierId:r.supplier_id||"",invoice:r.invoice||"",reason:r.reason||"",catId:r.category_id||"",note:r.note||"",
     by:r.created_by,createdAt:r.created_at,postedAt:r.posted_at,cancelledAt:r.cancelled_at,
-    lines:(r.stock_doc_lines||[]).sort((a,b)=>a.id-b.id).map(l=>({productId:l.product_id,name:(App.byId("products",l.product_id)||{}).name||"Товар",qty:l.qty,expected:l.expected,counted:l.counted==null?"":l.counted,cost:num(l.cost)}))}),
+    lines:(r.stock_doc_lines||[]).sort((a,b)=>a.id-b.id).map(l=>({productId:l.product_id,name:(App.byId("products",l.product_id)||{}).name||"Товар",qty:l.qty,expected:l.expected,counted:l.counted==null?"":l.counted,cost:num(l.cost),newUnits:l.new_units||[],unitIds:l.unit_ids||[],foundCodes:l.found_codes||[],unitLog:l.unit_log||[]}))}),
+  units:r=>({id:r.id,productId:r.product_id,imei:r.imei||"",imei2:r.imei2||"",serialNo:r.serial_no||"",whId:r.warehouse_id||"",status:r.status,condition:r.condition||"",batteryHealth:r.battery_health,
+    diagnostics:r.diagnostics||"",kit:r.kit||"",cost:num(r.cost),price:r.price==null?"":num(r.price),note:r.note||"",saleItemId:r.sale_item_id,lastRef:r.last_ref||"",createdAt:r.created_at,updatedAt:r.updated_at}),
+  models:r=>({id:r.id,family:r.family,name:r.name,year:r.year,memories:r.memories||[],colors:r.colors||[],options:r.options||{},order:r.sort,active:r.is_active}),
   movements:r=>({id:r.id,productId:r.product_id,productName:(App.byId("products",r.product_id)||{}).name||"Товар",whId:r.warehouse_id,qty:r.qty,type:r.type,ref:r.ref||"",note:r.note||"",by:r.staff_id,at:r.created_at}),
   shifts:r=>({id:r.id,num:r.num,pointId:r.point_id,status:r.status,openedAt:r.opened_at,openedBy:r.opened_by,openCash:num(r.open_cash),closedAt:r.closed_at,closedBy:r.closed_by,
     countedCash:num(r.counted_cash),expectedCash:num(r.expected_cash),diff:num(r.diff),closeNote:r.close_note||""}),
@@ -80,13 +83,15 @@ const L={
   cashops:async()=>(await all("cash_ops","*",r=>r.order("created_at",{ascending:false}))).map(M.cashops),
   staff:async()=>(await all("staff")).map(M.staff),
   staffreq:async()=>(await all("staff_requests")).map(M.staffreq),
+  units:async()=>(await all("units")).map(M.units),
+  models:async()=>(await all("apple_models","*",r=>r.order("sort"))).map(M.models),
   log:async()=>(await q(sb.from("audit_log").select("*").order("created_at",{ascending:false}).limit(500),"log")).map(M.log)
 };
 /* таблица базы → разделы, которые нужно перечитать */
 const T={settings:["settings"],points:["points"],warehouses:["warehouses"],categories:["categories"],suppliers:["suppliers"],services:["services"],
   customers:["customers"],products:["products"],stock:["products"],stock_movements:["movements"],stock_docs:["docs"],stock_doc_lines:["docs"],
   sales:["sales"],sale_items:["sales"],sale_payments:["sales"],returns:["returns"],return_items:["returns"],shifts:["shifts"],cash_ops:["cashops"],
-  staff:["staff"],staff_requests:["staffreq"],audit_log:["log"]};
+  staff:["staff"],staff_requests:["staffreq"],audit_log:["log"],units:["units"],apple_models:["models"]};
 
 App.reload = async function(cols){
   cols=[...new Set(cols)].filter(c=>L[c]);

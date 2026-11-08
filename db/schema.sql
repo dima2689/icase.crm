@@ -665,3 +665,347 @@ revoke execute on function snapshot_sale_item() from public, anon, authenticated
 alter table settings
   add column doc_config jsonb not null default '{}'::jsonb,
   add column tag_templates jsonb not null default '[]'::jsonb;
+
+-- icase_v3_serials: серийный учёт по IMEI / SN, каталог моделей Apple
+-- ================= серийный учёт: единицы техники по IMEI / серийному номеру =================
+create type unit_status as enum ('in_stock','sold','written_off','returned_supplier','in_repair','reserved');
+
+create table apple_models (                              -- справочник моделей Apple
+  id uuid primary key default gen_random_uuid(),
+  family text not null,                                  -- iPhone, iPad, Mac, Apple Watch, AirPods, Другое
+  name text not null,
+  year int,
+  memories text[] not null default '{}',
+  colors text[] not null default '{}',
+  options jsonb not null default '{}'::jsonb,            -- {"SIM":["nano-SIM + eSIM","eSIM"],"ОЗУ":["16 ГБ","24 ГБ"]}
+  sort int not null default 0,
+  is_active boolean not null default true,
+  unique (family, name)
+);
+
+alter table products
+  add column track_serial boolean not null default false,  -- учёт по IMEI / серийным номерам
+  add column attrs jsonb not null default '{}'::jsonb,       -- SIM, ОЗУ, размер корпуса, сеть и т.п.
+  add column catalog_id uuid references apple_models(id) on delete set null;
+
+create table units (
+  id uuid primary key default gen_random_uuid(),
+  product_id uuid not null references products(id),
+  imei text, imei2 text, serial_no text,
+  warehouse_id uuid references warehouses(id),
+  status unit_status not null default 'in_stock',
+  condition text,
+  battery_health int check (battery_health between 0 and 100),
+  diagnostics text, kit text,
+  cost numeric(12,2) not null default 0,
+  price numeric(12,2),                                     -- своя цена экземпляра (б/у); пусто — цена товара
+  note text,
+  sale_item_id bigint references sale_items(id),
+  last_ref text,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
+  check (imei is not null or serial_no is not null)
+);
+create unique index units_imei_uq on units(imei) where imei is not null;
+create unique index units_imei2_uq on units(imei2) where imei2 is not null;
+create unique index units_sn_uq on units(upper(serial_no)) where serial_no is not null;
+create index units_product_idx on units(product_id, status);
+create index units_wh_idx on units(warehouse_id) where status = 'in_stock';
+create trigger t3 before update on units for each row execute function touch();
+
+alter table sale_items add column unit_id uuid references units(id);
+alter table stock_doc_lines
+  add column new_units jsonb not null default '[]'::jsonb,  -- приход: [{imei, imei2, serial_no, condition, battery_health, price, cost, kit, diagnostics}]
+  add column unit_ids uuid[] not null default '{}',         -- перемещение / списание / возврат поставщику
+  add column found_codes text[] not null default '{}',      -- инвентаризация: отсканированные IMEI / SN
+  add column unit_log jsonb not null default '[]'::jsonb;   -- что изменилось при проведении (для отмены)
+
+-- найти единицу по любому коду
+create function find_unit(p_code text) returns units language sql stable set search_path = public as $$
+  select * from units where imei = trim(p_code) or imei2 = trim(p_code) or upper(serial_no) = upper(trim(p_code)) limit 1
+$$;
+
+-- принять единицу на склад: новая или ранее проданная/списанная (тот же IMEI вернулся через trade-in или выкуп)
+create function unit_receive(p_product uuid, p_wh uuid, p jsonb, p_cost numeric, p_ref text, out o_id uuid, out o_created boolean, out o_before jsonb)
+language plpgsql security definer set search_path = public as $$
+declare v_imei text := nullif(trim(p->>'imei'),''); v_sn text := nullif(trim(p->>'serial_no'),''); v_imei2 text := nullif(trim(p->>'imei2'),'');
+        u units; pr products;
+begin
+  if v_imei is null and v_sn is null then raise exception 'Укажите IMEI или серийный номер'; end if;
+  select * into pr from products where id = p_product;
+  select * into u from units where (v_imei is not null and (imei = v_imei or imei2 = v_imei)) or (v_sn is not null and upper(serial_no) = upper(v_sn)) limit 1 for update;
+  if u.id is not null then
+    if u.status in ('in_stock','reserved','in_repair') then
+      raise exception 'IMEI/SN % уже числится на складе («%»)', coalesce(v_imei, v_sn), (select name from products where id = u.product_id);
+    end if;
+    o_before := jsonb_build_object('product_id',u.product_id,'wh',u.warehouse_id,'status',u.status,'cost',u.cost,'price',u.price,'condition',u.condition,'battery_health',u.battery_health,'sale_item_id',u.sale_item_id);
+    update units set product_id = p_product, warehouse_id = p_wh, status = 'in_stock', sale_item_id = null, last_ref = p_ref,
+      imei = coalesce(v_imei, imei), imei2 = coalesce(v_imei2, imei2), serial_no = coalesce(v_sn, serial_no),
+      cost = coalesce(nullif(p->>'cost','')::numeric, p_cost, 0), price = nullif(p->>'price','')::numeric,
+      condition = coalesce(nullif(p->>'condition',''), pr.condition), battery_health = nullif(p->>'battery_health','')::int,
+      kit = coalesce(nullif(p->>'kit',''), pr.kit), diagnostics = nullif(p->>'diagnostics','')
+    where id = u.id;
+    o_id := u.id; o_created := false;
+  else
+    insert into units(product_id, imei, imei2, serial_no, warehouse_id, status, condition, battery_health, kit, diagnostics, cost, price, last_ref)
+    values (p_product, v_imei, v_imei2, v_sn, p_wh, 'in_stock', coalesce(nullif(p->>'condition',''), pr.condition), nullif(p->>'battery_health','')::int,
+      coalesce(nullif(p->>'kit',''), pr.kit), nullif(p->>'diagnostics',''), coalesce(nullif(p->>'cost','')::numeric, p_cost, 0), nullif(p->>'price','')::numeric, p_ref)
+    returning id into o_id;
+    o_created := true; o_before := null;
+  end if;
+end $$;
+
+-- провести документ (с серийным учётом)
+create or replace function post_doc(p_doc uuid) returns void language plpgsql security definer set search_path = public as $$
+declare d stock_docs; l record; p products; cur int; before_qty int; n int; r record; u units; lg jsonb; code text; seen uuid[];
+begin
+  if not has_role('owner','manager','storekeeper') then raise exception 'Нет права проводить документы'; end if;
+  select * into d from stock_docs where id = p_doc for update;
+  if d.status <> 'draft' then raise exception 'Документ % уже проведён или отменён', d.num; end if;
+  for l in select * from stock_doc_lines where doc_id = p_doc order by id loop
+    select * into p from products where id = l.product_id;
+    lg := '[]'::jsonb;
+    if p.track_serial then
+      ---------------- серийный товар ----------------
+      if d.type = 'in' then
+        n := jsonb_array_length(l.new_units);
+        if n = 0 then raise exception 'Укажите IMEI / серийные номера для «%»', p.name; end if;
+        select coalesce(sum(qty),0) into before_qty from stock where product_id = p.id;
+        for r in select * from unit_receive_all(p.id, d.wh_to, l.new_units, l.cost, d.num) loop
+          lg := lg || jsonb_build_object('id',r.o_id,'created',r.o_created,'before',r.o_before,'after',jsonb_build_object('wh',d.wh_to,'status','in_stock'));
+        end loop;
+        insert into stock_movements(product_id,warehouse_id,type,qty,ref) values (p.id,d.wh_to,'in',n,d.num);
+        if l.cost > 0 then
+          update products set last_cost = l.cost, cost = case when before_qty > 0 then round((before_qty*cost + n*l.cost)/(before_qty+n)) else l.cost end where id = p.id;
+        end if;
+        update stock_doc_lines set qty = n, unit_log = lg where id = l.id;
+      elsif d.type in ('transfer','writeoff','supret') then
+        n := coalesce(array_length(l.unit_ids,1),0);
+        if n = 0 then raise exception 'Выберите экземпляры (IMEI / SN) для «%»', p.name; end if;
+        for u in select * from units where id = any(l.unit_ids) for update loop
+          if u.product_id <> p.id or u.status <> 'in_stock' or u.warehouse_id is distinct from d.wh_from then
+            raise exception 'IMEI/SN % нет в наличии на складе «%»', coalesce(u.imei,u.serial_no), (select name from warehouses where id = d.wh_from);
+          end if;
+          lg := lg || jsonb_build_object('id',u.id,'created',false,'before',jsonb_build_object('wh',u.warehouse_id,'status',u.status),
+            'after',jsonb_build_object('wh',case when d.type='transfer' then d.wh_to end,'status',case d.type when 'transfer' then 'in_stock' when 'writeoff' then 'written_off' else 'returned_supplier' end));
+          update units set warehouse_id = case when d.type='transfer' then d.wh_to end,
+            status = case d.type when 'transfer' then 'in_stock' when 'writeoff' then 'written_off' else 'returned_supplier' end::unit_status, last_ref = d.num where id = u.id;
+        end loop;
+        if jsonb_array_length(lg) <> n then raise exception 'Часть выбранных экземпляров «%» не найдена', p.name; end if;
+        if d.type = 'transfer' then
+          insert into stock_movements(product_id,warehouse_id,type,qty,ref) values (p.id,d.wh_from,'transfer_out',-n,d.num);
+          insert into stock_movements(product_id,warehouse_id,type,qty,ref) values (p.id,d.wh_to,'transfer_in',n,d.num);
+        else
+          insert into stock_movements(product_id,warehouse_id,type,qty,ref,note) values (p.id,d.wh_from,d.type::text::move_type,-n,d.num,d.reason);
+        end if;
+        update stock_doc_lines set qty = n, unit_log = lg where id = l.id;
+      elsif d.type = 'inventory' then
+        select coalesce(qty,0) into cur from stock where product_id = p.id and warehouse_id = d.wh_to;
+        cur := coalesce(cur,0); seen := '{}';
+        foreach code in array l.found_codes loop
+          select * into u from units where imei = trim(code) or imei2 = trim(code) or upper(serial_no) = upper(trim(code)) limit 1 for update;
+          if u.id is null then raise exception 'IMEI/SN % не числится в базе — оформите приход', code; end if;
+          if u.product_id <> p.id then raise exception 'IMEI/SN % относится к товару «%»', code, (select name from products where id = u.product_id); end if;
+          if u.status <> 'in_stock' then raise exception 'IMEI/SN % числится как %', code, case u.status when 'sold' then 'проданный' when 'written_off' then 'списанный' when 'returned_supplier' then 'возвращённый поставщику' else u.status::text end; end if;
+          if u.id = any(seen) then continue; end if;
+          seen := seen || u.id;
+          if u.warehouse_id is distinct from d.wh_to then        -- нашли на этом складе, а числился на другом
+            lg := lg || jsonb_build_object('id',u.id,'created',false,'before',jsonb_build_object('wh',u.warehouse_id,'status',u.status),'after',jsonb_build_object('wh',d.wh_to,'status','in_stock'));
+            insert into stock_movements(product_id,warehouse_id,type,qty,ref,note) values (p.id,u.warehouse_id,'inventory',-1,d.num,'Найден на складе '||(select name from warehouses where id = d.wh_to));
+            update units set warehouse_id = d.wh_to, last_ref = d.num where id = u.id;
+          end if;
+        end loop;
+        for u in select * from units where product_id = p.id and status = 'in_stock' and warehouse_id = d.wh_to and not (id = any(seen)) for update loop
+          lg := lg || jsonb_build_object('id',u.id,'created',false,'before',jsonb_build_object('wh',u.warehouse_id,'status',u.status),'after',jsonb_build_object('wh',null,'status','written_off'));
+          update units set status = 'written_off', warehouse_id = null, last_ref = d.num, note = concat_ws(E'\n', note, 'Недостача по '||d.num) where id = u.id;
+        end loop;
+        n := coalesce(array_length(seen,1),0);
+        if n <> cur then insert into stock_movements(product_id,warehouse_id,type,qty,ref) values (p.id,d.wh_to,'inventory',n-cur,d.num); end if;
+        update stock_doc_lines set counted = n, unit_log = lg where id = l.id;
+      end if;
+    else
+      ---------------- обычный товар ----------------
+      if d.type = 'in' then
+        select coalesce(sum(qty),0) into before_qty from stock where product_id = l.product_id;
+        insert into stock_movements(product_id,warehouse_id,type,qty,ref) values (l.product_id,d.wh_to,'in',l.qty,d.num);
+        if l.cost > 0 then
+          update products set last_cost = l.cost,
+            cost = case when before_qty > 0 then round((before_qty*cost + l.qty*l.cost)/(before_qty+l.qty)) else l.cost end
+          where id = l.product_id;
+        end if;
+      elsif d.type = 'transfer' then
+        insert into stock_movements(product_id,warehouse_id,type,qty,ref) values (l.product_id,d.wh_from,'transfer_out',-l.qty,d.num);
+        insert into stock_movements(product_id,warehouse_id,type,qty,ref) values (l.product_id,d.wh_to,'transfer_in',l.qty,d.num);
+      elsif d.type in ('writeoff','supret') then
+        insert into stock_movements(product_id,warehouse_id,type,qty,ref,note) values (l.product_id,d.wh_from,d.type::text::move_type,-l.qty,d.num,d.reason);
+      elsif d.type = 'inventory' then
+        if l.counted is null then raise exception 'Не все строки инвентаризации посчитаны'; end if;
+        select coalesce(qty,0) into cur from stock where product_id = l.product_id and warehouse_id = d.wh_to;
+        if coalesce(cur,0) <> l.counted then
+          insert into stock_movements(product_id,warehouse_id,type,qty,ref) values (l.product_id,d.wh_to,'inventory',l.counted-coalesce(cur,0),d.num);
+        end if;
+      end if;
+    end if;
+  end loop;
+  update stock_docs set status='posted', posted_by=auth.uid(), posted_at=now() where id = p_doc;
+  insert into audit_log(action, ref) values ('Проведён документ', d.num);
+end $$;
+
+-- приход всех единиц строки
+create function unit_receive_all(p_product uuid, p_wh uuid, p_units jsonb, p_cost numeric, p_ref text)
+returns table(o_id uuid, o_created boolean, o_before jsonb) language plpgsql security definer set search_path = public as $$
+declare x jsonb; r record;
+begin
+  for x in select * from jsonb_array_elements(p_units) loop
+    select * into r from unit_receive(p_product, p_wh, x, p_cost, p_ref);
+    o_id := r.o_id; o_created := r.o_created; o_before := r.o_before; return next;
+  end loop;
+end $$;
+
+-- отменить проведение (с возвратом экземпляров в прежнее состояние)
+create or replace function cancel_doc(p_doc uuid) returns void language plpgsql security definer set search_path = public as $$
+declare d stock_docs; m record; l record; e jsonb; u units;
+begin
+  if not has_role('owner','manager') then raise exception 'Отменять документы может управляющий или владелец'; end if;
+  select * into d from stock_docs where id = p_doc for update;
+  if d.status <> 'posted' then raise exception 'Документ не проведён'; end if;
+  for l in select * from stock_doc_lines where doc_id = p_doc loop
+    for e in select * from jsonb_array_elements(l.unit_log) loop
+      select * into u from units where id = (e->>'id')::uuid for update;
+      if u.id is null then continue; end if;
+      if u.status::text <> e->'after'->>'status' or u.warehouse_id is distinct from nullif(e->'after'->>'wh','')::uuid then
+        raise exception 'IMEI/SN % уже продан или перемещён после этого документа — отменить нельзя', coalesce(u.imei,u.serial_no);
+      end if;
+      if u.product_id <> l.product_id then
+        raise exception 'IMEI/SN % уже относится к другому товару — отменить нельзя', coalesce(u.imei,u.serial_no);
+      end if;
+      if (e->>'created')::boolean then
+        if exists(select 1 from sale_items where unit_id = u.id) then
+          raise exception 'IMEI/SN % уже участвовал в продажах — отменить приход нельзя', coalesce(u.imei,u.serial_no);
+        end if;
+        delete from units where id = u.id;
+      elsif e->'before' ? 'product_id' then
+        update units set product_id = (e->'before'->>'product_id')::uuid, warehouse_id = nullif(e->'before'->>'wh','')::uuid, status = (e->'before'->>'status')::unit_status,
+          cost = (e->'before'->>'cost')::numeric, price = nullif(e->'before'->>'price','')::numeric, condition = e->'before'->>'condition',
+          battery_health = nullif(e->'before'->>'battery_health','')::int, sale_item_id = nullif(e->'before'->>'sale_item_id','')::bigint where id = u.id;
+      else
+        update units set warehouse_id = nullif(e->'before'->>'wh','')::uuid, status = (e->'before'->>'status')::unit_status where id = u.id;
+      end if;
+    end loop;
+  end loop;
+  for m in select product_id, warehouse_id, sum(qty) q from stock_movements where ref = d.num and type <> 'cancel' group by 1,2 loop
+    if m.q <> 0 then insert into stock_movements(product_id,warehouse_id,type,qty,ref,note) values (m.product_id,m.warehouse_id,'cancel',-m.q,d.num,'Отмена документа'); end if;
+  end loop;
+  update stock_docs set status='cancelled', cancelled_by=auth.uid(), cancelled_at=now() where id = p_doc;
+  insert into audit_log(action, ref) values ('Отмена документа', d.num);
+end $$;
+
+-- продажа: серийный товар продаётся конкретным экземпляром
+-- items: [{"product_id":"…","unit_id":"…","qty":1,"price":47500,"discount":0}]
+create or replace function create_sale(p_wh uuid, p_customer uuid, p_items jsonb, p_payments jsonb,
+  p_discount numeric default 0, p_tradein_device text default null, p_tradein_amount numeric default 0, p_tradein_imei text default null,
+  p_channel sale_channel default 'store') returns uuid language plpgsql security definer set search_path = public as $$
+declare v_sale uuid; v_num text; v_sub numeric := 0; v_total numeric; v_paid numeric; it jsonb; p products; u units; v_cost numeric;
+        v_point uuid := (select point_id from warehouses where id = p_wh); v_shift uuid; v_si bigint;
+        st settings; v_ti uuid; v_cat uuid; v_code text;
+begin
+  if not has_role('owner','manager','seller') then raise exception 'Нет права продавать'; end if;
+  if p_channel = 'store' and not can_work_at(v_point) then raise exception 'Вы не можете продавать с этой точки'; end if;
+  v_shift := current_shift(v_point);
+  select * into st from settings where id = 1;
+  if st.require_shift and v_shift is null then raise exception 'Откройте кассовую смену'; end if;
+  for it in select * from jsonb_array_elements(p_items) loop
+    select * into p from products where id = (it->>'product_id')::uuid;
+    v_cost := p.cost;
+    if p.track_serial then
+      if nullif(it->>'unit_id','') is null then raise exception 'Выберите IMEI / серийный номер для «%»', p.name; end if;
+      if (it->>'qty')::int <> 1 then raise exception 'Серийный товар продаётся по одной штуке'; end if;
+      select cost into v_cost from units where id = (it->>'unit_id')::uuid;
+    end if;
+    if (it->>'price')::numeric - coalesce((it->>'discount')::numeric,0)/(it->>'qty')::int < coalesce(v_cost,0) and not has_role('owner','manager') then
+      raise exception '«%» дешевле закупки: нужно разрешение управляющего', p.name; end if;
+    v_sub := v_sub + (it->>'qty')::int * (it->>'price')::numeric - coalesce((it->>'discount')::numeric,0);
+  end loop;
+  v_total := greatest(0, v_sub - p_discount - p_tradein_amount);
+  select coalesce(sum((x->>'amount')::numeric),0) into v_paid from jsonb_array_elements(p_payments) x;
+  if abs(v_paid - v_total) >= 0.5 then raise exception 'Оплата % не равна сумме чека %', v_paid, v_total; end if;
+  insert into sales(point_id,warehouse_id,shift_id,customer_id,channel,subtotal,discount,tradein_device,tradein_imei,tradein_amount,total)
+    values (v_point,p_wh,v_shift,p_customer,p_channel,v_sub,p_discount,p_tradein_device,p_tradein_imei,p_tradein_amount,v_total) returning id,num into v_sale,v_num;
+  for it in select * from jsonb_array_elements(p_items) loop
+    select * into p from products where id = (it->>'product_id')::uuid;
+    u := null;
+    if p.track_serial then
+      select * into u from units where id = (it->>'unit_id')::uuid for update;
+      if u.id is null or u.product_id <> p.id or u.status <> 'in_stock' or u.warehouse_id is distinct from p_wh then
+        raise exception 'IMEI/SN % нет в наличии на складе «%»', coalesce(u.imei,u.serial_no,'?'), (select name from warehouses where id = p_wh);
+      end if;
+    end if;
+    insert into sale_items(sale_id,product_id,unit_id,name,serial,qty,price,line_discount,cost,warranty_months,condition,battery_health,kit)
+      values (v_sale,p.id,u.id,p.name,coalesce(u.imei,u.serial_no,p.serial),(it->>'qty')::int,(it->>'price')::numeric,coalesce((it->>'discount')::numeric,0),coalesce(u.cost,p.cost),
+        case when exists(select 1 from categories c where c.id=p.category_id and (c.is_device or exists(select 1 from categories pc where pc.id=c.parent_id and pc.is_device)))
+             then coalesce(nullif(p.warranty_months,0), st.device_warranty_months) else p.warranty_months end,
+        coalesce(u.condition,p.condition),coalesce(u.battery_health,p.battery_health),coalesce(u.kit,p.kit))
+      returning id into v_si;
+    if u.id is not null then update units set status = 'sold', warehouse_id = null, sale_item_id = v_si, last_ref = v_num where id = u.id; end if;
+    insert into stock_movements(product_id,warehouse_id,type,qty,ref) values (p.id,p_wh,'sale',-(it->>'qty')::int,v_num);
+  end loop;
+  insert into sale_payments(sale_id,method,amount) select v_sale,(x->>'method')::pay_method,(x->>'amount')::numeric from jsonb_array_elements(p_payments) x;
+  insert into cash_ops(shift_id,type,method,amount,ref) select v_shift,'sale',(x->>'method')::pay_method,(x->>'amount')::numeric,v_num from jsonb_array_elements(p_payments) x where (x->>'amount')::numeric <> 0;
+  if p_tradein_device is not null then
+    select id into v_cat from categories where is_device and parent_id is null order by name limit 1;
+    v_code := nullif(trim(coalesce(p_tradein_imei,'')),'');
+    insert into products(name,category_id,condition,serial,cost,price,description,track_serial)
+      values (p_tradein_device,v_cat,'Б/у хорошее',null,p_tradein_amount,p_tradein_amount,'Trade-in по '||v_num,v_code is not null) returning id into v_ti;
+    if v_code is not null then
+      perform unit_receive(v_ti, p_wh, case when v_code ~ '^\d{15}$' then jsonb_build_object('imei',v_code) else jsonb_build_object('serial_no',v_code) end, p_tradein_amount, v_num);
+    end if;
+    insert into stock_movements(product_id,warehouse_id,type,qty,ref) values (v_ti,p_wh,'tradein',1,v_num);
+  end if;
+  insert into integration_jobs(target,action,payload) values ('kassa','sale_receipt',jsonb_build_object('sale_id',v_sale));
+  insert into audit_log(action,ref,details) values ('Продажа',v_num,v_total::text);
+  return v_sale;
+end $$;
+
+-- возврат: экземпляр возвращается на склад или списывается как брак
+create or replace function create_return(p_sale uuid, p_items jsonb, p_amount numeric, p_method pay_method, p_reason text,
+  p_wh uuid default null, p_defect boolean default false, p_note text default null) returns uuid language plpgsql security definer set search_path = public as $$
+declare s sales; v_ret uuid; v_num text; it jsonb; si sale_items; done_qty int; v_wh uuid; v_shift uuid; left_total int;
+begin
+  if not has_role('owner','manager','seller') then raise exception 'Нет права оформлять возвраты'; end if;
+  select * into s from sales where id = p_sale for update;
+  v_shift := current_shift(coalesce(s.point_id,(select point_id from warehouses where id = s.warehouse_id)));
+  if p_method = 'cash' and (v_shift is null or shift_expected_cash(v_shift) < p_amount) then raise exception 'Нет открытой смены или наличных в кассе'; end if;
+  v_wh := coalesce(p_wh, s.warehouse_id);
+  insert into returns(sale_id,customer_id,amount,method,reason,note,warehouse_id,is_defect,shift_id)
+    values (p_sale,s.customer_id,p_amount,p_method,p_reason,p_note,v_wh,p_defect,v_shift) returning id,num into v_ret,v_num;
+  for it in select * from jsonb_array_elements(p_items) loop
+    select * into si from sale_items where id = (it->>'sale_item_id')::bigint and sale_id = p_sale;
+    select coalesce(sum(ri.qty),0) into done_qty from return_items ri where ri.sale_item_id = si.id;
+    if done_qty + (it->>'qty')::int > si.qty then raise exception 'Нельзя вернуть больше, чем продано: %', si.name; end if;
+    insert into return_items(return_id,sale_item_id,qty) values (v_ret,si.id,(it->>'qty')::int);
+    insert into stock_movements(product_id,warehouse_id,type,qty,ref) values (si.product_id,v_wh,'return',(it->>'qty')::int,v_num);
+    if p_defect then insert into stock_movements(product_id,warehouse_id,type,qty,ref,note) values (si.product_id,v_wh,'writeoff',-(it->>'qty')::int,v_num,'Брак по возврату'); end if;
+    if si.unit_id is not null then
+      update units set status = case when p_defect then 'written_off' else 'in_stock' end::unit_status, warehouse_id = case when p_defect then null else v_wh end,
+        sale_item_id = case when p_defect then sale_item_id end, last_ref = v_num where id = si.unit_id;
+    end if;
+  end loop;
+  insert into cash_ops(shift_id,type,method,amount,ref,note) values (v_shift,'refund',p_method,-p_amount,v_num,'Возврат по '||s.num);
+  select coalesce(sum(si2.qty),0) - coalesce((select sum(ri.qty) from return_items ri join sale_items x on x.id=ri.sale_item_id where x.sale_id=p_sale),0)
+    into left_total from sale_items si2 where si2.sale_id = p_sale;
+  update sales set status = case when left_total <= 0 then 'returned' else 'partial' end where id = p_sale;
+  insert into audit_log(action,ref,details) values ('Возврат',v_num,s.num||' · '||p_amount);
+  return v_ret;
+end $$;
+
+-- права
+alter table units enable row level security;
+alter table apple_models enable row level security;
+create policy staff_read on units for select using (is_staff());
+create policy staff_read on apple_models for select using (is_staff());
+create policy w_units on units for update using (has_role('owner','manager','storekeeper')) with check (has_role('owner','manager','storekeeper'));
+create policy w_models on apple_models for all using (has_role('owner','manager')) with check (has_role('owner','manager'));
+revoke insert, update, delete on units from authenticated;
+grant update (condition, battery_health, diagnostics, kit, price, note, imei, imei2, serial_no) on units to authenticated;
+revoke all on units, apple_models from anon;
+revoke execute on function find_unit(text), unit_receive(uuid,uuid,jsonb,numeric,text), unit_receive_all(uuid,uuid,jsonb,numeric,text) from public, anon, authenticated;
+alter publication supabase_realtime add table units, apple_models;

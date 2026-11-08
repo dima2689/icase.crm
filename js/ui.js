@@ -119,8 +119,8 @@ App.productPicker = function(inputId,boxId,{wh=null,inStock=false,onPick,showCos
       return `<button type="button" data-pick="${esc(p.id)}"><span>${esc(p.name)}<small> · ${esc(App.catName(p))}${p.serial?" · "+esc(p.serial):""} · ${whv?"здесь ":"всего "}${here}${other?" · есть: "+esc(other):""}</small></span><b>${money(showCost?p.cost:p.price)}</b></button>`}).join(""):'<div class="empty">Не найдено'+(inStock?" в наличии":"")+'</div>';
     box.hidden=false};
   q.addEventListener("input",draw);
-  q.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();const p=App.findByCode(q.value)||(App.searchProducts(q.value,{wh:typeof wh==="function"?wh():wh,inStock,limit:2}).length===1?App.searchProducts(q.value,{wh:typeof wh==="function"?wh():wh,inStock,limit:1})[0]:null);
-    if(p){q.value="";box.hidden=true;onPick(p)}else App.toast("Код не найден: уточните поиск")}});
+  q.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();const u=App.findUnit?App.findUnit(q.value):null;const p=App.findByCode(q.value)||(App.searchProducts(q.value,{wh:typeof wh==="function"?wh():wh,inStock,limit:2}).length===1?App.searchProducts(q.value,{wh:typeof wh==="function"?wh():wh,inStock,limit:1})[0]:null);
+    if(p){q.value="";box.hidden=true;onPick(p,u||null)}else App.toast("Код не найден: уточните поиск")}});
   box.addEventListener("click",e=>{const b=e.target.closest("[data-pick]");if(!b)return;e.preventDefault();e.stopPropagation();const p=App.byId("products",b.dataset.pick);q.value="";box.hidden=true;if(p)onPick(p);q.focus()});
 };
 
@@ -172,6 +172,7 @@ function gsearch(){
   const k=App.phoneKey(q),out=[];
   S.repairs.forEach(r=>{if([r.num,r.device,r.imei].join(" ").toLowerCase().includes(q))out.push(`<button data-act="openRepair" data-id="${esc(r.id)}"><b>Ремонт ${esc(r.num)}</b> · ${esc(r.device)} <small>${esc((App.RS[r.status]||{}).label)}</small></button>`)});
   S.customers.forEach(c=>{if(!c.mergedInto&&(String(c.name).toLowerCase().includes(q)||(k.length>=4&&App.phoneKey(c.phone).includes(k))))out.push(`<button data-act="openClient" data-id="${esc(c.id)}"><b>${esc(c.name)}</b> <small>${esc(c.phone)}</small></button>`)});
+  if(q.length>=4)S.units.filter(u=>[u.imei,u.imei2,u.serialNo].some(x=>x&&x.toLowerCase().includes(q))).slice(0,6).forEach(u=>{const p=App.byId("products",u.productId)||{};out.push(`<button data-act="openUnit" data-id="${esc(u.id)}"><b>${esc(App.unitCode(u))}</b> <small>${esc(p.name||"")} · ${esc((App.UNIT_ST[u.status]||[u.status])[0])}</small></button>`)});
   App.searchProducts(q,{limit:8}).forEach(p=>out.push(`<button data-act="openProduct" data-id="${esc(p.id)}"><b>${esc(p.name)}</b> <small>${App.qtyTotal(p)} шт · ${money(p.price)}</small></button>`));
   S.sales.forEach(s=>{if(String(s.num).toLowerCase().includes(q))out.push(`<button data-act="openSale" data-id="${esc(s.id)}"><b>Продажа ${esc(s.num)}</b> <small>${App.dtt(s.createdAt)} · ${money(s.total)}</small></button>`)});
   S.docs.forEach(d=>{if(String(d.num).toLowerCase().includes(q))out.push(`<button data-act="openDoc" data-id="${esc(d.id)}"><b>${esc(App.DOCT[d.type].one)} ${esc(d.num)}</b> <small>${App.dt(d.createdAt)}</small></button>`)});

@@ -37,14 +37,18 @@ ACT.tagDel=i=>{App.ui.tagQueue.splice(+i,1);saveQueue();App.render()};
 ACT.tagClear=()=>{App.ui.tagQueue=[];saveQueue();App.render()};
 ACT.tagByStock=()=>{queueItems().forEach(({q,p})=>q.copies=Math.max(1,qtyHere(p)));saveQueue();App.render()};
 ACT.tagOnes=()=>{App.ui.tagQueue.forEach(q=>q.copies=1);saveQueue();App.render()};
-ACT.tagPrint=()=>{const list=queueItems().map(({q,p})=>({p,copies:q.copies}));if(!list.length)return App.toast("Добавьте товары");
+const unitsForTags=p=>{const pt=App.point(),here=pt&&pt.cashWh?App.unitsOf(p.id,{wh:pt.cashWh}):[];return here.length?here:App.unitsOf(p.id)};
+const asUnit=(p,u)=>Object.assign({},p,{serial:App.unitCode(u),batteryHealth:u.batteryHealth!=null&&u.batteryHealth!==""?u.batteryHealth:p.batteryHealth,condition:u.condition||p.condition,kit:u.kit||p.kit,price:App.unitPrice(u,p)});
+function printList(){const out=[];queueItems().forEach(({q,p})=>{if(p.trackSerial&&q.perUnit!==false){unitsForTags(p).forEach(u=>out.push({p:asUnit(p,u),copies:Math.max(1,num(q.copies)||1)}))}else out.push({p,copies:q.copies})});return out}
+ACT.tagUnitMode=i=>{const q=App.ui.tagQueue[+i];if(q){q.perUnit=q.perUnit===false;saveQueue();App.render()}};
+ACT.tagPrint=()=>{const list=printList();if(!list.length)return App.toast("Добавьте товары");
   App.printHtml(App.tagsHtml(list,App.tagTemplate(App.ui.tagTpl)))};
 function found(){
   const q=App.ui.tagQ.trim().toLowerCase();if(!q)return [];const w=q.split(/\s+/);
   return S.products.filter(p=>!p.archived&&w.every(x=>[p.name,p.sku,p.barcode,p.serial,p.model,App.catName(p)].join(" ").toLowerCase().includes(x)));
 }
 function tags(){
-  const items=queueItems(),total=items.reduce((a,x)=>a+num(x.q.copies),0),res=found();
+  const items=queueItems(),total=printList().reduce((a,x)=>a+num(x.copies),0),res=found();
   return `<div class="pgrid">
   <section class="card"><div class="card-h"><h2>Что печатаем</h2>${items.length?`<span class="pill">${items.length} товаров · ${total} ценников</span>`:""}</div>
     <input type="search" id="tagQ" placeholder="Найти товар: название, артикул, штрихкод, IMEI" value="${esc(App.ui.tagQ)}" data-filter="tagQ" aria-label="Поиск товара">
@@ -52,7 +56,7 @@ function tags(){
       ${res.length>1?`<div class="acts" style="justify-content:flex-start;margin-top:6px"><button class="btn sm" data-act="tagAddFound">Добавить все найденные (${res.length})</button></div>`:""}`:App.ui.tagQ?'<p class="muted">Ничего не найдено</p>':""}
     <p class="muted" style="margin:10px 0 0">Можно отметить товары галочками в разделе «Товары» и нажать «Ценники».</p>
     ${items.length?`<div class="tbl-wrap" style="margin-top:10px"><table><thead><tr><th>Товар</th><th class="n">Цена</th><th class="n">Остаток</th><th class="n">Копий</th><th></th></tr></thead><tbody>
-      ${items.map(({q,p},i)=>`<tr><td><b>${esc(p.name)}</b><span class="sub">${esc([p.memory,p.color,p.condition].filter(Boolean).join(" · "))}</span></td><td class="n">${money(p.price)}</td><td class="n">${qtyHere(p)}</td>
+      ${items.map(({q,p},i)=>`<tr><td><b>${esc(p.name)}</b><span class="sub">${esc([p.memory,p.color,p.condition].filter(Boolean).join(" · "))}</span>${p.trackSerial?`<label class="chk" style="margin-top:4px"><input type="checkbox" data-act="tagUnitMode" data-id="${i}" ${q.perUnit!==false?"checked":""}> по экземплярам: ${unitsForTags(p).length} шт. (свои IMEI, АКБ, цена)</label>`:""}</td><td class="n">${money(p.price)}</td><td class="n">${qtyHere(p)}</td>
         <td class="n"><input type="number" min="0" max="200" value="${num(q.copies)}" data-tagcopy="${i}" aria-label="Копий" style="width:70px"></td><td class="n"><button class="btn sm ghost" data-act="tagDel" data-id="${i}" aria-label="Убрать">✕</button></td></tr>`).join("")}
       </tbody></table></div>
       <div class="acts" style="justify-content:flex-start"><button class="btn sm" data-act="tagByStock">Копий по остатку на точке</button><button class="btn sm" data-act="tagOnes">По одному</button><button class="btn sm danger" data-act="tagClear">Очистить</button></div>`
@@ -147,7 +151,7 @@ ACT.docSave=(_,btn)=>run(btn,async()=>{const d=Object.assign({},docDraft());cons
 /* ---------- живые изменения без перерисовки ---------- */
 document.addEventListener("input",e=>{const t=e.target;
   if(t.dataset.tagcopy!=null){const q=App.ui.tagQueue[+t.dataset.tagcopy];if(q){q.copies=Math.max(0,Math.min(200,num(t.value)));saveQueue();
-    const total=App.ui.tagQueue.reduce((a,x)=>a+num(x.copies),0);const b=$("#tagPrintBtn");if(b)b.textContent="Печать"+(total?" · "+total+" шт.":"")}return}
+    const total=printList().reduce((a,x)=>a+num(x.copies),0);const b=$("#tagPrintBtn");if(b)b.textContent="Печать"+(total?" · "+total+" шт.":"")}return}
   if(t.dataset.tcfg){const d=tagDraft(),k=t.dataset.tcfg;d[k]=t.type==="checkbox"?t.checked:(t.type==="number"?num(t.value):t.value);previewSoon();return}
   if(t.dataset.tfield){const d=tagDraft();d.fields=Object.assign({},d.fields,{[t.dataset.tfield]:t.checked});previewSoon();return}
   if(t.dataset.dcfg){const d=docDraft(),k=t.dataset.dcfg;d[k]=t.type==="checkbox"?t.checked:(k==="scale"?num(t.value):t.value);if(k==="scale"){const v=$("#dcScaleV");if(v)v.textContent=d.scale+"%"}previewSoon()}
@@ -160,7 +164,7 @@ function updatePreview(){
   if(App.ui.view!=="print")return;
   if(App.ui.printTab==="receipt"){const s=App.demoSale(),d=docDraft();setFrame("docPrev",App.ui.docPrev==="80"?App.receipt80(s,d):App.receiptA4(s,d))}
   else if(App.ui.printTab==="tagtpl"){const t=tagDraft();setFrame("tagPrev",App.tagsHtml([{p:sampleProduct(),copies:1}],Object.assign({},t,{media:"sheet"})))}
-  else if(App.ui.printTab==="tags"){const list=queueItems().slice(0,8).map(({p})=>({p,copies:1}));
+  else if(App.ui.printTab==="tags"){const list=printList().slice(0,8).map(x=>({p:x.p,copies:1}));
     setFrame("tagPrev",list.length?App.tagsHtml(list,Object.assign({},App.tagTemplate(App.ui.tagTpl),{media:"sheet"})):'<p style="font:14px Arial;color:#888;padding:20px">Добавьте товары — здесь появятся ценники</p>')}
 }
 })();
