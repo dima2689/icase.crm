@@ -1,0 +1,216 @@
+/* iCase CRM v3 · настройки и справочники (Supabase) */
+"use strict";
+(function(){
+const {S,$,esc,num,money,ACT,VIEWS,TITLES}=App;
+TITLES.settings="Настройки";
+App.ui.setTab="shop";
+const TABS=[["shop","Магазин"],["points","Точки и склады"],["categories","Категории"],["suppliers","Поставщики"],["services","Прайс работ"],["staff","Сотрудники"],["log","Журнал"],["data","Данные"]];
+const run=async(btn,fn)=>{if(btn&&btn.disabled)return;if(btn)btn.disabled=true;try{await fn()}catch(e){App.toast(e.message)}finally{if(btn&&document.body.contains(btn))btn.disabled=false}};
+VIEWS.settings={
+  render(){
+    const t=App.ui.setTab;
+    const body={shop,points,categories,suppliers,services,staff,log,data}[t]();
+    return `<div class="tabs">${TABS.filter(([k])=>k!=="staff"||App.can("staff")).filter(([k])=>k!=="log"||App.can("log")).map(([k,l])=>`<button class="tab ${t===k?"on":""}" data-act="settingsTab" data-id="${k}">${l}</button>`).join("")}</div>${body}`;
+  }
+};
+ACT.settingsTab=k=>{App.ui.setTab=k;if(App.ui.view!=="settings")location.hash="settings";else App.render()};
+
+/* ---------- магазин ---------- */
+function shop(){
+  const s=App.settings(),ed=App.can("settings");
+  return `<section class="card"><div class="card-h"><h2>Магазин и правила</h2></div><div class="form">
+    ${App.fld("sName","Название",App.inp("sName",s.shopName))}${App.fld("sCity","Город",App.inp("sCity",s.city))}
+    ${App.fld("sAddr","Адрес (по умолчанию для чеков)",App.inp("sAddr",s.address))}${App.fld("sPhone","Телефон",App.inp("sPhone",s.phone))}
+    ${App.fld("sInn","ИНН ИП (для чеков)",App.inp("sInn",s.inn))}${App.fld("sMk","Мин. наценка на устройства, ₽",App.inp("sMk",s.minMarkup,"number"))}
+    ${App.fld("sWarr","Гарантия на устройства, мес.",App.inp("sWarr",s.deviceWarrantyMonths,"number"))}${App.fld("sRw","Гарантия на ремонт, дней",App.inp("sRw",s.repairWarrantyDays,"number"))}
+    ${App.fld("sStore","Бесплатное хранение готовых ремонтов, дней",App.inp("sStore",s.storageDays,"number"))}${App.fld("sDead","Товар «залежался» через, дней",App.inp("sDead",s.deadDays,"number"))}
+    ${App.fld("sFoot","Подпись в чеке",App.inp("sFoot",s.receiptFooter),"full")}
+    <div class="fld full">${App.chk("sShift","Продажи только при открытой кассовой смене",s.requireShift)}</div>
+  </div><div class="acts">${ed?'<button class="btn pri" data-act="saveSettings">Сохранить</button>':'<span class="muted">Изменять может управляющий или владелец</span>'}</div></section>`;
+}
+ACT.saveSettings=(_,btn)=>run(btn,async()=>{
+  const V=App.val;
+  await App.api.update("settings",1,{shop_name:V("sName")||"iCase",city:V("sCity"),address:V("sAddr")||null,phone:V("sPhone")||null,inn:V("sInn")||null,min_markup:num(V("sMk")),
+    device_warranty_months:num(V("sWarr")),repair_warranty_days:num(V("sRw")),storage_days:num(V("sStore"))||30,dead_days:num(V("sDead"))||60,receipt_footer:V("sFoot")||null,require_shift:App.checked("sShift")});
+  await App.api.audit("Настройки изменены","","");App.toast("Настройки сохранены");
+});
+
+/* ---------- точки и склады ---------- */
+function points(){
+  const ed=App.can("settings");
+  const pts=App.points(true);
+  return `<section class="card"><div class="card-h"><h2>Торговые точки</h2>${ed?'<button class="btn pri sm" data-act="pointForm">+ Точка</button>':""}</div>
+  <p class="muted">У каждой точки своя касса и смены. Склад кассы — откуда продаём на этой точке, склад сервиса — откуда берём запчасти.</p>
+  <div class="tbl-wrap"><table><thead><tr><th>Точка</th><th>Адрес</th><th>Склад кассы</th><th>Склад сервиса</th><th>Смена</th><th>Сотрудников</th></tr></thead><tbody>
+  ${pts.map(p=>{const sh=App.openShift(p.id);return `<tr class="rowlink" data-act="pointForm" data-id="${esc(p.id)}"><td><b>${esc(p.name)}</b>${p.active===false?' <span class="pill mute">закрыта</span>':""}${p.patentNo?`<span class="sub">патент ${esc(p.patentNo)}</span>`:""}</td><td>${esc(p.address)}</td><td>${esc(App.whName(p.cashWh))}</td><td>${esc(App.whName(p.serviceWh))}</td><td>${sh?'<span class="pill ok">'+esc(sh.num)+'</span>':'<span class="pill mute">закрыта</span>'}</td><td class="n">${S.staff.filter(s=>s.pointId===p.id).length}</td></tr>`}).join("")||'<tr><td colspan="6" class="empty">Точек нет. Добавьте первую</td></tr>'}
+  </tbody></table></div></section>
+  <section class="card"><div class="card-h"><h2>Склады</h2>${ed?'<button class="btn pri sm" data-act="whForm">+ Склад</button>':""}</div>
+  <div class="tbl-wrap"><table><thead><tr><th>Склад</th><th>Точка</th><th>Тип</th><th class="n">Позиций</th><th class="n">Штук</th><th>Статус</th></tr></thead><tbody>
+  ${App.whs(true).map(w=>{const ps=S.products.filter(p=>App.qtyIn(p,w.id)>0);return `<tr class="rowlink" data-act="whForm" data-id="${esc(w.id)}"><td><b>${esc(w.name)}</b></td><td>${w.pointId?esc(App.pointName(w.pointId)):'<span class="muted">общий</span>'}</td><td>${esc(w.kind)}</td><td class="n">${ps.length}</td><td class="n">${ps.reduce((a,p)=>a+App.qtyIn(p,w.id),0)}</td><td>${w.active===false?'<span class="pill mute">отключён</span>':'<span class="pill ok">работает</span>'}</td></tr>`}).join("")||'<tr><td colspan="6" class="empty">Складов нет</td></tr>'}
+  </tbody></table></div></section>`;
+}
+ACT.pointForm=id=>{
+  if(!App.can("settings"))return;
+  const p=id?App.byId("points",id):{active:true};
+  const whs=[["","— не выбран —"],...App.whs().map(w=>[w.id,w.name+(w.pointId&&w.pointId!==id?" ("+App.pointName(w.pointId)+")":"")])];
+  App.openModal(App.head(id?"Точка "+esc(p.name):"Новая точка")+`<div class="form">
+    ${App.fld("ptName","Название",App.inp("ptName",p.name,"text","iCase ТЦ «Октябрь»"))}${App.fld("ptPhone","Телефон",App.inp("ptPhone",p.phone,"tel"))}
+    ${App.fld("ptAddr","Адрес",App.inp("ptAddr",p.address),"full")}
+    ${App.fld("ptPatent","Номер патента (ПСН)",App.inp("ptPatent",p.patentNo))}${App.fld("ptEvo","Магазин в Эвоторе (ID)",App.inp("ptEvo",p.evotorStoreId,"text","понадобится для чеков"))}
+    ${id?App.fld("ptCash","Склад кассы",App.sel("ptCash",whs,p.cashWh||""))+App.fld("ptSrv","Склад сервиса",App.sel("ptSrv",whs,p.serviceWh||"")):`<div class="fld full">${App.chk("ptMkWh","Создать склады «Зал» и «Сервис» для этой точки",true)}</div>`}
+    <div class="fld">${App.chk("ptAct","Работает",p.active!==false)}</div>
+  </div><div class="acts"><button class="btn pri" data-act="pointSave" data-id="${esc(id||"")}">Сохранить</button></div>`);
+};
+ACT.pointSave=(id,btn)=>run(btn,async()=>{
+  const V=App.val;if(!V("ptName"))return App.toast("Укажите название");
+  const data={name:V("ptName"),phone:V("ptPhone")||null,address:V("ptAddr")||null,patent_no:V("ptPatent")||null,evotor_store_id:V("ptEvo")||null,is_active:App.checked("ptAct")};
+  if(id){data.cash_wh=V("ptCash")||null;data.service_wh=V("ptSrv")||null;
+    if(!data.is_active&&App.openShift(id))return App.toast("На точке открыта смена. Закройте её перед закрытием точки");
+    await App.api.update("points",id,data)}
+  else{
+    const p=await App.api.insert("points",data);
+    if(App.checked("ptMkWh")){
+      const hall=await App.api.insert("warehouses",{name:data.name+" · зал",kind:"Торговый зал",point_id:p.id});
+      const srv=await App.api.insert("warehouses",{name:data.name+" · сервис",kind:"Сервис",point_id:p.id});
+      await App.api.update("points",p.id,{cash_wh:hall.id,service_wh:srv.id});
+    }
+  }
+  await App.api.audit(id?"Точка изменена":"Новая точка",data.name,"");App.closeModal();App.toast("Сохранено");
+});
+ACT.whForm=id=>{
+  if(!App.can("settings"))return;
+  const w=id?App.byId("warehouses",id):{kind:"Склад",active:true,pointId:(App.point()||{}).id||""};
+  App.openModal(App.head(id?"Склад":"Новый склад")+`<div class="form">${App.fld("wName","Название",App.inp("wName",w.name,"text","Основной склад"))}${App.fld("wKind","Тип",App.sel("wKind",["Торговый зал","Склад","Сервис","Другое"],w.kind))}
+  ${App.fld("wPoint","Точка",App.sel("wPoint",[["","Общий (без точки)"],...App.points(true).map(p=>[p.id,p.name])],w.pointId||""))}${App.fld("wOrder","Порядок",App.inp("wOrder",w.order||0,"number"))}
+  ${App.fld("wAddr","Адрес",App.inp("wAddr",w.address),"full")}<div class="fld">${App.chk("wAct","Работает",w.active!==false)}</div></div>
+  <div class="acts"><button class="btn pri" data-act="whSave" data-id="${esc(id||"")}">Сохранить</button></div>`);
+};
+ACT.whSave=(id,btn)=>run(btn,async()=>{
+  if(!App.val("wName"))return App.toast("Укажите название");
+  if(id&&!App.checked("wAct")&&S.products.some(p=>App.qtyIn(p,id)>0))return App.toast("На складе есть товар. Переместите его перед отключением");
+  const data={name:App.val("wName"),kind:App.val("wKind"),address:App.val("wAddr")||null,point_id:App.val("wPoint")||null,sort:num(App.val("wOrder")),is_active:App.checked("wAct")};
+  if(id)await App.api.update("warehouses",id,data);else await App.api.insert("warehouses",data);
+  await App.api.audit(id?"Склад изменён":"Новый склад",data.name,"");App.closeModal();App.toast("Сохранено");
+});
+
+/* ---------- категории ---------- */
+function categories(){
+  const cnt=id=>S.products.filter(p=>!p.archived&&App.inCat(p,id)).length;
+  const row=(c,lvl)=>`<tr class="rowlink" data-act="catForm" data-id="${esc(c.id)}"><td style="padding-left:${10+lvl*22}px">${lvl?"— ":""}<b>${esc(c.name)}</b></td><td>${c.isDevice?'<span class="pill dark">устройство</span>':""}</td><td class="n">${cnt(c.id)}</td></tr>`;
+  return `<section class="card"><div class="card-h"><h2>Категории</h2>${App.can("settings")?'<button class="btn pri sm" data-act="catForm">+ Категория</button>':""}</div>
+  <p class="muted">Флажок «устройство» включает правило минимальной наценки и гарантию на устройства. Подкатегории наследуют его.</p>
+  <div class="tbl-wrap"><table><thead><tr><th>Название</th><th>Тип</th><th class="n">Товаров</th></tr></thead><tbody>
+  ${App.catChildren("").map(c=>row(c,0)+App.catChildren(c.id).map(s=>row(s,1)).join("")).join("")||'<tr><td colspan="3" class="empty">Категорий нет</td></tr>'}
+  </tbody></table></div></section>`;
+}
+ACT.catForm=id=>{
+  if(!App.can("settings"))return;
+  const c=id?App.cat(id):{parentId:"",isDevice:false};
+  App.openModal(App.head(id?"Категория":"Новая категория",id&&App.can("del")?`<button class="btn sm danger" data-act="catDel" data-id="${esc(id)}">Удалить</button>`:"")+`<div class="form">
+  ${App.fld("kName","Название",App.inp("kName",c.name))}${App.fld("kParent","Родительская",App.sel("kParent",[["","— верхний уровень —"],...App.catChildren("").filter(x=>x.id!==id).map(x=>[x.id,x.name])],c.parentId||""))}
+  <div class="fld full">${App.chk("kDev","Устройство (правило наценки, гарантия)",c.isDevice)}</div></div>
+  <div class="acts"><button class="btn pri" data-act="catSave" data-id="${esc(id||"")}">Сохранить</button></div>`);
+};
+ACT.catSave=(id,btn)=>run(btn,async()=>{
+  const name=App.val("kName");if(!name)return App.toast("Укажите название");
+  const parentId=App.val("kParent");
+  if(S.categories.some(c=>c.id!==id&&(c.parentId||"")===parentId&&String(c.name).toLowerCase()===name.toLowerCase()))return App.toast("Такая категория уже есть");
+  if(id&&parentId&&App.catChildren(id).length)return App.toast("У категории есть подкатегории, её нельзя вложить");
+  const data={name,parent_id:parentId||null,is_device:App.checked("kDev")};
+  if(id)await App.api.update("categories",id,data);else await App.api.insert("categories",data);
+  App.closeModal();App.toast("Сохранено");
+});
+ACT.catDel=(id,el)=>run(null,async()=>{
+  if(S.products.some(p=>p.categoryId===id)||App.catChildren(id).length)return App.toast("В категории есть товары или подкатегории. Перенесите их сначала");
+  if(!App.confirm2(el,"Удалить? Нажмите ещё раз"))return;await App.api.remove("categories",id);App.closeModal();App.toast("Категория удалена");
+});
+
+/* ---------- поставщики ---------- */
+function suppliers(){
+  return `<section class="card"><div class="card-h"><h2>Поставщики</h2>${App.can("stock")?'<button class="btn pri sm" data-act="supForm">+ Поставщик</button>':""}</div>
+  <div class="tbl-wrap"><table><thead><tr><th>Название</th><th>Контакт</th><th>Телефон</th><th class="n">Приходов</th><th class="n">На сумму</th></tr></thead><tbody>
+  ${S.suppliers.slice().sort((a,b)=>String(a.name).localeCompare(b.name)).map(s=>{const ds=S.docs.filter(d=>d.supplierId===s.id&&d.type==="in"&&d.status==="posted");return `<tr class="rowlink" data-act="supForm" data-id="${esc(s.id)}"><td><b>${esc(s.name)}</b><span class="sub">${esc(s.inn||"")}</span></td><td>${esc(s.contact||"")}</td><td>${esc(s.phone||"")}</td><td class="n">${ds.length}</td><td class="n">${App.can("cost")?money(ds.reduce((a,d)=>a+(d.lines||[]).reduce((b,l)=>b+num(l.qty)*num(l.cost),0),0)):"—"}</td></tr>`}).join("")||'<tr><td colspan="5" class="empty">Поставщиков нет</td></tr>'}
+  </tbody></table></div></section>`;
+}
+ACT.supForm=id=>{
+  if(!App.can("stock"))return;
+  const s=id?App.byId("suppliers",id):{};
+  App.openModal(App.head(id?"Поставщик":"Новый поставщик")+`<div class="form">${App.fld("uName","Название",App.inp("uName",s.name))}${App.fld("uInn","ИНН",App.inp("uInn",s.inn))}
+  ${App.fld("uContact","Контактное лицо",App.inp("uContact",s.contact))}${App.fld("uPhone","Телефон",App.inp("uPhone",s.phone,"tel"))}${App.fld("uNote","Условия, заметки",App.area("uNote",s.note),"full")}</div>
+  <div class="acts"><button class="btn pri" data-act="supSave" data-id="${esc(id||"")}">Сохранить</button></div>`);
+};
+ACT.supSave=(id,btn)=>run(btn,async()=>{if(!App.val("uName"))return App.toast("Укажите название");
+  const d={name:App.val("uName"),inn:App.val("uInn")||null,contact:App.val("uContact")||null,phone:App.val("uPhone")||null,note:App.val("uNote")||null};
+  if(id)await App.api.update("suppliers",id,d);else await App.api.insert("suppliers",d);App.closeModal();App.toast("Сохранено")});
+
+/* ---------- прайс работ ---------- */
+function services(){
+  return `<section class="card"><div class="card-h"><h2>Прайс работ сервиса</h2>${App.can("settings")?'<button class="btn pri sm" data-act="svcForm">+ Работа</button>':""}</div>
+  <div class="tbl-wrap"><table><thead><tr><th>Работа</th><th>Группа</th><th class="n">Цена</th></tr></thead><tbody>
+  ${S.services.slice().sort((a,b)=>String(a.group||"").localeCompare(b.group||"")||String(a.name).localeCompare(b.name)).map(s=>`<tr class="rowlink" data-act="svcForm" data-id="${esc(s.id)}"><td>${esc(s.name)}</td><td>${esc(s.group||"")}</td><td class="n"><b>${money(s.price)}</b></td></tr>`).join("")||'<tr><td colspan="3" class="empty">Прайс пуст</td></tr>'}
+  </tbody></table></div></section>`;
+}
+ACT.svcForm=id=>{
+  if(!App.can("settings"))return;
+  const s=id?App.byId("services",id):{};
+  App.openModal(App.head(id?"Работа":"Новая работа",id?`<button class="btn sm danger" data-act="svcDel" data-id="${esc(id)}">Удалить</button>`:"")+`<div class="form">${App.fld("vName","Название",App.inp("vName",s.name,"text","Замена дисплея iPhone 11"),"full")}${App.fld("vGroup","Группа",App.inp("vGroup",s.group,"text","iPhone"))}${App.fld("vPrice","Цена, ₽",App.inp("vPrice",s.price,"number"))}</div>
+  <div class="acts"><button class="btn pri" data-act="svcSave" data-id="${esc(id||"")}">Сохранить</button></div>`);
+};
+ACT.svcSave=(id,btn)=>run(btn,async()=>{if(!App.val("vName"))return App.toast("Укажите название");const d={name:App.val("vName"),grp:App.val("vGroup")||null,price:num(App.val("vPrice"))};
+  if(id)await App.api.update("services",id,d);else await App.api.insert("services",d);App.closeModal();App.toast("Сохранено")});
+ACT.svcDel=(id,el)=>run(null,async()=>{if(!App.confirm2(el))return;await App.api.remove("services",id);App.closeModal()});
+
+/* ---------- сотрудники ---------- */
+function staff(){
+  const reqs=S.staffreq.filter(r=>!App.byId("staff",r.id));
+  const ptOpts=[["","— все / не привязан —"],...App.points().map(p=>[p.id,p.name])];
+  const roles=Object.entries(App.ROLES);
+  return `<section class="card"><div class="card-h"><h2>Сотрудники и роли</h2></div>
+  <p class="muted">Новый сотрудник открывает CRM, нажимает «Я новый сотрудник» и регистрируется по email. Его заявка появится здесь: назначьте роль и точку. Продавец, мастер и кладовщик работают только на своей точке, управляющий — на всех.</p>
+  ${reqs.length?`<h3 class="sub-h">Заявки</h3><div class="list-mini">${reqs.map(r=>`<div class="lrow"><span><b>${esc(r.fullName||r.email)}</b><small>${esc(r.email)} · ${App.dtt(r.at)}</small></span><span class="row-f">${App.sel("rq_"+r.id,roles.filter(([k])=>k!=="owner"),"seller")}${App.sel("rqp_"+r.id,ptOpts,(App.point()||{}).id||"")}<button class="btn sm pri" data-act="staffAdd" data-id="${esc(r.id)}">Принять</button><button class="btn sm ghost danger" data-act="staffReject" data-id="${esc(r.id)}">Отклонить</button></span></div>`).join("")}</div>`:""}
+  <div class="tbl-wrap"><table><thead><tr><th>Сотрудник</th><th>Роль</th><th>Точка</th><th>Статус</th><th class="n">Продаж</th><th></th></tr></thead><tbody>
+  ${S.staff.slice().sort((a,b)=>String(a.fullName).localeCompare(b.fullName)).map(s=>s.role==="owner"?`<tr><td><b>${esc(s.fullName)}</b></td><td><span class="pill dark">Владелец</span></td><td>все</td><td><span class="pill ok">активен</span></td><td class="n">${S.sales.filter(x=>x.by===s.id).length}</td><td></td></tr>`:
+  `<tr><td><b>${esc(s.fullName)}</b></td><td>${App.sel("role_"+s.id,roles.filter(([k])=>k!=="owner"),s.role)}</td><td>${App.sel("pt_"+s.id,ptOpts,s.pointId||"")}</td><td>${s.active===false?'<span class="pill mute">отключён</span>':'<span class="pill ok">активен</span>'}</td>
+    <td class="n">${S.sales.filter(x=>x.by===s.id).length}</td>
+    <td class="n"><button class="btn sm" data-act="staffSave" data-id="${esc(s.id)}">Сохранить</button> <button class="btn sm ${s.active===false?"":"danger"}" data-act="staffToggle" data-id="${esc(s.id)}">${s.active===false?"Включить":"Отключить"}</button></td></tr>`).join("")}
+  </tbody></table></div>
+  <h3 class="sub-h">Что может каждая роль</h3>
+  <div class="tbl-wrap"><table><tbody>
+    <tr><td><b>Управляющий</b></td><td>всё на всех точках, кроме назначения ролей</td></tr><tr><td><b>Продавец</b></td><td>касса и смена своей точки, продажи, возвраты, клиенты</td></tr>
+    <tr><td><b>Мастер</b></td><td>ремонт на своей точке</td></tr><tr><td><b>Кладовщик</b></td><td>товары, приход, перемещение, списание, инвентаризация; видит закупочные цены</td></tr>
+  </tbody></table></div></section>`;
+}
+ACT.staffAdd=(id,btn)=>run(btn,async()=>{
+  const r=App.byId("staffreq",id),role=App.val("rq_"+id),pt=App.val("rqp_"+id)||null;
+  if(["seller","master","storekeeper"].includes(role)&&!pt)return App.toast("Для этой роли выберите точку");
+  await App.api.insert("staff",{id,full_name:r.fullName||r.email,role,point_id:pt});
+  await App.api.remove("staff_requests",id);
+  await App.api.audit("Принят сотрудник",r.fullName||r.email,App.ROLES[role]);App.toast("Сотрудник добавлен");
+});
+ACT.staffReject=(id,el)=>run(null,async()=>{if(!App.confirm2(el,"Отклонить заявку?"))return;await App.api.remove("staff_requests",id);App.toast("Заявка отклонена")});
+ACT.staffSave=(id,btn)=>run(btn,async()=>{
+  const role=App.val("role_"+id),pt=App.val("pt_"+id)||null;
+  if(["seller","master","storekeeper"].includes(role)&&!pt)return App.toast("Для этой роли выберите точку");
+  await App.api.update("staff",id,{role,point_id:pt});await App.api.audit("Изменён сотрудник",App.nameOf(id),App.ROLES[role]+" · "+(pt?App.pointName(pt):"все точки"));App.toast("Сохранено");
+});
+ACT.staffToggle=(id,btn)=>run(btn,async()=>{const s=App.byId("staff",id);await App.api.update("staff",id,{is_active:s.active===false});await App.api.audit(s.active===false?"Сотрудник включён":"Сотрудник отключён",App.nameOf(id),"")});
+
+/* ---------- журнал ---------- */
+App.ui.logQ="";
+function log(){
+  const q=App.ui.logQ.toLowerCase();
+  const list=App.sortDesc(S.log,"at").filter(l=>!q||[l.action,l.ref,l.details,App.nameOf(l.by)].join(" ").toLowerCase().includes(q)).slice(0,300);
+  return `<section class="card"><div class="card-h"><h2>Журнал действий</h2><input id="logQ" type="search" placeholder="Поиск" value="${esc(App.ui.logQ)}" data-filter="logQ" aria-label="Поиск в журнале"></div>
+  <div class="tbl-wrap"><table><thead><tr><th>Когда</th><th>Кто</th><th>Действие</th><th>Объект</th><th>Подробности</th></tr></thead><tbody>
+  ${list.map(l=>`<tr><td>${App.dtt(l.at)}</td><td>${esc(App.nameOf(l.by))}</td><td>${esc(l.action)}</td><td>${esc(l.ref)}</td><td>${esc(l.details)}</td></tr>`).join("")||'<tr><td colspan="5" class="empty">Записей нет</td></tr>'}
+  </tbody></table></div><p class="muted">Показаны последние 500 записей.</p></section>`;
+}
+
+/* ---------- данные ---------- */
+function data(){
+  return `<section class="card"><div class="card-h"><h2>Данные</h2><span class="pill">база Supabase</span></div>
+  <div class="tiles">${[["points","Точки"],["customers","Клиенты"],["products","Товары"],["sales","Продажи"],["docs","Документы"],["shifts","Смены"],["staff","Сотрудники"]].map(([c,l])=>`<div class="tile"><span>${l}</span><b>${S[c].length}</b></div>`).join("")}</div>
+  ${App.can("io")?'<div class="acts" style="justify-content:flex-start;margin-top:14px"><button class="btn" data-act="exportDlg">Экспорт</button><button class="btn" data-act="importDlg">Импорт товаров</button><button class="btn" data-act="importDlg" data-id="customers">Импорт клиентов</button><button class="btn" data-act="reloadAll">Перечитать всё из базы</button></div>':""}</section>`;
+}
+ACT.reloadAll=async()=>{await App.reload(App.COLS.filter(c=>c!=="repairs"));App.toast("Данные обновлены")};
+})();
