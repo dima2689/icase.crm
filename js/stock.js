@@ -8,6 +8,7 @@ TITLES.stock="Товары";
 Object.assign(App.ui,{stockQ:"",stockWh:""});
 const SF_KEY="icase_sf";
 const isMob=()=>window.matchMedia&&matchMedia("(max-width:760px)").matches;
+const isNarrow=()=>window.matchMedia&&matchMedia("(max-width:1100px)").matches;
 const SF0=()=>({cat:"",brands:[],avail:"all",conds:[],mems:[],colors:[],track:"",chan:"",pmin:"",pmax:"",arch:false,sort:"name",group:"cat",open:{},ub:{batt:"",repair:"",box:false,never:false,icloud:false},
   sec:isMob()?{cat:false,brand:false,avail:false,params:false}:{cat:true,brand:false,avail:true,params:false}});
 App.ui.sf=(()=>{try{const o=Object.assign(SF0(),JSON.parse(localStorage.getItem(SF_KEY)||"{}"));o.ub=Object.assign(SF0().ub,o.ub);o.sec=Object.assign({used:false},o.sec);return o}catch(e){return SF0()}})();
@@ -68,7 +69,7 @@ VIEWS.stock={
     list.sort((a,b)=>String(gkey(a)).localeCompare(String(gkey(b)),"ru",{numeric:true})||cmp(a,b)||String(a.name).localeCompare(b.name));
     const totCost=list.reduce((a,p)=>a+num(p.cost)*Math.max(0,qty(p)),0),totPrice=list.reduce((a,p)=>a+num(p.price)*Math.max(0,qty(p)),0),totQty=list.reduce((a,p)=>a+Math.max(0,qty(p)),0);
     const shown=list.slice(0,u.stockLimit||300);App.ui.stockShown=shown.map(p=>p.id);
-    const cols=2+(u.stockWh?1:whs.length+1)+(showCost?3:1)+1;
+    const cols=2+(u.stockWh?1:whs.length+1)+(showCost?2:1);
     // фасеты
     const fb=facet(stockBase("brand"),brandOf),fc=facet(stockBase("cond"),p=>p.condition),fm=facet(stockBase("mem"),p=>p.memory),fcol=facet(stockBase("color"),p=>p.color);
     const chipset=(kind,arr,sel)=>arr.map(([v,n])=>`<button class="chip ${sel.includes(v)?"on":""}" data-act="sfToggle" data-id="${esc(kind+"|"+v)}">${esc(v)}<b>${n}</b></button>`).join("");
@@ -77,7 +78,7 @@ VIEWS.stock={
       ...(f.chan?[["chan","",{site:"На сайте",avito:"На Авито",none:"Нигде не выставлен"}[f.chan]]]:[]),...(f.pmin!==""||f.pmax!==""?[["price","","Цена "+(f.pmin!==""?"от "+num(f.pmin):"")+(f.pmax!==""?" до "+num(f.pmax):"")]]:[]),
       ...(f.arch?[["arch","","Архив"]]:[]),...(ubOn(f)?[["ub","","Б/у параметры"]]:[])];
     // строки с группировкой
-    const mob=isMob();let rows="",g=null;
+    const mob=isNarrow();let rows="",g=null;
     shown.forEach(p=>{const k=gkey(p);
       if(f.group!=="none"&&k!==g&&mob){g=k;const inG=list.filter(x=>gkey(x)===k);rows+=`<div class="mgrow"><b>${esc(k)}</b><span>${inG.length} поз. · ${inG.reduce((a,x)=>a+Math.max(0,qty(x)),0)} шт</span></div>`}
       if(mob){const q=qty(p),mk=num(p.price)-num(p.cost);
@@ -85,18 +86,16 @@ VIEWS.stock={
           <div class="pci"><b>${esc(p.name)}</b><div class="chips">${p.condition&&p.condition!=="Новый"?`<span class="pill">${esc(p.condition)}</span>`:""}${p.trackSerial?'<span class="pill info">IMEI</span>':""}${p.onSite?'<span class="pill info">Сайт</span>':""}${p.onAvito?'<span class="pill info">Авито</span>':""}</div>
           <span class="sub">${esc([f.group!=="cat"?App.catName(p):"",p.brand,p.sku?"арт. "+p.sku:""].filter(Boolean).join(" · "))}</span>
           <span class="sub">${whs.map(w=>App.qtyIn(p,w.id)?esc(w.name)+": "+App.qtyIn(p,w.id):"").filter(Boolean).join(" · ")||"нет в наличии"}</span></div>
-          <div class="pcr"><b>${money(p.price)}</b><span>${qtyCell(q,p)} шт</span>${showCost?`<small>закупка ${money(p.cost)}<br>наценка ${money(mk)}</small>`:""}</div></div>`;return}
+          <div class="pcr"><b>${money(p.price)}</b><span>${qtyCell(q,p)} шт</span>${showCost?`<small>закупка ${money(p.cost)}</small>`:""}</div></div>`;return}
       if(f.group!=="none"&&k!==g){g=k;const inG=list.filter(x=>gkey(x)===k);
         rows+=`<tr class="grow"><td colspan="${cols}"><b>${esc(k)}</b><span>${inG.length} поз. · ${inG.reduce((a,x)=>a+Math.max(0,qty(x)),0)} шт${showCost?" · "+money(inG.reduce((a,x)=>a+num(x.cost)*Math.max(0,qty(x)),0)):""}</span></td></tr>`}
       const mk=num(p.price)-num(p.cost);
       rows+=`<tr class="rowlink" data-act="openProduct" data-id="${esc(p.id)}">
       <td class="tagsel"><input type="checkbox" data-act="tagPick" data-id="${esc(p.id)}" aria-label="Ценник" ${App.ui.tagPick.has(p.id)?"checked":""}></td>
-      <td><b>${esc(p.name)}</b>${p.condition&&p.condition!=="Новый"?` <span class="pill">${esc(p.condition)}</span>`:""}${p.trackSerial?' <span class="pill info">IMEI</span>':""}
+      <td><b>${esc(p.name)}</b>${p.condition&&p.condition!=="Новый"?` <span class="pill">${esc(p.condition)}</span>`:""}${p.trackSerial?' <span class="pill info">IMEI</span>':""}${p.onSite?' <span class="pill info">Сайт</span>':""}${p.onAvito?' <span class="pill info">Авито</span>':""}
         <span class="sub">${esc([f.group!=="cat"?App.catName(p):"",f.group!=="brand"&&p.brand?p.brand:"",p.sku?"арт. "+p.sku:"",p.barcode?"ШК "+p.barcode:"",usedRange(p)].filter(Boolean).join(" · "))}</span></td>
       ${u.stockWh?`<td class="n">${qtyCell(App.qtyIn(p,u.stockWh),p)}</td>`:whs.map(w=>`<td class="n">${App.qtyIn(p,w.id)||'<span class="muted">·</span>'}</td>`).join("")+`<td class="n">${qtyCell(App.qtyTotal(p),p)}</td>`}
-      ${showCost?`<td class="n">${money(p.cost)}</td>`:""}<td class="n"><b>${money(p.price)}</b></td>
-      ${showCost?`<td class="n">${mk<0?`<span class="pill bad">${money(mk)}</span>`:money(mk)}</td>`:""}
-      <td><div class="chips">${p.onSite?'<span class="pill info">Сайт</span>':""}${p.onAvito?'<span class="pill info">Авито</span>':""}</div></td></tr>`});
+      ${showCost?`<td class="n">${money(p.cost)}</td>`:""}<td class="n"><b>${money(p.price)}</b></td></tr>`});
     const curCat=App.cat(f.cat),catLabel=f.cat==="__none"?"Без категории":curCat?App.catName({categoryId:curCat.id}):"";
     const nOn=(ubOn(f)?1:0)+(f.cat?1:0)+f.brands.length+(f.avail!=="all"?1:0)+f.conds.length+f.mems.length+f.colors.length+(f.track?1:0)+(f.chan?1:0)+(f.pmin!==""||f.pmax!==""?1:0)+(f.arch?1:0);
     const allOpen=["cat","brand","avail","used","params"].every(k=>(f.sec||{})[k]);
@@ -131,10 +130,10 @@ VIEWS.stock={
         ${pOpen?filtersBody():""}
       </div>
       ${active.length?`<div class="chips activef">${active.map(([k,v,l])=>`<button class="chip on" data-act="sfDrop" data-id="${esc(k+"|"+v)}">${esc(l)} ✕</button>`).join("")}<button class="btn sm ghost" data-act="sfReset">Сбросить всё</button></div>`:""}
-      ${(()=>{const open=!!(f.sec||{}).totals;return `<div class="totbox ${open?"open":""}"><button class="fsh" data-act="sfSec" data-id="totals" aria-expanded="${open}"><span class="ft">Итоги</span><span class="fsum">${list.length} поз. · ${totQty} шт · в рознице ${money(totPrice)}</span><span class="car"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform:rotate(${open?180:0}deg);transition:transform .15s"><path d="M6 9l6 6 6-6"/></svg></span><span class="totbtn">${open?"Свернуть":"Развернуть"}</span></button>${open?`<div class="totbody"><div class="tiles"><div class="tile"><span>Позиций</span><b>${list.length}</b><small>${totQty} шт</small></div>${showCost?`<div class="tile"><span>В закупке</span><b>${money(totCost)}</b></div>`:""}<div class="tile"><span>В рознице</span><b>${money(totPrice)}</b></div>${showCost?`<div class="tile"><span>Потенциальная наценка</span><b>${money(totPrice-totCost)}</b></div>`:""}</div></div>`:""}</div>`})()}
+      ${(()=>{const open=!!(f.sec||{}).totals;return `<div class="totbox ${open?"open":""}"><button class="fsh" data-act="sfSec" data-id="totals" aria-expanded="${open}"><span class="ft">Итоги</span><span class="fsum">${list.length} поз. · ${totQty} шт · в рознице ${money(totPrice)}</span><span class="car"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform:rotate(${open?180:0}deg);transition:transform .15s"><path d="M6 9l6 6 6-6"/></svg></span><span class="totbtn">${open?"Свернуть":"Развернуть"}</span></button>${open?`<div class="totbody"><div class="tiles"><div class="tile"><span>Позиций</span><b>${list.length}</b><small>${totQty} шт</small></div>${showCost?`<div class="tile"><span>В закупке</span><b>${money(totCost)}</b></div>`:""}<div class="tile"><span>В рознице</span><b>${money(totPrice)}</b></div></div></div>`:""}</div>`})()}
       ${mob?`<section class="card mlist"><label class="chk"><input type="checkbox" data-act="tagPickAll" ${shown.length&&shown.every(p=>App.ui.tagPick.has(p.id))?"checked":""}> выбрать все для ценников</label>${rows||`<div class="empty">${S.products.length?"Ничего не найдено — измените фильтры":"Товаров пока нет. Начните с «Приёмки»"}</div>`}
         ${list.length>shown.length?`<div class="acts" style="justify-content:center"><button class="btn" data-act="moreStock">Показать ещё (${list.length-shown.length})</button></div>`:""}</section>`:`
-      <section class="card"><div class="tbl-wrap"><table><thead><tr><th class="tagsel"><input type="checkbox" data-act="tagPickAll" aria-label="Выбрать все для ценников" ${shown.length&&shown.every(p=>App.ui.tagPick.has(p.id))?"checked":""}></th><th>Товар</th>${u.stockWh?"<th class=\"n\">Остаток</th>":whs.map(w=>`<th class="n">${esc(w.name)}</th>`).join("")+'<th class="n">Всего</th>'}${showCost?'<th class="n">Закупка</th>':""}<th class="n">Цена</th>${showCost?'<th class="n">Наценка</th>':""}<th>Каналы</th></tr></thead><tbody>
+      <section class="card"><div class="tbl-wrap"><table><thead><tr><th class="tagsel"><input type="checkbox" data-act="tagPickAll" aria-label="Выбрать все для ценников" ${shown.length&&shown.every(p=>App.ui.tagPick.has(p.id))?"checked":""}></th><th>Товар</th>${u.stockWh?"<th class=\"n\">Остаток</th>":whs.map(w=>{const [a,b]=String(w.name).split(/\s+·\s+/);return `<th class="n wh">${esc(a)}${b?`<small>${esc(b)}</small>`:""}</th>`}).join("")+'<th class="n">Всего</th>'}${showCost?'<th class="n">Закупка</th>':""}<th class="n">Цена</th></tr></thead><tbody>
       ${rows||`<tr><td colspan="${cols}" class="empty">${S.products.length?"Ничего не найдено — измените фильтры":"Товаров пока нет. Начните с «Приёмки» или «Из каталога Apple»"}</td></tr>`}
       </tbody></table></div>${list.length>shown.length?`<div class="acts" style="justify-content:center;margin-top:10px"><button class="btn" data-act="moreStock">Показать ещё (${list.length-shown.length})</button></div>`:""}</section>`}
     </div>`;
@@ -149,8 +148,8 @@ ACT.sfDrop=v=>{const [k,val]=v.split(/\|(.*)/s),f=App.ui.sf;
   if(Array.isArray(f[k]))f[k]=f[k].filter(x=>x!==val);else if(k==="avail")f.avail="all";else if(k==="price"){f.pmin="";f.pmax=""}else if(k==="arch")f.arch=false;else if(k==="ub")f.ub=SF0().ub;else f[k]="";sfSave();App.render()};
 ACT.sfReset=()=>{const keep={sort:App.ui.sf.sort,group:App.ui.sf.group,sec:App.ui.sf.sec};App.ui.sf=Object.assign(SF0(),keep);App.ui.stockQ="";sfSave();App.render()};
 ACT.subCatNew=parent=>{ACT.catForm("");setTimeout(()=>{const s=document.getElementById("kParent");if(s)s.value=parent},0)};
-let sfT=0,wasMob=isMob();
-window.addEventListener("resize",()=>{const m=isMob();if(m!==wasMob){wasMob=m;if(App.ui.view==="stock")App.render()}});
+let sfT=0,wasMob=isNarrow();
+window.addEventListener("resize",()=>{const m=isNarrow();if(m!==wasMob){wasMob=m;if(App.ui.view==="stock")App.render()}});
 document.addEventListener("input",e=>{const t=e.target;if(t.dataset&&t.dataset.ub){const b=App.ui.sf.ub;b[t.dataset.ub]=t.type==="checkbox"?t.checked:t.value;sfSave();clearTimeout(sfT);sfT=setTimeout(()=>App.render(),t.type==="number"?400:0);return}
   if(!t.dataset||!t.dataset.sf)return;const k=t.dataset.sf;App.ui.sf[k]=t.type==="checkbox"?t.checked:t.value;sfSave();
   clearTimeout(sfT);sfT=setTimeout(()=>App.render(),k==="pmin"||k==="pmax"?400:0)});

@@ -308,7 +308,7 @@ table.cart table.units input{text-align:right}
 .seg.wrap{flex-wrap:wrap}.frow .seg button,.fsb .seg button{padding:6px 12px}
 .activef{margin-bottom:8px}
 tr.grow td{background:var(--surface-2,#f1eee4);padding:8px 12px;font-size:14px}tr.grow td span{margin-left:10px;color:var(--muted,#666);font-size:12px}
-.smain table td:nth-child(2){min-width:240px}
+.smain table td:nth-child(2){min-width:200px}
 .mlist{display:flex;flex-direction:column;gap:8px;padding:10px}
 .mgrow{display:flex;justify-content:space-between;gap:8px;padding:8px 4px 2px;font-size:14px}.mgrow span{color:var(--muted,#666);font-size:12px}
 .pcard{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:start;border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff;cursor:pointer}
@@ -359,3 +359,7 @@ details>summary{padding-right:8px}
 .fpanel.closed{padding-bottom:0}.fpanel.closed .fhead{padding:0}
 .fhead .btn{margin-left:8px}
 @media (max-width:760px){.fhead{flex-wrap:wrap}.fhead>.btn{margin:0 0 8px auto}}
+/* stock table: compact warehouse headers, no overflow */
+th.wh{line-height:1.15;white-space:nowrap}
+th.wh small{display:block;font-weight:500;opacity:.7;font-size:11px}
+@media (max-width:1180px){.tbl-wrap td .sub{white-space:normal}}
