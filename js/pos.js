@@ -108,7 +108,7 @@ VIEWS.pos={
 </div>
         <div class="plist ${App.ui.posListOpen?"open":""}" id="plist">
           <button type="button" class="pl-trig" data-act="posListT" aria-expanded="${!!App.ui.posListOpen}"><span class="pl-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span><span class="pl-t">Выбрать из списка</span><span class="pl-n">${inStock.length} в наличии</span><svg class="pl-car" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
-          ${App.ui.posListOpen?`<div class="pl-pop">
+          ${App.ui.posListOpen?`<div class="pl-dim" data-act="posListT" aria-hidden="true"></div><div class="pl-pop">
             <div class="pl-head"><input type="search" id="plQ" placeholder="Фильтр по названию" autocomplete="off" data-nodirty aria-label="Фильтр списка">
               <div class="chips">${[["","Все"],...[...new Set(Object.keys(groups).map(g=>g.split(" / ")[0]))].map(g=>[g,g])].map(([k,l])=>`<button type="button" class="chip ${k?"":"on"}" data-plg="${esc(k)}">${esc(l)}</button>`).join("")}</div></div>
             <div class="pl-body">${inStock.length?Object.keys(groups).map(g=>`<div class="pl-grp" data-g="${esc(g)}"><div class="pl-gh">${esc(g)}<span>${groups[g].length}</span></div>${groups[g].map(p=>{const q=App.qtyIn(p,wh);return `<button type="button" class="pl-row" data-act="posPickL" data-id="${esc(p.id)}" data-s="${esc((p.name+" "+(p.brand||"")+" "+(p.sku||"")).toLowerCase())}">
