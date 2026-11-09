@@ -1768,3 +1768,6 @@ revoke execute on function staff_me_update(text,text), staff_password_changed(),
 grant execute on function staff_me_update(text,text), staff_password_changed(), staff_touch(), transfer_owner(uuid) to authenticated;
 revoke execute on function staff_admin_mark(uuid,jsonb), staff_guard() from public, anon, authenticated;
 grant execute on function staff_admin_mark(uuid,jsonb) to service_role;
+-- site_config отдаёт секреты: только сервис
+revoke execute on function site_config() from public, anon, authenticated;
+grant execute on function site_config() to service_role;

@@ -112,3 +112,6 @@ revoke execute on function site_order_public(text,text) from public, anon, authe
 grant execute on function site_order_public(text,text) to service_role;
 revoke execute on function site_hook_secret(boolean) from public, anon;
 grant execute on function site_hook_secret(boolean) to authenticated;
+-- site_config отдаёт секреты: только сервис
+revoke execute on function site_config() from public, anon, authenticated;
+grant execute on function site_config() to service_role;
