@@ -42,7 +42,7 @@ const M={
   customers:r=>({id:r.id,name:r.name,phone:App.fmtPhone(r.phone),phone2:r.phone2?App.fmtPhone(r.phone2):"",email:r.email||"",birthday:r.birthday||"",source:r.source||"",
     discount:num(r.discount),tags:r.tags||[],blacklisted:r.blacklisted,blackReason:r.black_reason||"",note:r.note||"",mergedInto:r.merged_into,createdAt:r.created_at}),
   products:r=>({id:r.id,name:r.name,categoryId:r.category_id||"",brand:r.brand||"",condition:r.condition,sku:r.sku||"",barcode:r.barcode||"",serial:r.serial||"",
-    cost:num(r.cost),lastCost:num(r.last_cost),price:num(r.price),minQty:r.min_qty,warrantyMonths:r.warranty_months,batteryHealth:r.battery_health,diagnostics:r.diagnostics||"",
+    cost:num(r.cost),lastCost:num(r.last_cost),price:num(r.price),oldPrice:r.old_price==null?null:num(r.old_price),minQty:r.min_qty,warrantyMonths:r.warranty_months,batteryHealth:r.battery_health,diagnostics:r.diagnostics||"",
     kit:r.kit||"",trackSerial:!!r.track_serial,attrs:r.attrs||{},catalogId:r.catalog_id||"",model:r.model||"",memory:r.memory||"",color:r.color||"",avitoPrice:r.avito_price==null?"":num(r.avito_price),ownership:r.ownership,onSite:r.on_site,onAvito:r.on_avito,archived:r.is_archived,note:r.description||"",
     createdAt:r.created_at,stock:{}}),
   sales:r=>({id:r.id,num:r.num,pointId:r.point_id,whId:r.warehouse_id,shiftId:r.shift_id,customerId:r.customer_id,channel:r.channel,subtotal:num(r.subtotal),discount:num(r.discount),

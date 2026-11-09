@@ -1771,3 +1771,5 @@ grant execute on function staff_admin_mark(uuid,jsonb) to service_role;
 -- site_config отдаёт секреты: только сервис
 revoke execute on function site_config() from public, anon, authenticated;
 grant execute on function site_config() to service_role;
+-- v3: старая цена для ценника со скидкой
+alter table products add column if not exists old_price numeric(12,2) check (old_price is null or old_price >= 0);

@@ -252,72 +252,185 @@ App.demoSale=function(){
 };
 
 /* =====================================================================
-   ЦЕННИКИ
+   ЦЕННИКИ: шаблон = размер + блоки со своими координатами (мм), шрифтом и цветами
    ===================================================================== */
-const TAG_FIELDS=[["shop","Название магазина"],["name","Название товара"],["model","Модель"],["chips","Память и цвет"],["cond","Состояние"],["battery","Ёмкость АКБ"],
-  ["kit","Комплектация"],["used","Б/у: ремонт, детали"],["warranty","Гарантия"],["imei","IMEI / серийный №"],["sku","Артикул"],["barcode","Штрихкод"],["price","Цена"],["note","Своя надпись"]];
+const TAG_FIELDS=[["logo","Логотип"],["shop","Название магазина"],["name","Название товара"],["model","Модель"],["chips","Память и цвет"],["cond","Состояние"],
+  ["battery","Ёмкость АКБ"],["warranty","Гарантия"],["kit","Комплектация"],["used","Б/у: ремонт, детали"],["imei","IMEI / серийный №"],["sku","Артикул"],
+  ["barcode","Штрихкод"],["qr","QR на сайт"],["price","Цена"],["oldprice","Старая цена"],["discount","Скидка, %"],["credit","Рассрочка"],["note","Своя надпись"]];
 App.TAG_FIELDS=TAG_FIELDS;
+const PILLS=["chips","cond","battery","warranty"];
+App.TAG_BLOCKS={logo:"Логотип",shop:"Магазин",name:"Название",model:"Модель",pills:"Плашки",kit:"Комплектация",used:"Б/у: ремонт",imei:"IMEI / S/N",
+  sku:"Артикул",barcode:"Штрихкод",qr:"QR-код",note:"Своя надпись",credit:"Рассрочка",discount:"Скидка",oldprice:"Старая цена",price:"Цена"};
+const BKEYS=Object.keys(App.TAG_BLOCKS);
+App.tagBlockOf=k=>PILLS.includes(k)?"pills":k;
+App.TAG_FONTS=[["helv","Обычный","'Helvetica Neue',Helvetica,Arial,sans-serif"],["narrow","Узкий","'Arial Narrow','Roboto Condensed','Helvetica Neue',Arial,sans-serif"],
+  ["round","Округлый","'Trebuchet MS',Verdana,sans-serif"],["serif","С засечками","Georgia,'Times New Roman',serif"],["mono","Моноширинный","'Courier New',Courier,monospace"]];
+const fontOf=t=>(App.TAG_FONTS.find(f=>f[0]===t.font)||App.TAG_FONTS[0])[2];
+const blockOn=(t,k)=>{const f=t.fields||{};return k==="pills"?PILLS.some(x=>f[x]):!!f[k]};
+App.tagBlockOn=blockOn;
 const F=(...on)=>Object.fromEntries(TAG_FIELDS.map(([k])=>[k,on.includes(k)]));
 App.TAG_PRESETS=[
   {id:"dev70",name:"Устройство 70×50",w:70,h:50,media:"sheet",border:true,round:true,invert:false,priceSize:"L",note:"",fields:F("shop","name","chips","cond","battery","warranty","price")},
   {id:"acc58",name:"Аксессуар 58×40",w:58,h:40,media:"sheet",border:true,round:false,invert:false,priceSize:"M",note:"",fields:F("name","sku","barcode","price")},
-  {id:"show100",name:"Витрина 100×70",w:100,h:70,media:"sheet",border:true,round:true,invert:true,priceSize:"L",note:"Принимаем ваше устройство в Trade-in",fields:F("shop","name","chips","cond","battery","kit","warranty","price","note")},
+  {id:"show100",name:"Витрина 100×70",w:100,h:70,media:"sheet",border:true,round:true,invert:true,priceSize:"L",note:"Принимаем ваше устройство в Trade-in",fields:F("shop","name","chips","cond","battery","kit","warranty","price","note","qr")},
+  {id:"sale70",name:"Акция 70×50",w:70,h:50,media:"sheet",border:true,round:true,invert:false,priceSize:"M",note:"",fields:F("shop","name","chips","warranty","price","oldprice","discount","credit")},
   {id:"used70",name:"Б/у устройство 70×50",w:70,h:50,media:"sheet",border:true,round:true,invert:false,priceSize:"L",note:"",fields:F("name","chips","cond","battery","kit","used","warranty","price")},
   {id:"label40",name:"Этикетка 40×30 (термопринтер)",w:40,h:30,media:"label",border:false,round:false,invert:false,priceSize:"M",note:"",fields:F("name","barcode","price")}
 ];
-App.tagTemplates=()=>[...App.TAG_PRESETS.map(t=>({...t,builtin:true})),...((App.settings().tagTemplates)||[])];
-App.tagTemplate=id=>App.tagTemplates().find(t=>t.id===id)||App.TAG_PRESETS[0];
 
-function barcodeSvg(code,h){
+/** Автоматическая раскладка блоков под размер и набор полей. Блоки считаются для всех полей, выключенные просто не печатаются. */
+function autoBlocks(t){
+  const w=num(t.w)||60,h=num(t.h)||40,on=k=>blockOn(t,k);
+  const base=Math.min(h,w*.75),pad=Math.max(1.5,Math.round(base*.14)/2),W=w-2*pad,R=v=>Math.round(v*2)/2;
+  const B={};const put=(k,x,y,bw,bh,o)=>{B[k]=Object.assign({b:0,i:0,up:0,al:"l",c:"#000000",bg:""},o,
+    {x:R(Math.max(0,x)),y:R(Math.max(0,y)),w:R(Math.min(w,Math.max(3,bw))),h:R(Math.max(2,bh)),fs:+(o.fs||1).toFixed(2)})};
+  const gap=Math.max(.5,base*.025);
+  // верх: логотип и магазин
+  let y=pad;const topH=base*.11,lg=on("logo");
+  put("logo",pad,y,W*.4,topH*1.2,{fs:base*.075,b:1});
+  put("shop",lg?pad+W*.42:pad,y,lg?W*.58:W,topH,{fs:base*.075,b:1,al:lg?"r":"l"});
+  if(lg||on("shop"))y+=topH*(lg?1.2:1)+gap;
+  // низ, правая колонка: цена, над ней старая цена со скидкой, выше рассрочка
+  const left=on("qr")||on("barcode"),rx=pad+W*(left?.42:.25),RW=pad+W-rx,bot=h-pad;
+  const pfs=base*({S:.16,M:.21,L:.27}[t.priceSize]||.21)*(left&&w<60?.85:1),ph=pfs*1.05;
+  let rTop=bot;
+  put("price",rx,bot-ph,RW,ph,{fs:pfs,b:1,al:"r"});if(on("price"))rTop-=ph+gap*.5;
+  const ofs=pfs*.42,oh=ofs*1.3;
+  put("oldprice",rx+(on("discount")?RW*.42:0),rTop-oh,on("discount")?RW*.58:RW,oh,{fs:ofs,al:"r",c:"#555555"});
+  put("discount",rx,rTop-oh,on("oldprice")?RW*.4:RW*.45,oh,{fs:ofs*.95,b:1,al:"c",c:"#ffffff",bg:"#000000"});
+  if(on("discount")&&!on("oldprice"))B.discount.x=R(pad+W-B.discount.w);
+  if(on("oldprice")||on("discount"))rTop-=oh+gap*.5;
+  const cfs=base*.058,chh=cfs*1.4;
+  put("credit",rx,rTop-chh,RW,chh,{fs:cfs,b:1,al:"r"});if(on("credit"))rTop-=chh+gap*.5;
+  // низ, левая колонка: QR и штрихкод
+  let lTop=bot;const lw=rx-pad-gap;
+  const qs=R(Math.min(h*.36,Math.max(bot-rTop,h*.24),lw*(on("barcode")?.45:1),bot-y-2));
+  put("qr",pad,bot-qs,qs,qs,{fs:2});
+  const bx=on("qr")?pad+qs+gap:pad,bw=Math.max(8,rx-gap-bx),bh=Math.max(6,Math.min(h*.2,bw*.45));
+  put("barcode",bx,bot-bh,bw,bh,{fs:2});
+  if(on("qr"))lTop=bot-qs;if(on("barcode"))lTop=Math.min(lTop,bot-bh);
+  let top=Math.min(rTop,lTop)-gap;
+  const nfs=base*.06,nh=nfs*(t.invert?1.7:1.35);
+  put("note",pad,top-nh,W,nh,{fs:nfs,b:1,c:t.invert?"#ffffff":"#000000",bg:t.invert?"#000000":""});if(on("note"))top-=nh+gap;
+  // середина сверху вниз; если не помещается — уменьшаем пропорционально
+  const nfz=base*.1,mfs=base*.065,pfz=base*.062;
+  const mk=(lines,rows)=>[["name",nfz,nfz*1.13*lines,{b:1}],["model",mfs,mfs*1.3,{c:"#333333"}],["pills",pfz,pfz*2.05*rows,{b:1}],
+    ["kit",pfz,pfz*1.4,{c:"#222222"}],["used",pfz,pfz*1.4,{c:"#222222"}],["imei",pfz,pfz*1.4,{c:"#222222"}],["sku",pfz,pfz*1.4,{c:"#222222"}]];
+  const needOf=m=>m.filter(x=>on(x[0])).reduce((a,x)=>a+x[2]+gap*.6,0),avail=top-y;
+  // сначала плашки в один ряд, потом название в одну строку, и только потом уменьшаем шрифт
+  const L=h>=60?3:2,opts=[[L,h>=45?2:1],[L,1],[1,1]].map(([l,r])=>mk(l,r));
+  let mid=opts.find(m=>needOf(m)<=avail/.72)||opts[opts.length-1];
+  const need=needOf(mid),s=need>avail&&need>0?Math.max(.45,avail/need):1;
+  for(const [k,fs,hh,o] of mid){put(k,pad,y,W,hh*s,Object.assign({fs:fs*s},o));if(on(k))y+=hh*s+gap*.6*s}
+  return B;
+}
+App.tagAutoBlocks=autoBlocks;
+/** Шаблон в рабочем виде: у старых и готовых шаблонов блоки достраиваются автоматически. */
+function normTpl(t0){
+  const t=JSON.parse(JSON.stringify(t0||App.TAG_PRESETS[0]));
+  t.fields=Object.assign(F(),t.fields||{});
+  const auto=autoBlocks(t);t.blocks=Object.assign({},auto,t.blocks||{});
+  if(!Array.isArray(t.order))t.order=BKEYS.slice();for(const k of BKEYS)if(!t.order.includes(k))t.order.push(k);
+  if(!t.font)t.font="helv";if(!t.bg)t.bg="#ffffff";if(t.creditMonths==null)t.creditMonths=12;if(t.creditRate==null)t.creditRate=0;
+  return t;
+}
+App.tagNorm=normTpl;
+App.tagTemplates=()=>[...App.TAG_PRESETS.map(t=>({...normTpl(t),builtin:true})),...((App.settings().tagTemplates)||[]).map(normTpl)];
+App.tagTemplate=id=>App.tagTemplates().find(t=>t.id===id)||App.tagTemplates()[0];
+
+function barcodeSvg(code,css){
   if(!code||typeof JsBarcode!=="function")return "";
   try{const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");
     const ean=/^\d{13}$/.test(code);
     try{JsBarcode(svg,code,{format:ean?"EAN13":"CODE128",displayValue:true,fontSize:14,textMargin:1,height:50,margin:0,width:2,flat:true})}
     catch(e){JsBarcode(svg,code,{format:"CODE128",displayValue:true,fontSize:14,textMargin:1,height:50,margin:0,width:2})}
     const w=svg.getAttribute("width"),hh=svg.getAttribute("height");svg.setAttribute("viewBox",`0 0 ${parseFloat(w)} ${parseFloat(hh)}`);
-    svg.removeAttribute("width");svg.removeAttribute("height");svg.setAttribute("preserveAspectRatio","xMinYMid meet");svg.style.cssText=`height:${h}mm;width:auto;display:block`;
+    svg.removeAttribute("width");svg.removeAttribute("height");svg.setAttribute("preserveAspectRatio","xMinYMid meet");svg.style.cssText=css;
     return svg.outerHTML}catch(e){return ""}
 }
-const tagCss=t=>{const w=num(t.w)||60,h=num(t.h)||40,base=Math.min(h,w*0.75);
-  const ps={S:.16,M:.21,L:.27}[t.priceSize]||.21;
-  return `*{box-sizing:border-box}html,body{margin:0}body{font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-${t.media==="label"?`@page{size:${w}mm ${h}mm;margin:0}.tag{page-break-after:always;break-after:page}.sheet{display:block}`:`@page{size:A4;margin:8mm}.sheet{display:flex;flex-wrap:wrap;align-content:flex-start}`}
-.tag{width:${w}mm;height:${h}mm;padding:${(base*.07).toFixed(2)}mm ${(base*.08).toFixed(2)}mm;display:flex;flex-direction:column;overflow:hidden;position:relative;
-  ${t.border?"border:.3mm solid #000;":"outline:.2mm dashed #bbb;outline-offset:-.1mm;"}${t.round&&t.border?`border-radius:${(base*.08).toFixed(2)}mm;`:""}${t.media==="sheet"?"margin:0 1mm 1mm 0;":""}}
-@media print{.tag{${t.border?"":"outline:none;"}}}
-.shop{font-weight:800;font-size:${(base*.075).toFixed(2)}mm;letter-spacing:-.02em;display:flex;justify-content:space-between;align-items:center;gap:2mm}
-.shop span{font-weight:600;font-size:${(base*.055).toFixed(2)}mm;color:#444}
-.nm{font-weight:800;font-size:${(base*.1).toFixed(2)}mm;line-height:1.12;margin-top:${(base*.03).toFixed(2)}mm;display:-webkit-box;-webkit-line-clamp:${h>=45?3:2};-webkit-box-orient:vertical;overflow:hidden}
-.md{font-size:${(base*.065).toFixed(2)}mm;color:#333;margin-top:.4mm}
-.ch{display:flex;flex-wrap:wrap;gap:${(base*.025).toFixed(2)}mm;margin-top:${(base*.035).toFixed(2)}mm}
-.c{border:.25mm solid #000;border-radius:99px;padding:${(base*.012).toFixed(2)}mm ${(base*.035).toFixed(2)}mm;font-size:${(base*.058).toFixed(2)}mm;font-weight:600;white-space:nowrap}
-.c.d{background:#000;color:#fff}
-.ln{font-size:${(base*.058).toFixed(2)}mm;color:#222;margin-top:${(base*.02).toFixed(2)}mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tag>*{flex-shrink:0}.tag>.mid{flex:1 1 auto;min-height:0;overflow:hidden;display:flex;flex-direction:column}.mid>*{flex-shrink:0}.bt{margin-top:auto;display:flex;flex-direction:column;align-items:stretch;gap:1mm}
-.bc{display:flex;justify-content:flex-start}.bc svg{max-width:100%}
-.pr{font-weight:800;font-size:${(base*ps).toFixed(2)}mm;line-height:.95;letter-spacing:-.03em;white-space:nowrap;text-align:right;margin-left:auto}
-.pr small{font-size:.45em;font-weight:700;margin-left:.08em}
-.note{font-size:${(base*.06).toFixed(2)}mm;font-weight:700;margin-top:${(base*.03).toFixed(2)}mm}
-.tag.inv .note{background:#000;color:#fff;padding:${(base*.015).toFixed(2)}mm ${(base*.035).toFixed(2)}mm;border-radius:${(base*.03).toFixed(2)}mm;align-self:flex-start}
-@media screen{body{background:#e5e5e5;padding:6mm}.tag{background:#fff}}`};
-function tagHtml(p,t){
-  const f=t.fields||{},st=App.settings(),h=num(t.h)||40;
-  const price=Math.round(num(p.price)).toLocaleString("ru-RU");
-  const code=p.barcode||p.sku||p.serial||"";
-  const chips=[f.chips&&p.memory,f.chips&&p.color,f.cond&&p.condition].filter(Boolean).map(x=>`<span class="c">${esc(x)}</span>`).join("")
-    +(f.battery&&p.batteryHealth!=null&&p.batteryHealth!==""?`<span class="c">АКБ ${num(p.batteryHealth)}%</span>`:"")
-    +(f.warranty&&App.tagWarranty(p)?`<span class="c d">гарантия ${App.tagWarranty(p)} мес.</span>`:"");
-  return `<div class="tag ${t.invert?"inv":""}">
-    ${f.shop?`<div class="shop">${esc(st.shopName||"iCase")}${f.sku&&p.sku?`<span>${esc(p.sku)}</span>`:""}</div>`:""}
-    <div class="mid">${f.name?`<div class="nm">${esc(p.name)}</div>`:""}${f.model&&p.model?`<div class="md">${esc(p.model)}</div>`:""}
-    ${chips?`<div class="ch">${chips}</div>`:""}
-    ${f.kit&&p.kit?`<div class="ln">Комплект: ${esc(p.kit)}</div>`:""}${f.used&&p.uattrs&&(p.uattrs.repair||p.uattrs.parts)?`<div class="ln">${esc([p.uattrs.repair==="Был"?"Был ремонт"+((p.uattrs.repairParts||[]).length?": "+p.uattrs.repairParts.join(", "):""):p.uattrs.repair==="Не было"?"Без ремонта":"",p.uattrs.parts==="Оригинальные"?"детали оригинальные":""].filter(Boolean).join(", "))}</div>`:""}${f.imei&&p.serial?`<div class="ln">${App.codeLbl(p)} ${esc(p.serial)}</div>`:""}
-    ${!f.shop&&f.sku&&p.sku?`<div class="ln">Арт. ${esc(p.sku)}</div>`:""}
-</div>
-    <div class="bt">${f.note&&t.note?`<div class="note">${esc(t.note).replace(/-/g,"\u2011")}</div>`:""}${f.barcode&&code?`<div class="bc">${barcodeSvg(code,Math.max(6,h*.2))}</div>`:""}${f.price?`<div class="pr">${price}<small>₽</small></div>`:""}</div></div>`;
-}
+const TR={"а":"a","б":"b","в":"v","г":"g","д":"d","е":"e","ё":"e","ж":"zh","з":"z","и":"i","й":"y","к":"k","л":"l","м":"m","н":"n","о":"o","п":"p","р":"r","с":"s","т":"t","у":"u","ф":"f","х":"h","ц":"c","ч":"ch","ш":"sh","щ":"sch","ъ":"","ы":"y","ь":"","э":"e","ю":"yu","я":"ya"};
+/** Тот же адрес страницы, что отдаёт API сайта (site-api / shape.ts). */
+App.siteSlug=(name,sku)=>{const base=String(name||"").toLowerCase().split("").map(c=>TR[c]??c).join("").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,80);
+  const tail=String(sku||"").toLowerCase().replace(/[^a-z0-9]+/g,"").slice(-8);return tail?`${base}-${tail}`:base};
+App.tagQrUrl=(p,t)=>{const site=String(App.settings().siteUrl||"").replace(/\/+$/,"");
+  const pat=String(t.qrUrl||"").trim()||(site?site+"/product/{slug}":"");if(!pat)return "";
+  const sku=p.sku||p.barcode||("CRM-"+String(p.id||"").slice(0,8));
+  return pat.replace(/\{slug\}/g,App.siteSlug(p.name,sku)).replace(/\{sku\}/g,encodeURIComponent(sku)).replace(/\{id\}/g,encodeURIComponent(p.id||""))};
 App.tagWarranty=p=>num(p.warrantyMonths)||(App.isDevice&&App.isDevice(p)?num(App.settings().deviceWarrantyMonths):0);
-App.tagsHtml=function(list,t){
+const trub=v=>Math.round(num(v)).toLocaleString("ru-RU");
+App.tagCredit=(p,t)=>{const m=Math.max(1,num(t.creditMonths)||12);return Math.ceil(num(p.price)*(1+num(t.creditRate)/100)/m)};
+App.tagDiscount=p=>{const o=num(p.oldPrice),pr=num(p.price);return o>pr&&pr>0?Math.round((1-pr/o)*100):0};
+
+/** Содержимое блока. Пустая строка — нечего печатать (у товара нет таких данных). */
+function blockText(k,p,t){
+  const st=App.settings();
+  switch(k){
+    case "shop":return esc(st.shopName||"iCase");
+    case "name":return esc(p.name||"");
+    case "model":return p.model?esc(p.model):"";
+    case "kit":return p.kit?"Комплект: "+esc(p.kit):"";
+    case "used":{const u=p.uattrs||{};return esc([u.repair==="Был"?"Был ремонт"+((u.repairParts||[]).length?": "+u.repairParts.join(", "):""):u.repair==="Не было"?"Без ремонта":"",u.parts==="Оригинальные"?"детали оригинальные":""].filter(Boolean).join(", "))}
+    case "imei":return p.serial?App.codeLbl(p)+" "+esc(p.serial):"";
+    case "sku":return p.sku?"Арт. "+esc(p.sku):"";
+    case "note":return t.note?esc(t.note).replace(/-/g,"‑"):"";
+    case "price":return num(p.price)?trub(p.price):"";
+    case "oldprice":return num(p.oldPrice)>num(p.price)?trub(p.oldPrice):"";
+    case "discount":{const d=App.tagDiscount(p);return d?"−"+d+"%":""}
+    case "credit":return num(p.price)?"от "+trub(App.tagCredit(p,t))+" ₽/мес":"";
+  }
+  return "";
+}
+const PH={shop:"Магазин",name:"Название товара",model:"Модель",kit:"Комплект: …",used:"Б/у: ремонт",imei:"IMEI / S/N",sku:"Артикул",note:"Своя надпись",price:"0",oldprice:"Старая цена",discount:"−0%",credit:"от … ₽/мес",logo:"Логотип",qr:"QR",barcode:"Штрихкод",pills:"Плашки"};
+const ONE_LINE=["shop","model","kit","used","imei","sku","price","oldprice","discount","credit"];
+function blockHtml(k,b,p,t,o){
+  const f=t.fields||{},edit=o&&o.edit;
+  const al={l:"left",c:"center",r:"right"}[b.al]||"left",jc={l:"flex-start",c:"center",r:"flex-end"}[b.al]||"flex-start";
+  let fs=num(b.fs)||2,inner="",lh=1.12,empty=false;
+  const box=`position:absolute;left:${b.x}mm;top:${b.y}mm;width:${b.w}mm;height:${b.h}mm;overflow:hidden;`;
+  const look=`color:${b.c||"#000"};${b.bg?`background:${b.bg};border-radius:${Math.min(b.h/2,1.2).toFixed(2)}mm;`:""}font-weight:${b.b?800:400};${b.i?"font-style:italic;":""}${b.up?"text-transform:uppercase;letter-spacing:.02em;":""}`;
+  const padX=b.bg?Math.min(1.2,b.w*.06):0,iw=b.w-2*padX;
+  if(k==="logo"){
+    if(t.logo)inner=`<img src="${t.logo}" alt="" style="max-width:100%;max-height:100%;object-fit:contain;display:block;${t.logoBw?"filter:grayscale(1) contrast(1.4);":""}">`;
+    else{const s=esc(App.settings().shopName||"iCase");fs=Math.min(fs,b.h/1.1,iw/(s.length*.6));inner=s}
+  }else if(k==="qr"){const u=App.tagQrUrl(p,t);if(u)inner=App.qrSvg(u).replace("<svg",`<svg style="width:100%;height:100%;display:block"`);else empty=true}
+  else if(k==="barcode"){const code=p.barcode||p.sku||p.serial||"";if(code)inner=barcodeSvg(code,`height:100%;width:auto;max-width:100%;display:block`);else empty=true}
+  else if(k==="pills"){
+    const cs=[f.chips&&p.memory,f.chips&&p.color,f.cond&&p.condition].filter(Boolean).map(x=>[esc(x),0]);
+    if(f.battery&&p.batteryHealth!=null&&p.batteryHealth!=="")cs.push(["АКБ "+num(p.batteryHealth)+"%",0]);
+    if(f.warranty&&App.tagWarranty(p))cs.push(["гарантия "+App.tagWarranty(p)+" мес.",1]);
+    const ink=b.c||"#000",paper=t.bg||"#fff";
+    const wrapOk=b.h>=fs*3.6;
+    inner=cs.length?`<div style="display:flex;flex-wrap:${wrapOk?"wrap":"nowrap"};gap:${(fs*.4).toFixed(2)}mm;justify-content:${jc}">${cs.map(([x,d])=>`<span style="border:.25mm solid ${ink};border-radius:99px;padding:${(fs*.18).toFixed(2)}mm ${(fs*.55).toFixed(2)}mm;white-space:nowrap;line-height:1.1;${d?`background:${ink};color:${paper};`:""}">${x}</span>`).join("")}</div>`:"";
+    if(!inner)empty=true;
+  }else{
+    const txt=blockText(k,p,t);if(!txt)empty=true;
+    const plain=String(txt).replace(/&[a-z#0-9]+;/gi,"_");
+    if(ONE_LINE.includes(k)&&txt){const len=k==="price"?plain.length+.8:plain.length;fs=Math.max(.8,Math.min(fs,b.h/1.02,iw/(len*(b.b?.63:.56))));lh=1}
+    if(k==="price"&&txt)inner=`${txt}<span style="font-size:.45em;margin-left:.08em">₽</span>`;
+    else if(k==="oldprice"&&txt)inner=`<span style="text-decoration:line-through">${txt} ₽</span>`;
+    else if(k==="name"&&txt){const n=Math.max(1,Math.floor(b.h/(fs*1.12)));inner=`<div style="display:-webkit-box;-webkit-line-clamp:${n};-webkit-box-orient:vertical;overflow:hidden">${txt}</div>`}
+    else inner=txt;
+  }
+  if(empty){if(!edit)return "";inner=`<span style="opacity:.35;font-style:italic">${PH[k]||k}</span>`;fs=Math.min(fs,b.h/1.2)}
+  const media=["logo","qr","barcode"].includes(k)&&!empty;
+  if(!media&&k!=="pills"&&k!=="name")inner=`<div>${inner}</div>`; // текст и «₽» — одна строка, а не два флекс-элемента
+  const flex=`display:flex;flex-direction:column;justify-content:${k==="price"||k==="oldprice"||k==="discount"||k==="credit"?"flex-end":b.bg||media?"center":"flex-start"};${media?`align-items:${jc};`:""}`;
+  return `<div data-blk="${k}"${edit&&o.sel===k?' class="sel"':""} style="${box}${flex}${look}font-size:${fs.toFixed(2)}mm;line-height:${lh};text-align:${al};white-space:${ONE_LINE.includes(k)?"nowrap":"normal"};${padX?`padding:0 ${padX.toFixed(2)}mm;`:""}">${inner}${edit&&o.sel===k?'<i class="rh"></i>':""}</div>`;
+}
+/** Один ценник. o.edit — режим редактора: пустые блоки видны как подсказки, у выбранного есть уголок для размера. */
+function tagHtml(p,t0,o){
+  const t=t0.blocks?t0:normTpl(t0),w=num(t.w)||60,h=num(t.h)||40,base=Math.min(h,w*.75);
+  const bl=(t.order||BKEYS).filter(k=>blockOn(t,k)&&t.blocks[k]).map(k=>blockHtml(k,t.blocks[k],p,t,o)).join("");
+  return `<div class="tag${t.border?"":" nb"}" style="position:relative;flex:none;width:${w}mm;height:${h}mm;overflow:hidden;background:${t.bg||"#fff"};color:#000;font-family:${fontOf(t)};${t.border?`border:.3mm solid ${t.borderColor||"#000"};`:""}${t.round&&t.border?`border-radius:${(base*.08).toFixed(2)}mm;`:""}">${bl}</div>`;
+}
+App.tagHtml=tagHtml;
+const tagCss=t=>{const w=num(t.w)||60,h=num(t.h)||40;
+  return `*{box-sizing:border-box}html,body{margin:0}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+${t.media==="label"?`@page{size:${w}mm ${h}mm;margin:0}.tag{page-break-after:always;break-after:page}.sheet{display:block}`:`@page{size:A4;margin:8mm}.sheet{display:flex;flex-wrap:wrap;align-content:flex-start;gap:0 1mm}.tag{margin-bottom:1mm}`}
+.tag.nb{outline:.2mm dashed #bbb;outline-offset:-.1mm}@media print{.tag.nb{outline:none}}
+@media screen{body{background:#e5e5e5;padding:6mm}}`};
+App.tagsHtml=function(list,t0){
+  const t=normTpl(t0);
   const tags=[];list.forEach(({p,copies})=>{for(let i=0;i<Math.max(0,Math.min(200,num(copies)));i++)tags.push(tagHtml(p,t))});
   return wrap("Ценники",tagCss(t),`<div class="sheet">${tags.join("")}</div>`);
 };

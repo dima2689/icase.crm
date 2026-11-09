@@ -229,6 +229,7 @@ function productForm(id){
     ${attrs.length?`<div class="fld full"><label>Параметры</label><div class="chips">${attrs.map(([k,v])=>`<span class="pill">${esc(k)}: ${esc(v)}</span>`).join("")}</div></div>`:""}
     ${cost?App.fld("pCost","Закупка, ₽",App.inp("pCost",p.cost||"","number","",price?"":"disabled")):""}
     ${App.fld("pPrice","Цена продажи, ₽",App.inp("pPrice",p.price||"","number","",price?"":"disabled"))}
+    ${App.fld("pOld","Старая цена, ₽ (для ценника со скидкой)",App.inp("pOld",p.oldPrice||"","number","пусто — без скидки",price?"":"disabled"))}
     <div class="fld full"><span class="hint" id="pMk"></span></div>
     ${App.fld("pMin","Минимальный остаток (всего)",App.inp("pMin",p.minQty||0,"number","",edit?"":"disabled"))}
     ${App.fld("pWarr","Гарантия, мес. (0 = по умолчанию)",App.inp("pWarr",p.warrantyMonths||"","number","",edit?"":"disabled"))}
@@ -263,13 +264,14 @@ ACT.saveProduct=async(id,btn)=>{
   const n=v=>v===""?null:num(v);
   const data={name:V("pName"),category_id:V("pCat")||null,condition:V("pCond"),brand:V("pBrand")||null,sku:V("pSku")||null,barcode:V("pBar")||null,serial:V("pSerial")||null,
     track_serial:App.checked("pTrack"),price:num(V("pPrice")),min_qty:num(V("pMin")),warranty_months:num(V("pWarr")),battery_health:n(V("pBatt")),diagnostics:V("pDiag")||null,kit:V("pKit")||null,model:V("pModel")||null,memory:V("pMem")||null,color:V("pColor")||null,
-    avito_price:n(V("pAvito")),on_site:App.checked("pSite"),on_avito:App.checked("pOnAvito"),description:V("pNote")||null};
+    avito_price:n(V("pAvito")),old_price:n(V("pOld")),on_site:App.checked("pSite"),on_avito:App.checked("pOnAvito"),description:V("pNote")||null};
   if(data.battery_health!=null&&(data.battery_health<0||data.battery_health>100))return App.toast("Ёмкость АКБ — от 0 до 100%");
   if(App.can("cost")&&document.getElementById("pCost"))data.cost=num(V("pCost"));
   if(old&&old.trackSerial&&!data.track_serial&&S.units.some(u=>u.productId===id))return App.toast("У товара есть экземпляры с IMEI — учёт по серийным номерам отключить нельзя");
   if(old&&!old.trackSerial&&data.track_serial&&App.qtyTotal(old)>0)return App.toast("Сначала спишите или продайте остаток без IMEI, потом включите учёт по серийным номерам");
   if(!document.getElementById("pSerial"))delete data.serial;
-  if(!App.can("price")){delete data.price;delete data.avito_price}
+  if(!App.can("price")){delete data.price;delete data.avito_price;delete data.old_price}
+  if(data.old_price!=null&&data.old_price<=num(data.price))data.old_price=null;
   if(btn.disabled)return;btn.disabled=true;
   try{
     if(id){await App.api.update("products",id,data);App.closeModal();App.toast("Сохранено")}
