@@ -331,7 +331,7 @@ function normTpl(t0){
   t.fields=Object.assign(F(),t.fields||{});
   const auto=autoBlocks(t);t.blocks=Object.assign({},auto,t.blocks||{});
   if(!Array.isArray(t.order))t.order=BKEYS.slice();for(const k of BKEYS)if(!t.order.includes(k))t.order.push(k);
-  if(!t.font)t.font="helv";if(!t.bg)t.bg="#ffffff";if(t.creditMonths==null)t.creditMonths=12;if(t.creditRate==null)t.creditRate=0;
+  if(!t.font)t.font="helv";if(!t.bg)t.bg="#ffffff";if(t.creditMonths==null)t.creditMonths=12;if(t.gap==null)t.gap=1;if(t.creditRate==null)t.creditRate=0;
   return t;
 }
 App.tagNorm=normTpl;
@@ -424,9 +424,9 @@ function tagHtml(p,t0,o){
   return `<div class="tag${t.border?"":" nb"}" style="position:relative;flex:none;width:${w}mm;height:${h}mm;overflow:hidden;background:${t.bg||"#fff"};color:#000;font-family:${fontOf(t)};${t.border?`border:.3mm solid ${t.borderColor||"#000"};`:""}${t.round&&t.border?`border-radius:${(base*.08).toFixed(2)}mm;`:""}">${bl}</div>`;
 }
 App.tagHtml=tagHtml;
-const tagCss=t=>{const w=num(t.w)||60,h=num(t.h)||40;
+const tagCss=t=>{const w=num(t.w)||60,h=num(t.h)||40,g=Math.max(0,Math.min(10,t.gap==null?1:num(t.gap)));
   return `*{box-sizing:border-box}html,body{margin:0}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-${t.media==="label"?`@page{size:${w}mm ${h}mm;margin:0}.tag{page-break-after:always;break-after:page}.sheet{display:block}`:`@page{size:A4;margin:8mm}.sheet{display:flex;flex-wrap:wrap;align-content:flex-start;gap:0 1mm}.tag{margin-bottom:1mm}`}
+${t.media==="label"?`@page{size:${w}mm ${h}mm;margin:0}.tag{page-break-after:always;break-after:page}.sheet{display:block}`:`@page{size:A4;margin:8mm}.sheet{display:flex;flex-wrap:wrap;align-content:flex-start;gap:${g}mm}.tag{break-inside:avoid;page-break-inside:avoid}`}
 .tag.nb{outline:.2mm dashed #bbb;outline-offset:-.1mm}@media print{.tag.nb{outline:none}}
 @media screen{body{background:#e5e5e5;padding:6mm}}`};
 App.tagsHtml=function(list,t0){

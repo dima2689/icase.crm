@@ -562,3 +562,7 @@ label.chip{cursor:pointer}
 .unitmode input{display:inline-block;width:15px!important;height:15px;min-height:0;margin:0 6px 0 0;padding:0;vertical-align:-2px;accent-color:var(--olive)}
 .unitmode small{display:block;color:var(--muted);font-size:.74rem;padding-left:21px}
 @media (max-width:600px){.tagtbl th:nth-child(2),.tagtbl td:nth-child(2){display:none}.tagtbl td,.tagtbl th{padding-left:6px;padding-right:6px}.tagtbl input[data-tagcopy]{width:56px!important}}
+.sizebox{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sizebox input{width:96px}
+.sizebox .muted{font-size:.78rem;flex-basis:100%}
+.sizewarn{margin:6px 0 0;font-size:.8rem;color:#b3261e}.sizewarn .ok{color:var(--muted)}

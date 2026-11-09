@@ -75,7 +75,9 @@ function tags(){
 }
 
 /* ---------- конструктор ценников: холст с блоками ---------- */
-const SIZES=[[58,40],[70,50],[100,70],[40,30],[58,30],[105,74]];
+const SIZES={tags:[[58,40],[70,50],[100,70],[105,74],[148,105]],labels:[[30,20],[40,25],[43,25],[40,30],[58,30],[58,40],[58,60]]};
+const LIM={min:10,max:297},SHEET={w:194,h:281}; // A4 минус поля 8 мм
+const sizeTxt=v=>String(+num(v).toFixed(1)).replace(".",",");
 const MM=3.7795;
 const SW=["#000000","#ffffff","#d70015","#ff9500","#ffcc00","#1f9d55","#0a6cff","#8e8e93"];
 function tagDraft(){if(!App.ui.tagEdit)App.ui.tagEdit=App.tagNorm(App.tagTemplate(App.ui.tagTpl));return App.ui.tagEdit}
@@ -86,6 +88,15 @@ const sampleProduct=()=>{const q=queueItems()[0];let p=q?q.p:
   if(!(num(p.oldPrice)>num(p.price)))p=Object.assign({},p,{oldPrice:Math.round(num(p.price)*1.12/100)*100,_demoOld:true});
   return p};
 const swatches=(attr,cur,none)=>`<div class="sw">${none?`<button class="swb none ${!cur?"on":""}" data-act="${attr}" data-id="" title="Без фона"></button>`:""}${SW.map(c=>`<button class="swb ${String(cur).toLowerCase()===c?"on":""}" style="background:${c}" data-act="${attr}" data-id="${c}" title="${c}"></button>`).join("")}<input type="color" value="${cur||"#000000"}" data-tbcolor="${attr}" aria-label="Свой цвет"></div>`;
+const sizeChips=(list,t)=>list.map(([w,h])=>`<button class="btn sm ${num(t.w)===w&&num(t.h)===h?"pri":""}" data-act="tagSize" data-id="${w}x${h}">${sizeTxt(w)}×${sizeTxt(h)}</button>`).join("");
+const mySizes=()=>{const all=[...SIZES.tags,...SIZES.labels].map(s=>s.join("x")),out=[];
+  for(const x of (App.settings().tagTemplates||[])){const k=num(x.w)+"x"+num(x.h);if(num(x.w)&&num(x.h)&&!all.includes(k)&&!out.some(o=>o.join("x")===k))out.push([num(x.w),num(x.h)])}return out};
+function sizeWarn(t){const w=num(t.w),h=num(t.h);
+  if(w<LIM.min||h<LIM.min)return `Минимум ${LIM.min} мм по каждой стороне`;
+  if(w>LIM.max||h>LIM.max)return `Максимум ${LIM.max} мм по каждой стороне`;
+  if(t.media==="sheet"){if(w>SHEET.w||h>SHEET.h)return `Не помещается на лист A4 (до ${SHEET.w}×${SHEET.h} мм). Уменьшите размер или выберите печать на термопринтере`;
+    const g=t.gap==null?1:num(t.gap),n=Math.max(1,Math.floor((SHEET.w+g)/(w+g)))*Math.max(1,Math.floor((SHEET.h+g)/(h+g)));return `<span class="ok">На листе A4: ${n} шт.</span>`}
+  return `<span class="ok">В настройках термопринтера задайте этикетку ${sizeTxt(w)}×${sizeTxt(h)} мм</span>`}
 function tagtpl(){
   const t=tagDraft(),f=t.fields||{},st=App.settings();
   const inp=(k,lab,type="text",extra="",cls="")=>App.fld("tc_"+k,lab,`<input id="tc_${k}" type="${type}" value="${esc(t[k]==null?"":t[k])}" data-tcfg="${k}" ${extra}>`,cls);
@@ -98,8 +109,16 @@ function tagtpl(){
       ${App.fld("tcBase","Взять за основу",`<select id="tcBase">${App.tagTemplates().map(x=>`<option value="${esc(x.id)}"${x.id===t.id?" selected":""}>${esc(x.name)}</option>`).join("")}</select>`,"full")}
       ${inp("name","Название шаблона","text","","full")}
       ${opt("media","Как печатаем",[["sheet","Лист A4 — раскладка, вырезать"],["label","Термопринтер этикеток — по одной"]],"full")}
-      ${inp("w","Ширина, мм","number",'min="25" max="200" data-redraw')}${inp("h","Высота, мм","number",'min="15" max="150" data-redraw')}
-      <div class="fld full"><label>Готовые размеры</label><div class="chips">${SIZES.map(([w,h])=>`<button class="btn sm ${num(t.w)===w&&num(t.h)===h?"pri":""}" data-act="tagSize" data-id="${w}x${h}">${w}×${h}</button>`).join("")}</div></div>
+      <div class="fld full"><label>Размер, мм</label>
+        <div class="sizebox"><input id="tc_w" type="number" step="0.5" min="${LIM.min}" max="${LIM.max}" value="${num(t.w)}" data-tcfg="w" aria-label="Ширина, мм">
+          <button class="btn sm ghost" data-act="tagSwap" title="Повернуть: поменять ширину и высоту" aria-label="Поменять ширину и высоту">⇄</button>
+          <input id="tc_h" type="number" step="0.5" min="${LIM.min}" max="${LIM.max}" value="${num(t.h)}" data-tcfg="h" aria-label="Высота, мм">
+          <span class="muted">ширина × высота, от ${LIM.min} до ${LIM.max} мм, можно с половиной</span></div>
+        <p class="sizewarn" id="tcSizeWarn">${sizeWarn(t)}</p></div>
+      <div class="fld full"><label>Ценники</label><div class="chips">${sizeChips(SIZES.tags,t)}</div></div>
+      <div class="fld full"><label>Этикетки термопринтера</label><div class="chips">${sizeChips(SIZES.labels,t)}</div></div>
+      ${mySizes().length?`<div class="fld full"><label>Мои размеры</label><div class="chips">${sizeChips(mySizes(),t)}</div></div>`:""}
+      ${t.media==="sheet"?inp("gap","Промежуток между ценниками на листе, мм","number",'min="0" max="10" step="0.5"'):""}
       ${opt("font","Шрифт",App.TAG_FONTS.map(([k,l])=>[k,l]))}
       <div class="fld"><label>Фон ценника</label>${swatches("tagBg",t.bg)}</div>
       <div class="fld full"><label>Оформление</label><div class="chips">${ck("border","Рамка",t.border,'data-tcfg="border"')}${ck("round","Скруглённые углы",t.round,'data-tcfg="round"')}</div></div>
@@ -218,12 +237,15 @@ document.addEventListener("change",e=>{const t=e.target;if(t.id!=="tcLogo"||!t.f
   rd.readAsDataURL(file)});
 document.addEventListener("change",e=>{const t=e.target;if(t.id==="tagTplSel"){LS("icase_tagtpl",t.value);App.ui.tagEdit=null}
   if(t.id==="tcBase"){App.ui.tagEdit=App.tagNorm(App.tagTemplate(t.value));App.ui.tagSel=null;App.render()}});
+ACT.tagSwap=()=>{const t=tagDraft(),w=num(t.w),h=num(t.h);ACT.tagSize(h+"x"+w)};
 ACT.tagSize=v=>{const [w,h]=v.split("x").map(Number);const t=tagDraft(),rx=w/(num(t.w)||w),ry=h/(num(t.h)||h),rf=Math.min(rx,ry);
   for(const b of Object.values(t.blocks||{})){b.x=+(b.x*rx).toFixed(2);b.w=+(b.w*rx).toFixed(2);b.y=+(b.y*ry).toFixed(2);b.h=+(b.h*ry).toFixed(2);b.fs=+(b.fs*rf).toFixed(2)}
-  t.w=w;t.h=h;App.render()};
+  t.w=w;t.h=h;t._w=w;t._h=h;relayoutIfUntouched(t);App.render()};
+// пока блоки не двигали руками — под новый размер раскладываем заново, иначе масштабируем то, что есть
+function relayoutIfUntouched(t){if(!Object.values(t.blocks||{}).some(b=>b.m))t.blocks=App.tagAutoBlocks(t)}
 async function saveTagTemplates(list){await App.api.update("settings",1,{tag_templates:list});await App.reload(["settings"])}
 const custom=()=>(App.settings().tagTemplates||[]).slice();
-const clean=t=>{const c=JSON.parse(JSON.stringify(t));delete c.builtin;c.w=Math.max(15,num(c.w));c.h=Math.max(15,num(c.h));return c};
+const clean=t=>{const c=JSON.parse(JSON.stringify(t));delete c.builtin;delete c._w;delete c._h;c.w=Math.min(LIM.max,Math.max(LIM.min,num(c.w)));c.h=Math.min(LIM.max,Math.max(LIM.min,num(c.h)));return c};
 ACT.tagTplSaveNew=(_,btn)=>run(btn,async()=>{const t=clean(tagDraft());t.id="t"+Date.now().toString(36);
   if(!t.name||App.TAG_PRESETS.some(p=>p.name===t.name))t.name=(t.name||"Шаблон")+" (свой)";
   await saveTagTemplates([...custom(),t]);App.ui.tagEdit=App.tagNorm(t);App.ui.tagTpl=t.id;LS("icase_tagtpl",t.id);App.render();App.toast("Шаблон сохранён")});
@@ -270,9 +292,10 @@ document.addEventListener("input",e=>{const t=e.target;
   if(t.dataset.tagcopy!=null){const q=App.ui.tagQueue[+t.dataset.tagcopy];if(q){q.copies=Math.max(0,Math.min(200,num(t.value)));saveQueue();
     const total=printList().reduce((a,x)=>a+num(x.copies),0);document.querySelectorAll('[data-act="tagPrint"]').forEach(b=>{b.textContent="🖨 Печать"+(total?" · "+total+" шт.":"");b.disabled=!total})}return}
   if(t.dataset.tcfg){const d=tagDraft(),k=t.dataset.tcfg,v=t.type==="checkbox"?t.checked:(t.type==="number"?num(t.value):t.value);
-    if((k==="w"||k==="h")&&num(v)>=15){const old=num(d[k])||num(v),r=num(v)/old;
-      for(const b of Object.values(d.blocks||{})){if(k==="w"){b.x=+(b.x*r).toFixed(2);b.w=+(b.w*r).toFixed(2)}else{b.y=+(b.y*r).toFixed(2);b.h=+(b.h*r).toFixed(2)}if(r<1)b.fs=+(b.fs*r).toFixed(2)}}
-    d[k]=v;if(k!=="w"&&k!=="h"||num(v)>=15)previewSoon();return}
+    const okSize=x=>num(x)>=LIM.min&&num(x)<=LIM.max;
+    if((k==="w"||k==="h")&&okSize(v)){const last=okSize(d["_"+k])?num(d["_"+k]):okSize(d[k])?num(d[k]):num(v),r=num(v)/last;d["_"+k]=num(v);
+      for(const b of Object.values(d.blocks||{})){if(k==="w"){b.x=+(b.x*r).toFixed(2);b.w=+(b.w*r).toFixed(2)}else{b.y=+(b.y*r).toFixed(2);b.h=+(b.h*r).toFixed(2)}if(r<1)b.fs=+(b.fs*r).toFixed(2)}d[k]=v;relayoutIfUntouched(d)}
+    d[k]=v;if(k==="w"||k==="h"||k==="gap"){const wn=$("#tcSizeWarn");if(wn)wn.innerHTML=sizeWarn(d);if(!okSize(d.w)||!okSize(d.h))return}previewSoon();return}
   if(t.dataset.tfield){const d=tagDraft(),k=t.dataset.tfield;d.fields=Object.assign({},d.fields,{[k]:t.checked});
     // блоки, которые пользователь не двигал, раскладываем заново под новый набор полей
     const auto=App.tagAutoBlocks(d);for(const [bk,b] of Object.entries(auto))if(!d.blocks[bk]||!d.blocks[bk].m)d.blocks[bk]=b;
@@ -286,7 +309,7 @@ document.addEventListener("input",e=>{const t=e.target;
 document.addEventListener("change",e=>{const t=e.target;if(t.dataset&&t.dataset.tbcolor){if(t.dataset.tbcolor==="tagBg")App.render();else drawEd();return}
   if(t.dataset&&t.dataset.tbn){drawEd();return}
   if(t.type==="checkbox"&&(t.dataset.tcfg||t.dataset.tfield||t.dataset.dcfg))t.dispatchEvent(new Event("input",{bubbles:true}));
-  if(t.tagName==="SELECT"&&t.dataset.tcfg)t.dispatchEvent(new Event("input",{bubbles:true}))});
+  if(t.tagName==="SELECT"&&t.dataset.tcfg){t.dispatchEvent(new Event("input",{bubbles:true}));if(t.dataset.tcfg==="media")App.render()}});
 let pv=0;const previewSoon=()=>{clearTimeout(pv);pv=setTimeout(updatePreview,150)};
 function setFrame(id,html){const f=document.getElementById(id);if(f&&f.dataset.html!==html){f.srcdoc=html;f.dataset.html=html}}
 function updatePreview(){
