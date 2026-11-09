@@ -105,27 +105,32 @@ function tagtpl(){
   const site=String(st.siteUrl||"").replace(/\/+$/,"");
   return `<div class="pgrid tedit">
   <section class="card"><div class="card-h"><h2>Шаблон</h2></div>
-    <div class="form">
+    <div class="tsec"><div class="form">
       ${App.fld("tcBase","Взять за основу",`<select id="tcBase">${App.tagTemplates().map(x=>`<option value="${esc(x.id)}"${x.id===t.id?" selected":""}>${esc(x.name)}</option>`).join("")}</select>`,"full")}
       ${inp("name","Название шаблона","text","","full")}
       ${opt("media","Как печатаем",[["sheet","Лист A4 — раскладка, вырезать"],["label","Термопринтер этикеток — по одной"]],"full")}
-      <div class="fld full"><label>Размер, мм</label>
-        <div class="sizebox"><input id="tc_w" type="number" step="0.5" min="${LIM.min}" max="${LIM.max}" value="${num(t.w)}" data-tcfg="w" aria-label="Ширина, мм">
-          <button class="btn sm ghost" data-act="tagSwap" title="Повернуть: поменять ширину и высоту" aria-label="Поменять ширину и высоту">⇄</button>
-          <input id="tc_h" type="number" step="0.5" min="${LIM.min}" max="${LIM.max}" value="${num(t.h)}" data-tcfg="h" aria-label="Высота, мм">
-          <span class="muted">ширина × высота, от ${LIM.min} до ${LIM.max} мм, можно с половиной</span></div>
-        <p class="sizewarn" id="tcSizeWarn">${sizeWarn(t)}</p></div>
-      <div class="fld full"><label>Ценники</label><div class="chips">${sizeChips(SIZES.tags,t)}</div></div>
-      <div class="fld full"><label>Этикетки термопринтера</label><div class="chips">${sizeChips(SIZES.labels,t)}</div></div>
-      ${mySizes().length?`<div class="fld full"><label>Мои размеры</label><div class="chips">${sizeChips(mySizes(),t)}</div></div>`:""}
-      ${t.media==="sheet"?inp("gap","Промежуток между ценниками на листе, мм","number",'min="0" max="10" step="0.5"'):""}
-      ${opt("font","Шрифт",App.TAG_FONTS.map(([k,l])=>[k,l]))}
-      <div class="fld"><label>Фон ценника</label>${swatches("tagBg",t.bg)}</div>
-      <div class="fld full"><label>Оформление</label><div class="chips">${ck("border","Рамка",t.border,'data-tcfg="border"')}${ck("round","Скруглённые углы",t.round,'data-tcfg="round"')}</div></div>
-    </div>
-    <h3 class="sub">Что показывать</h3>
+    </div></div>
+    <div class="tsec"><h3 class="sub">Размер</h3>
+      <div class="sizebox"><label class="szf"><span>Ширина</span><input id="tc_w" type="number" step="0.5" min="${LIM.min}" max="${LIM.max}" value="${num(t.w)}" data-tcfg="w"></label>
+        <button class="btn sm ghost szswap" data-act="tagSwap" title="Повернуть: поменять ширину и высоту" aria-label="Поменять ширину и высоту">⇄</button>
+        <label class="szf"><span>Высота</span><input id="tc_h" type="number" step="0.5" min="${LIM.min}" max="${LIM.max}" value="${num(t.h)}" data-tcfg="h"></label>
+        <span class="szmm">мм</span>
+        ${t.media==="sheet"?`<label class="szf szgap"><span>Промежуток</span><input id="tc_gap" type="number" min="0" max="10" step="0.5" value="${t.gap==null?1:num(t.gap)}" data-tcfg="gap"></label><span class="szmm">мм</span>`:""}</div>
+      <p class="szhint">От ${LIM.min} до ${LIM.max} мм, можно с половиной миллиметра.</p>
+      <p class="sizewarn" id="tcSizeWarn">${sizeWarn(t)}</p>
+      <div class="szgroups">
+        <div><span class="szlab">Ценники</span><div class="chips">${sizeChips(SIZES.tags,t)}</div></div>
+        <div><span class="szlab">Этикетки термопринтера</span><div class="chips">${sizeChips(SIZES.labels,t)}</div></div>
+        ${mySizes().length?`<div><span class="szlab">Мои размеры</span><div class="chips">${sizeChips(mySizes(),t)}</div></div>`:""}
+      </div></div>
+    <div class="tsec"><h3 class="sub">Оформление</h3><div class="form">
+      ${opt("font","Шрифт",App.TAG_FONTS.map(([k,l])=>[k,l]),"full")}
+      <div class="fld full"><label>Рамка</label><div class="chips">${ck("border","Рамка",t.border,'data-tcfg="border"')}${ck("round","Скруглённые углы",t.round,'data-tcfg="round"')}</div></div>
+      <div class="fld full"><label>Фон ценника</label>${swatches("tagBg",t.bg)}</div>
+    </div></div>
+    <div class="tsec"><h3 class="sub">Что показывать</h3>
     <div class="chips">${App.TAG_FIELDS.map(([k,l])=>ck(k,l,f[k],`data-tfield="${k}"`)).join("")}</div>
-    <div class="form">
+    <div class="form tsec-extra${f.note||f.credit||f.qr||f.logo||f.oldprice||f.discount?"":" none"}">
       ${f.note?inp("note","Своя надпись","text",'placeholder="Например: Trade-in, рассрочка, скидка"',"full"):""}
       ${f.credit?inp("creditMonths","Рассрочка, месяцев","number",'min="1" max="60"')+inp("creditRate","Переплата, %","number",'min="0" max="100" step="0.5"'):""}
       ${f.qr?App.fld("tc_qrUrl","Ссылка в QR",`<input id="tc_qrUrl" type="text" value="${esc(t.qrUrl||"")}" data-tcfg="qrUrl" placeholder="${esc(site?site+"/product/{slug}":"https://ваш-сайт/product/{slug}")}">`,"full")
@@ -134,6 +139,7 @@ function tagtpl(){
         <label class="btn sm">Загрузить<input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" id="tcLogo" hidden></label>${t.logo?`<button class="btn sm" data-act="tagLogoDel">Убрать</button>`:""}</div>
         ${ck("logoBw","Печатать логотип чёрно-белым",t.logoBw,'data-tcfg="logoBw"')}</div>`:""}
       ${f.oldprice||f.discount?`<p class="muted full">Старая цена берётся из карточки товара (поле «Старая цена»). Если её нет или она не выше текущей, блоки «Старая цена» и «Скидка» не печатаются.</p>`:""}
+    </div>
     </div>
     <div class="acts">${t.builtin?"":`<button class="btn danger" data-act="tagTplDel">Удалить</button>`}
       ${t.builtin?"":`<button class="btn" data-act="tagTplSave">Сохранить</button>`}<button class="btn ${t.builtin?"pri":""}" data-act="tagTplSaveNew">Сохранить как новый</button>
