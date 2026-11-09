@@ -547,3 +547,18 @@ label.chip{cursor:pointer}
 .logobox{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .logobox img{max-height:44px;max-width:160px;object-fit:contain;border:1px solid var(--line);border-radius:8px;padding:4px;background:#fff}
 @media (max-width:1000px){.tedit .tcard{order:-1;display:flex;flex-direction:column}.tedit .tcard .tcwrap{order:1}.tedit .tcard #tbPanel{order:2;margin-top:10px}.tedit .tcard>p{order:3}}
+/* печать ценников: кнопка */
+.printbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;flex-wrap:wrap}
+.printbar .muted{font-size:.85rem}
+.printbar .btn{min-height:44px;padding:0 22px;font-size:1rem}
+.printbar .btn:disabled{opacity:.45;cursor:not-allowed}
+.printfab{display:none}
+@media (max-width:1000px){
+  .printfab{display:block;position:sticky;bottom:12px;z-index:20;margin-top:12px}
+  .printfab .btn{width:100%;min-height:50px;font-size:1.02rem;box-shadow:0 6px 20px rgba(22,23,15,.25)}
+  .printbar .btn{display:none}
+}
+.unitmode{display:block;margin-top:6px;font-size:.8rem;cursor:pointer;color:var(--ink);line-height:1.35}
+.unitmode input{display:inline-block;width:15px!important;height:15px;min-height:0;margin:0 6px 0 0;padding:0;vertical-align:-2px;accent-color:var(--olive)}
+.unitmode small{display:block;color:var(--muted);font-size:.74rem;padding-left:21px}
+@media (max-width:600px){.tagtbl th:nth-child(2),.tagtbl td:nth-child(2){display:none}.tagtbl td,.tagtbl th{padding-left:6px;padding-right:6px}.tagtbl input[data-tagcopy]{width:56px!important}}

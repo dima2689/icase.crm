@@ -49,6 +49,7 @@ function found(){
   const q=App.ui.tagQ.trim().toLowerCase();if(!q)return [];const w=q.split(/\s+/);
   return S.products.filter(p=>!p.archived&&w.every(x=>[p.name,p.sku,p.barcode,p.serial,p.model,App.catName(p)].join(" ").toLowerCase().includes(x)));
 }
+const plural=n=>{const a=n%10,b=n%100;return a===1&&b!==11?"ценник":a>=2&&a<=4&&(b<12||b>14)?"ценника":"ценников"};
 function tags(){
   const items=queueItems(),total=printList().reduce((a,x)=>a+num(x.copies),0),res=found();
   return `<div class="pgrid">
@@ -57,8 +58,8 @@ function tags(){
     ${res.length?`<div class="list-mini" style="margin-top:8px">${res.slice(0,8).map(p=>`<button data-act="tagAdd" data-id="${esc(p.id)}"><span>${esc(p.name)}<small>${esc(App.catName(p))} · остаток ${App.qtyTotal(p)}</small></span><b>${money(p.price)}</b></button>`).join("")}</div>
       ${res.length>1?`<div class="acts" style="justify-content:flex-start;margin-top:6px"><button class="btn sm" data-act="tagAddFound">Добавить все найденные (${res.length})</button></div>`:""}`:App.ui.tagQ?'<p class="muted">Ничего не найдено</p>':""}
     <p class="muted" style="margin:10px 0 0">Можно отметить товары галочками в разделе «Товары» и нажать «Ценники».</p>
-    ${items.length?`<div class="tbl-wrap" style="margin-top:10px"><table><thead><tr><th>Товар</th><th class="n">Цена</th><th class="n">Остаток</th><th class="n">Копий</th><th></th></tr></thead><tbody>
-      ${items.map(({q,p},i)=>`<tr><td><b>${esc(p.name)}</b><span class="sub">${esc([p.memory,p.color,p.condition].filter(Boolean).join(" · "))}</span>${p.trackSerial?`<label class="chk" style="margin-top:4px"><input type="checkbox" data-act="tagUnitMode" data-id="${i}" ${q.perUnit!==false?"checked":""}> по экземплярам: ${unitsForTags(p).length} шт. (свои IMEI, АКБ, цена)</label>`:""}</td><td class="n">${money(p.price)}</td><td class="n">${qtyHere(p)}</td>
+    ${items.length?`<div class="tbl-wrap" style="margin-top:10px"><table class="tagtbl"><thead><tr><th>Товар</th><th class="n">Цена</th><th class="n">Остаток</th><th class="n">Копий</th><th></th></tr></thead><tbody>
+      ${items.map(({q,p},i)=>`<tr><td><b>${esc(p.name)}</b><span class="sub">${esc([p.memory,p.color,p.condition].filter(Boolean).join(" · "))}</span>${p.trackSerial?`<label class="unitmode"><input type="checkbox" data-act="tagUnitMode" data-id="${i}" ${q.perUnit!==false?"checked":""}> по экземплярам: ${unitsForTags(p).length} шт.<small>свои IMEI, АКБ и цена</small></label>`:""}</td><td class="n">${money(p.price)}</td><td class="n">${qtyHere(p)}</td>
         <td class="n"><input type="number" min="0" max="200" value="${num(q.copies)}" data-tagcopy="${i}" aria-label="Копий" style="width:70px"></td><td class="n"><button class="btn sm ghost" data-act="tagDel" data-id="${i}" aria-label="Убрать">✕</button></td></tr>`).join("")}
       </tbody></table></div>
       <div class="acts" style="justify-content:flex-start"><button class="btn sm" data-act="tagByStock">Копий по остатку на точке</button><button class="btn sm" data-act="tagOnes">По одному</button><button class="btn sm danger" data-act="tagClear">Очистить</button></div>`
@@ -67,8 +68,10 @@ function tags(){
   <section class="card"><div class="card-h"><h2>Шаблон</h2>${canTpl()?'<button class="btn sm" data-act="printTab" data-id="tagtpl">Настроить</button>':""}</div>
     ${App.sel("tagTplSel",App.tagTemplates().map(t=>[t.id,t.name+(t.builtin?"":" · свой")]),App.ui.tagTpl,'data-filter-sel="tagTpl" aria-label="Шаблон ценника"')}
     <div class="prevbox"><iframe id="tagPrev" title="Предпросмотр ценников"></iframe></div>
-    <div class="acts"><button class="btn pri" data-act="tagPrint" id="tagPrintBtn">Печать${total?" · "+total+" шт.":""}</button></div>
-  </section></div>`;
+    <div class="printbar"><span class="muted">${total?`${total} ${plural(total)} · ${esc(App.tagTemplate(App.ui.tagTpl).name)}`:"Добавьте товары слева"}</span>
+      <button class="btn pri" data-act="tagPrint" id="tagPrintBtn" ${total?"":"disabled"}>🖨 Печать${total?" · "+total+" шт.":""}</button></div>
+  </section></div>
+  ${total?`<div class="printfab"><button class="btn pri" data-act="tagPrint">🖨 Печать · ${total} шт.</button></div>`:""}`;
 }
 
 /* ---------- конструктор ценников: холст с блоками ---------- */
@@ -265,7 +268,7 @@ ACT.docSave=(_,btn)=>run(btn,async()=>{const d=Object.assign({},docDraft());cons
 /* ---------- живые изменения без перерисовки ---------- */
 document.addEventListener("input",e=>{const t=e.target;
   if(t.dataset.tagcopy!=null){const q=App.ui.tagQueue[+t.dataset.tagcopy];if(q){q.copies=Math.max(0,Math.min(200,num(t.value)));saveQueue();
-    const total=printList().reduce((a,x)=>a+num(x.copies),0);const b=$("#tagPrintBtn");if(b)b.textContent="Печать"+(total?" · "+total+" шт.":"")}return}
+    const total=printList().reduce((a,x)=>a+num(x.copies),0);document.querySelectorAll('[data-act="tagPrint"]').forEach(b=>{b.textContent="🖨 Печать"+(total?" · "+total+" шт.":"");b.disabled=!total})}return}
   if(t.dataset.tcfg){const d=tagDraft(),k=t.dataset.tcfg,v=t.type==="checkbox"?t.checked:(t.type==="number"?num(t.value):t.value);
     if((k==="w"||k==="h")&&num(v)>=15){const old=num(d[k])||num(v),r=num(v)/old;
       for(const b of Object.values(d.blocks||{})){if(k==="w"){b.x=+(b.x*r).toFixed(2);b.w=+(b.w*r).toFixed(2)}else{b.y=+(b.y*r).toFixed(2);b.h=+(b.h*r).toFixed(2)}if(r<1)b.fs=+(b.fs*r).toFixed(2)}}
