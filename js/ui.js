@@ -28,7 +28,7 @@ function drawNav(){
   const items=App.NAV.filter(n=>App.VIEWS[n[0]]&&(!n[3]||App.can(n[3])));
   $("#navlist").innerHTML=items.map(([v,l,ic])=>`<a class="nav ${App.ui.view===v?"on":""}" href="#${v}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">${ic}</svg><span>${l}</span>${counts[v]?`<span class="cnt">${counts[v]}</span>`:""}</a>`).join("");
   const sh=App.openShift(),pts=App.myPoints(),cur=App.point();
-  $("#who").innerHTML=`<b>${esc(App.me.name)}</b><span>${esc(App.ROLES[App.me.role]||"")}</span>
+  $("#who").innerHTML=`<button type="button" class="whobtn" data-act="profile" title="Мой профиль"><b>${esc(App.me.name)}</b><span>${esc(App.ROLES[App.me.role]||"")} · профиль</span></button>
     ${pts.length>1?`<select id="pointSel" aria-label="Точка">${pts.map(p=>`<option value="${esc(p.id)}"${cur&&cur.id===p.id?" selected":""}>${esc(p.name)}</option>`).join("")}</select>`:`<span>${esc(cur?cur.name:"Точка не выбрана")}</span>`}
     <span class="pill ${sh?"ok":"mute"}">${sh?"Смена "+esc(sh.num)+" открыта":"Смена закрыта"}</span>
     <button class="btn sm ghost" data-act="logout">Выйти</button>`;
@@ -139,30 +139,43 @@ App.productPicker = function(inputId,boxId,{wh=null,inStock=false,onPick,showCos
 
 /* ---------- вход ---------- */
 App.showApp=()=>{$("#login").hidden=true;$(".app").hidden=false};
-App.showLogin=function(mode){
-  $(".app").hidden=true;const L=$("#login");L.hidden=false;
-  const reg=mode==="register",np=mode==="newpass";
+App.showLogin=function(mode,opt){
+  opt=opt||{};$(".app").hidden=true;const L=$("#login");L.hidden=false;
+  const reg=mode==="register",np=mode==="newpass",fg=mode==="forgot";
+  const eye='<button type="button" class="btn ghost sm pwtoggle" data-pw aria-label="Показать пароль">👁</button>';
+  const pw=(id,label,ac)=>`<div class="fld"><label for="${id}">${label}</label><div class="pwbox">${App.inp(id,"","password","",`autocomplete="${ac}" ${ac==="new-password"?'minlength="8"':""} required`)}${eye}</div></div>`;
   L.innerHTML=`<form class="login-card" id="loginForm"><div class="brand"><b>iCase</b><span>CRM</span></div>
-    <h1>${np?"Новый пароль":reg?"Регистрация сотрудника":"Вход"}</h1>
+    <h1>${np?(opt.forced?"Смените временный пароль":"Новый пароль"):fg?"Восстановление доступа":reg?"Регистрация сотрудника":"Вход"}</h1>
+    ${np?`<p class="muted">${opt.forced?"Владелец задал вам временный пароль. Придумайте свой — не короче 8 символов.":"Придумайте новый пароль — не короче 8 символов."}</p>`:""}
+    ${fg?'<p class="muted">Введите email, с которым входите в CRM. Пришлём ссылку — по ней вы зададите новый пароль.</p>':""}
     ${reg?App.fld("lgName","Имя и фамилия",App.inp("lgName","","text","",'autocomplete="name" required')):""}
-    ${np?"":App.fld("lgEmail","Email",App.inp("lgEmail","","email","",'autocomplete="username" required'))}
-    ${App.fld("lgPass",np?"Новый пароль":"Пароль",App.inp("lgPass","","password","",(reg||np?'autocomplete="new-password" minlength="8"':'autocomplete="current-password"')+" required"))}
-    <div class="hint bad" id="lgErr"></div>
-    <button class="btn pri big" type="submit">${np?"Сохранить пароль":reg?"Зарегистрироваться":"Войти"}</button>
-    ${np?"":`<div class="acts" style="justify-content:space-between"><button class="btn ghost sm" type="button" id="lgSwitch">${reg?"У меня есть аккаунт":"Я новый сотрудник"}</button>${reg?"":`<button class="btn ghost sm" type="button" id="lgReset">Забыли пароль?</button>`}</div>`}
+    ${np?"":App.fld("lgEmail","Email",App.inp("lgEmail",opt.email||"","email","",'autocomplete="username" required'))}
+    ${fg?"":pw("lgPass",np?"Новый пароль":"Пароль",reg||np?"new-password":"current-password")}
+    ${np||reg?pw("lgPass2","Повторите пароль","new-password"):""}
+    <div class="hint bad" id="lgErr" role="alert"></div>
+    <button class="btn pri big" type="submit">${np?"Сохранить пароль":fg?"Прислать ссылку":reg?"Зарегистрироваться":"Войти"}</button>
+    ${np?(opt.forced?'<div class="acts"><button class="btn ghost sm" type="button" id="lgOut">Выйти</button></div>':""):`<div class="acts" style="justify-content:space-between">
+      ${fg?'<button class="btn ghost sm" type="button" id="lgBack">← Ко входу</button>':`<button class="btn ghost sm" type="button" id="lgSwitch">${reg?"У меня есть аккаунт":"Я новый сотрудник"}</button>${reg?"":'<button class="btn ghost sm" type="button" id="lgForgot">Забыли пароль?</button>'}`}</div>`}
+    ${fg?'<p class="muted small" style="margin-top:10px">Письмо не пришло за 5 минут? Проверьте «Спам» или попросите владельца: в «Настройки → Сотрудники» он может прислать вам ссылку для входа в мессенджер или задать временный пароль.</p>':""}
   </form>`;
   const e=$("#lgErr");
-  $("#loginForm").onsubmit=async ev=>{ev.preventDefault();e.textContent="";const b=ev.target.querySelector("button[type=submit]");b.disabled=true;
+  L.querySelectorAll("[data-pw]").forEach(btn=>btn.onclick=()=>{const i=btn.parentElement.querySelector("input");i.type=i.type==="password"?"text":"password"});
+  $("#loginForm").onsubmit=async ev=>{ev.preventDefault();e.className="hint bad";e.textContent="";const b=ev.target.querySelector("button[type=submit]");b.disabled=true;
     try{
-      if(np){const {error}=await App.sb.auth.updateUser({password:App.val("lgPass")});if(error)throw error;location.hash="";location.reload();return}
+      if((np||reg)&&App.val("lgPass")!==App.val("lgPass2"))throw new Error("Пароли не совпадают");
+      if((np||reg)&&App.val("lgPass").length<8)throw new Error("Пароль — минимум 8 символов");
+      if(np){await App.auth.setPassword(App.val("lgPass"));history.replaceState(null,"",location.pathname);location.reload();return}
+      if(fg){const em=App.val("lgEmail");await App.auth.reset(em);ev.target.innerHTML='<div class="brand"><b>iCase</b><span>CRM</span></div><h1>Проверьте почту</h1><p>Если '+App.esc(em)+' зарегистрирован в CRM, на него пришла ссылка для смены пароля. Откройте её на этом устройстве.</p><p class="muted small">Нет письма? Проверьте «Спам» или попросите владельца прислать ссылку для входа.</p><div class="acts"><button class="btn" type="button" onclick="App.showLogin()">Ко входу</button></div>';return}
       if(reg){const d=await App.auth.signUp(App.val("lgEmail"),App.val("lgPass"),App.val("lgName"));
-        if(!d.session){L.querySelector("form").innerHTML='<div class="brand"><b>iCase</b><span>CRM</span></div><h1>Почти готово</h1><p>Мы отправили письмо на '+App.esc(App.val("lgEmail")||"ваш email")+'. Откройте ссылку из письма, затем войдите.</p><button class="btn pri" type="button" onclick="location.reload()">Ко входу</button>';return}
+        if(!d.session){L.querySelector("form").innerHTML='<div class="brand"><b>iCase</b><span>CRM</span></div><h1>Почти готово</h1><p>Мы отправили письмо на '+App.esc(App.val("lgEmail")||"ваш email")+'. Откройте ссылку из письма, затем войдите — владелец увидит вашу заявку.</p><div class="acts"><button class="btn" type="button" onclick="App.showLogin()">Ко входу</button></div>';return}
         await App.enter(d.session.user);return}
       await App.auth.signIn(App.val("lgEmail"),App.val("lgPass"));const {data}=await App.sb.auth.getSession();await App.enter(data.session.user);
     }catch(x){e.textContent=x.message||String(x);b.disabled=false}};
   const sw=$("#lgSwitch");if(sw)sw.onclick=()=>App.showLogin(reg?"":"register");
-  const rs=$("#lgReset");if(rs)rs.onclick=async()=>{const em=App.val("lgEmail");if(!em){e.textContent="Введите email, на него придёт ссылка";return}
-    try{await App.auth.reset(em);e.className="hint ok";e.textContent="Ссылка для смены пароля отправлена на "+em}catch(x){e.textContent=x.message}};
+  const fgb=$("#lgForgot");if(fgb)fgb.onclick=()=>App.showLogin("forgot",{email:App.val("lgEmail")});
+  const bk=$("#lgBack");if(bk)bk.onclick=()=>App.showLogin("",{email:App.val("lgEmail")});
+  const out=$("#lgOut");if(out)out.onclick=()=>App.auth.signOut();
+  const f=L.querySelector("input");if(f)setTimeout(()=>f.focus(),0);
 };
 App.showPending=function(noOwner,disabled){
   $(".app").hidden=true;const L=$("#login");L.hidden=false;
@@ -178,6 +191,29 @@ App.showPending=function(noOwner,disabled){
   const rb=$("#reqBtn");if(rb){const send=async()=>{try{await App.requestAccess(App.val("reqName")||App.me.email);$("#reqHint").className="hint ok";$("#reqHint").textContent="Заявка отправлена владельцу"}catch(x){$("#reqHint").className="hint bad";$("#reqHint").textContent=x.message}};rb.onclick=send;if(!disabled)send()}
 };
 App.ACT.logout=()=>App.auth.signOut();
+/* ---------- мой профиль ---------- */
+App.ACT.profile=()=>{
+  App.openModal(App.head("Мой профиль",`<span class="pill info">${esc(App.ROLES[App.me.role]||"")}</span>`)+`
+    <div class="form">${App.fld("prName","Имя",App.inp("prName",App.me.name))}${App.fld("prPhone","Телефон",App.inp("prPhone",App.me.phone||"","tel","+7"))}</div>
+    <div class="acts"><button class="btn pri" data-act="profSave">Сохранить</button></div>
+    <h3 class="sub-h">Пароль</h3>
+    <div class="form">${App.fld("prOld","Текущий пароль",App.inp("prOld","","password","",'autocomplete="current-password"'))}${App.fld("prNew","Новый пароль (от 8 символов)",App.inp("prNew","","password","",'autocomplete="new-password"'))}${App.fld("prNew2","Повторите новый",App.inp("prNew2","","password","",'autocomplete="new-password"'))}</div>
+    <div class="acts"><button class="btn" data-act="profPass">Сменить пароль</button></div>
+    <h3 class="sub-h">Email для входа</h3>
+    <div class="form">${App.fld("prEmail","Email",App.inp("prEmail",App.me.email,"email"),"full")}</div>
+    <p class="muted small">После смены придут письма на старый и новый адрес — подтвердите по ссылке.</p>
+    <div class="acts"><button class="btn" data-act="profEmail">Сменить email</button></div>
+    <h3 class="sub-h">Безопасность</h3>
+    <p class="muted small">Если вы входили с чужого устройства или потеряли телефон — завершите все сеансы. Войти заново нужно будет везде.</p>
+    <div class="acts"><button class="btn danger" data-act="profOutAll">Выйти на всех устройствах</button><button class="btn" data-act="logout">Выйти</button></div>`);
+};
+const prun=async(btn,fn)=>{if(btn&&btn.disabled)return;if(btn)btn.disabled=true;try{await fn()}catch(e){App.toast(e.message)}finally{if(btn&&document.body.contains(btn))btn.disabled=false}};
+App.ACT.profSave=(_,btn)=>prun(btn,async()=>{await App.api.rpc("staff_me_update",{p_name:App.val("prName"),p_phone:App.val("prPhone")},["staff"]);App.me.name=App.val("prName")||App.me.name;App.me.phone=App.val("prPhone");App.toast("Сохранено");App.render()});
+App.ACT.profPass=(_,btn)=>prun(btn,async()=>{const a=App.val("prNew");if(a.length<8)throw new Error("Новый пароль — минимум 8 символов");if(a!==App.val("prNew2"))throw new Error("Пароли не совпадают");
+  await App.auth.checkPassword(App.val("prOld"));await App.auth.setPassword(a);["prOld","prNew","prNew2"].forEach(i=>{const el=document.getElementById(i);if(el)el.value=""});App.toast("Пароль изменён")});
+App.ACT.profEmail=(_,btn)=>prun(btn,async()=>{const em=App.val("prEmail").trim();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em))throw new Error("Укажите правильный email");if(em===App.me.email)throw new Error("Это ваш текущий email");
+  await App.auth.setEmail(em);App.toast("Письма для подтверждения отправлены на старый и новый адрес")});
+App.ACT.profOutAll=(_,btn)=>{if(!App.confirm2(btn,"Нажмите ещё раз — выйдем на всех устройствах"))return;App.auth.signOutAll()};
 
 /* ---------- глобальный поиск ---------- */
 function gsearch(){

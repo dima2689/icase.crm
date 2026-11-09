@@ -504,3 +504,12 @@ label.chip{cursor:pointer}
 .apidoc{font-size:13px;line-height:1.5}.apidoc p{margin:6px 0}.apidoc code,.steps code{background:#fff;border:1px solid var(--line);border-radius:6px;padding:1px 5px;font-size:12px}
 .pvjson{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;font-size:12px;max-height:300px;overflow:auto;white-space:pre-wrap}
 @media (max-width:900px){.sfgrid.two{grid-template-columns:1fr}}
+/* вход и профиль */
+.pwbox{position:relative}.pwbox input{width:100%;padding-right:44px}.pwbox .pwtoggle{position:absolute;right:4px;top:50%;transform:translateY(-50%);padding:4px 8px}
+.muted.small,.small{font-size:12.5px}
+.whobtn{display:flex;flex-direction:column;gap:2px;border:0;background:none;padding:4px 6px;margin:-4px -6px 2px;border-radius:10px;text-align:left;cursor:pointer;font:inherit;color:inherit}
+.whobtn:hover{background:var(--sage-soft)}.whobtn span{font-size:12px;color:var(--muted)}
+.stafflist .lrow{width:100%;border:0;background:none;font:inherit;color:inherit;text-align:left;cursor:pointer;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 8px;border-radius:10px}
+.stafflist .lrow:hover{background:var(--sage-soft)}.stafflist .lrow+.lrow{border-top:1px solid var(--line)}
+.stafflist .row-f{gap:8px;align-items:center;flex-wrap:wrap}
+.banner.info{background:#E6EEF6;color:#2A4A6B}

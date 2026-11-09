@@ -62,7 +62,7 @@ const M={
   shifts:r=>({id:r.id,num:r.num,pointId:r.point_id,status:r.status,openedAt:r.opened_at,openedBy:r.opened_by,openCash:num(r.open_cash),closedAt:r.closed_at,closedBy:r.closed_by,
     countedCash:num(r.counted_cash),expectedCash:num(r.expected_cash),diff:num(r.diff),closeNote:r.close_note||""}),
   cashops:r=>({id:r.id,shiftId:r.shift_id,pointId:r.point_id,type:r.type,method:r.method,amount:num(r.amount),ref:r.ref||"",note:r.note||"",by:r.staff_id,at:r.created_at}),
-  staff:r=>({id:r.id,fullName:r.full_name,role:r.role,pointId:r.point_id,phone:r.phone||"",active:r.is_active}),
+  staff:r=>({id:r.id,fullName:r.full_name,role:r.role,pointId:r.point_id,phone:r.phone||"",active:r.is_active,email:r.email||"",mustChange:!!r.must_change_password,lastSeen:r.last_seen_at||"",blockedAt:r.blocked_at||""}),
   staffreq:r=>({id:r.id,email:r.email||"",fullName:r.full_name||"",at:r.created_at}),
   siteorders:r=>({id:r.id,wooId:r.woo_id,num:r.num,status:r.status,wooStatus:r.woo_status||"",customerId:r.customer_id||"",name:r.name||"",phone:r.phone||"",email:r.email||"",address:r.address||"",delivery:r.delivery||"",payment:r.payment||"",paid:!!r.paid,total:num(r.total),note:r.note||"",problems:r.problems||"",saleId:r.sale_id||"",createdAt:r.created_at,
     items:(r.items||[]).map(i=>({productId:i.product_id||"",unitId:i.unit_id||"",name:i.name||"",sku:i.sku||"",qty:num(i.qty),price:num(i.price),from:i.from||[],problem:i.problem||""}))}),
@@ -125,7 +125,11 @@ App.auth = {
   async signIn(email,password){const {error}=await sb.auth.signInWithPassword({email,password});if(error)throw new Error(/Invalid login/i.test(error.message)?"Неверный email или пароль":/confirm/i.test(error.message)?"Подтвердите email по ссылке из письма":error.message)},
   async signUp(email,password,name){const {data,error}=await sb.auth.signUp({email,password,options:{data:{full_name:name}}});if(error)throw new Error(/registered/i.test(error.message)?"Этот email уже зарегистрирован":error.message);return data},
   async signOut(){await sb.auth.signOut();location.reload()},
-  async reset(email){const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});if(error)throw new Error(error.message)}
+  async reset(email){const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});if(error)throw new Error(/rate limit/i.test(error.message)?"Слишком много писем — подождите несколько минут или попросите владельца прислать ссылку для входа":error.message)},
+  async setPassword(pw){const {error}=await sb.auth.updateUser({password:pw});if(error)throw new Error(/different|same/i.test(error.message)?"Новый пароль должен отличаться от старого":/weak|short|least/i.test(error.message)?"Слишком простой пароль: минимум 8 символов":error.message);try{await sb.rpc("staff_password_changed")}catch(e){}},
+  async checkPassword(pw){const {error}=await sb.auth.signInWithPassword({email:App.me.email,password:pw});if(error)throw new Error("Текущий пароль неверный")},
+  async setEmail(email){const {error}=await sb.auth.updateUser({email},{emailRedirectTo:location.origin+location.pathname});if(error)throw new Error(/registered|exists/i.test(error.message)?"Этот email уже занят":error.message)},
+  async signOutAll(){await sb.auth.signOut({scope:"global"});location.reload()},
 };
 App.start = async function(){
   const {data}=await sb.auth.getSession();
@@ -141,7 +145,9 @@ App.enter = async function(user){
     const exists=await q(sb.rpc("staff_exists"),"staff_exists");
     App.showPending(!exists,st&&st.is_active===false);return;
   }
-  App.me.role=st.role;App.me.pointId=st.point_id;App.me.name=st.full_name;
+  App.me.role=st.role;App.me.pointId=st.point_id;App.me.name=st.full_name;App.me.phone=st.phone||"";
+  if(st.must_change_password){App.showLogin("newpass",{forced:true});return}
+  sb.rpc("staff_touch").then(()=>{},()=>{});
   try{const saved=localStorage.getItem("icase_point");if(saved)App.ui.pointId=saved}catch(e){}
   await App.reload(Object.keys(L));
   App.banner("");subscribe();App.route();

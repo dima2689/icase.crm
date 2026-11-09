@@ -167,36 +167,100 @@ ACT.svcDel=(id,el)=>run(null,async()=>{if(!App.confirm2(el))return;await App.api
 function staff(){
   const reqs=S.staffreq.filter(r=>!App.byId("staff",r.id));
   const ptOpts=[["","— все / не привязан —"],...App.points().map(p=>[p.id,p.name])];
-  const roles=Object.entries(App.ROLES);
-  return `<section class="card"><div class="card-h"><h2>Сотрудники и роли</h2></div>
-  <p class="muted">Новый сотрудник открывает CRM, нажимает «Я новый сотрудник» и регистрируется по email. Его заявка появится здесь: назначьте роль и точку. Продавец, мастер и кладовщик работают только на своей точке, управляющий — на всех.</p>
-  ${reqs.length?`<h3 class="sub-h">Заявки</h3><div class="list-mini">${reqs.map(r=>`<div class="lrow"><span><b>${esc(r.fullName||r.email)}</b><small>${esc(r.email)} · ${App.dtt(r.at)}</small></span><span class="row-f">${App.sel("rq_"+r.id,roles.filter(([k])=>k!=="owner"),"seller")}${App.sel("rqp_"+r.id,ptOpts,(App.point()||{}).id||"")}<button class="btn sm pri" data-act="staffAdd" data-id="${esc(r.id)}">Принять</button><button class="btn sm ghost danger" data-act="staffReject" data-id="${esc(r.id)}">Отклонить</button></span></div>`).join("")}</div>`:""}
-  <div class="tbl-wrap"><table><thead><tr><th>Сотрудник</th><th>Роль</th><th>Точка</th><th>Статус</th><th class="n">Продаж</th><th></th></tr></thead><tbody>
-  ${S.staff.slice().sort((a,b)=>String(a.fullName).localeCompare(b.fullName)).map(s=>s.role==="owner"?`<tr><td><b>${esc(s.fullName)}</b></td><td><span class="pill dark">Владелец</span></td><td>все</td><td><span class="pill ok">активен</span></td><td class="n">${S.sales.filter(x=>x.by===s.id).length}</td><td></td></tr>`:
-  `<tr><td><b>${esc(s.fullName)}</b></td><td>${App.sel("role_"+s.id,roles.filter(([k])=>k!=="owner"),s.role)}</td><td>${App.sel("pt_"+s.id,ptOpts,s.pointId||"")}</td><td>${s.active===false?'<span class="pill mute">отключён</span>':'<span class="pill ok">активен</span>'}</td>
-    <td class="n">${S.sales.filter(x=>x.by===s.id).length}</td>
-    <td class="n"><button class="btn sm" data-act="staffSave" data-id="${esc(s.id)}">Сохранить</button> <button class="btn sm ${s.active===false?"":"danger"}" data-act="staffToggle" data-id="${esc(s.id)}">${s.active===false?"Включить":"Отключить"}</button></td></tr>`).join("")}
-  </tbody></table></div>
+  const roles=Object.entries(App.ROLES).filter(([k])=>k!=="owner");
+  const au=App.ui.authUsers||{};
+  if(!App.ui.authUsers&&!App.ui.authLoading&&App.can("staff")){App.ui.authLoading=true;App.api.invoke("staff-admin",{action:"list"}).then(r=>{App.ui.authUsers=Object.fromEntries((r.users||[]).map(u=>[u.id,u]));App.ui.authLoading=false;App.render()}).catch(()=>{App.ui.authUsers={};App.ui.authLoading=false})}
+  const stat=s=>{const u=au[s.id]||{};return s.active===false||u.banned?'<span class="pill bad">заблокирован</span>':u.invited?'<span class="pill warn">приглашён</span>':s.mustChange?'<span class="pill warn">временный пароль</span>':'<span class="pill ok">активен</span>'};
+  const seen=s=>{const u=au[s.id]||{},t=u.last_sign_in_at||s.lastSeen;return t?App.dtt(t):'<span class="muted">не входил</span>'};
+  return `<section class="card"><div class="card-h"><h2>Сотрудники и доступ</h2>${App.can("staff")?'<button class="btn pri sm" data-act="staffNew">+ Сотрудник</button>':""}</div>
+  <p class="muted">Пригласите сотрудника по email или создайте вход с временным паролем — при первом входе он задаст свой. Нажмите на сотрудника, чтобы сменить роль, точку, прислать ссылку для входа, сбросить пароль или заблокировать.</p>
+  ${reqs.length?`<h3 class="sub-h">Заявки на доступ</h3><div class="list-mini">${reqs.map(r=>`<div class="lrow"><span><b>${esc(r.fullName||r.email)}</b><small>${esc(r.email)} · ${App.dtt(r.at)}</small></span><span class="row-f">${App.sel("rq_"+r.id,roles,"seller")}${App.sel("rqp_"+r.id,ptOpts,"")}<button class="btn sm pri" data-act="staffAdd" data-id="${esc(r.id)}">Принять</button><button class="btn sm ghost danger" data-act="staffReject" data-id="${esc(r.id)}">Отклонить</button></span></div>`).join("")}</div>`:""}
+  <div class="list-mini stafflist">${S.staff.slice().sort((a,b)=>(a.role==="owner"?-1:b.role==="owner"?1:String(a.fullName).localeCompare(b.fullName))).map(s=>`<button type="button" class="lrow" data-act="staffOpen" data-id="${esc(s.id)}">
+    <span><b>${esc(s.fullName)}</b><small>${esc(s.email||(au[s.id]||{}).email||"")}${s.phone?" · "+esc(s.phone):""}</small></span>
+    <span class="row-f"><span class="pill ${s.role==="owner"?"dark":""}">${esc(App.ROLES[s.role])}</span><span class="muted small">${s.pointId?esc(App.pointName(s.pointId)):"все точки"}</span>${stat(s)}<span class="muted small">вход: ${seen(s)}</span></span></button>`).join("")}</div>
   <h3 class="sub-h">Что может каждая роль</h3>
   <div class="tbl-wrap"><table><tbody>
-    <tr><td><b>Управляющий</b></td><td>всё на всех точках, кроме назначения ролей</td></tr><tr><td><b>Продавец</b></td><td>касса и смена своей точки, продажи, возвраты, клиенты</td></tr>
-    <tr><td><b>Мастер</b></td><td>ремонт на своей точке</td></tr><tr><td><b>Кладовщик</b></td><td>товары, приход, перемещение, списание, инвентаризация; видит закупочные цены</td></tr>
+    <tr><td><b>Владелец</b></td><td>всё, включая сотрудников, доступы и подключения; один на CRM, права можно передать</td></tr>
+    <tr><td><b>Управляющий</b></td><td>всё на всех точках, кроме сотрудников и ключей подключения</td></tr><tr><td><b>Продавец</b></td><td>касса и смена своей точки, продажи, возвраты, клиенты, заказы с сайта</td></tr>
+    <tr><td><b>Мастер</b></td><td>ремонт на своей точке</td></tr><tr><td><b>Кладовщик</b></td><td>товары, приход, перемещение, списание, инвентаризация, поставщики; видит закупочные цены</td></tr>
   </tbody></table></div></section>`;
 }
+const REDIR=()=>location.origin+location.pathname;
+const genPass=()=>{const a="ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";let p="";const r=new Uint32Array(10);crypto.getRandomValues(r);r.forEach(x=>p+=a[x%a.length]);return p.slice(0,4)+"-"+p.slice(4)};
+const sa=async(body)=>{const r=await App.api.invoke("staff-admin",{redirect:REDIR(),...body});App.ui.authUsers=null;await App.reload(["staff","staffreq","log"]);return r};
+ACT.staffNew=()=>{
+  if(!App.can("staff"))return;
+  const roles=Object.entries(App.ROLES).filter(([k])=>k!=="owner"),pts=[["","— все / не привязан —"],...App.points().map(p=>[p.id,p.name])];
+  App.openModal(App.head("Новый сотрудник")+`<div class="form">
+    ${App.fld("snName","Имя и фамилия",App.inp("snName",""))}${App.fld("snEmail","Email для входа",App.inp("snEmail","","email"))}
+    ${App.fld("snRole","Роль",App.sel("snRole",roles,"seller"))}${App.fld("snPoint","Точка",App.sel("snPoint",pts,(App.point()||{}).id||""))}
+    ${App.fld("snPhone","Телефон",App.inp("snPhone","","tel","+7"))}
+    ${App.fld("snHow","Как выдать доступ",App.sel("snHow",[["invite","Приглашение на email — сотрудник сам задаст пароль"],["create","Создать сейчас с временным паролем"]],"invite"),"full")}
+    <div class="fld full" id="snPassBox" hidden><label for="snPass">Временный пароль</label><div class="row-f">${App.inp("snPass",genPass(),"text","",'autocomplete="off"')}<button class="btn sm" type="button" data-act="snGen">Другой</button></div><small class="muted">Передайте его сотруднику лично. При первом входе CRM попросит сменить.</small></div>
+  </div><div class="acts"><button class="btn" data-act="close">Отмена</button><button class="btn pri" data-act="staffCreate">Добавить</button></div>`);
+  const how=document.getElementById("snHow");how.onchange=()=>{document.getElementById("snPassBox").hidden=how.value!=="create"};
+};
+ACT.snGen=()=>{const i=document.getElementById("snPass");if(i)i.value=genPass()};
+ACT.staffCreate=(_,btn)=>run(btn,async()=>{
+  const how=App.val("snHow"),email=App.val("snEmail"),pass=App.val("snPass");
+  await sa({action:how,email,full_name:App.val("snName"),role:App.val("snRole"),point_id:App.val("snPoint")||null,phone:App.val("snPhone"),password:how==="create"?pass:undefined});
+  if(how==="create")App.openModal(App.head("Сотрудник добавлен")+`<p>Передайте сотруднику данные для входа:</p><div class="kvcopy"><span>Адрес CRM</span><code>${esc(REDIR())}</code><button class="btn sm" data-act="copyTxt" data-id="${esc(REDIR())}">Копировать</button></div><div class="kvcopy"><span>Email</span><code>${esc(email)}</code></div><div class="kvcopy"><span>Временный пароль</span><code>${esc(pass)}</code><button class="btn sm" data-act="copyTxt" data-id="${esc(pass)}">Копировать</button></div><p class="muted small">При первом входе CRM попросит придумать свой пароль.</p><div class="acts"><button class="btn pri" data-act="close">Готово</button></div>`);
+  else{App.closeModal();App.toast("Приглашение отправлено на "+email)}
+});
+ACT.staffOpen=id=>{
+  curStaff=id;App.ui.staffOut=null;
+  const draw=()=>{
+    const s=App.byId("staff",id);if(!s)return App.closeModal();
+    const own=App.can("staff"),me=id===App.me.id,isOwner=s.role==="owner",u=(App.ui.authUsers||{})[id]||{},blocked=s.active===false||u.banned;
+    const roles=Object.entries(App.ROLES).filter(([k])=>k!=="owner"),pts=[["","— все / не привязан —"],...App.points().map(p=>[p.id,p.name])];
+    App.redrawModal(App.head(esc(s.fullName),`<span class="pill ${isOwner?"dark":""}">${esc(App.ROLES[s.role])}</span>${blocked?' <span class="pill bad">заблокирован</span>':""}`)+`
+      <div class="tiles"><div class="tile"><span>Email</span><b class="mid">${esc(s.email||u.email||"—")}</b><small>${u.confirmed===false?"не подтверждён":u.invited?"приглашение не принято":""}</small></div>
+        <div class="tile"><span>Последний вход</span><b class="mid">${u.last_sign_in_at||s.lastSeen?App.dtt(u.last_sign_in_at||s.lastSeen):"не входил"}</b></div>
+        <div class="tile"><span>Продаж</span><b>${S.sales.filter(x=>x.by===id).length}</b></div></div>
+      ${isOwner?`<p class="muted">Владелец видит и меняет всё. Сменить роль или заблокировать владельца нельзя — можно только передать права другому сотруднику.</p>`
+      :own?`<div class="form">${App.fld("soRole","Роль",App.sel("soRole",roles,s.role))}${App.fld("soPoint","Точка",App.sel("soPoint",pts,s.pointId||""))}</div>
+        <div class="acts"><button class="btn pri" data-act="staffSave" data-id="${esc(id)}">Сохранить роль и точку</button></div>`:""}
+      ${own&&!me?`<h3 class="sub-h">Доступ</h3>
+      <div class="acts" style="justify-content:flex-start;flex-wrap:wrap">
+        <button class="btn" data-act="staffResetMail" data-id="${esc(id)}">Отправить ссылку смены пароля на email</button>
+        <button class="btn" data-act="staffResetLink" data-id="${esc(id)}">Ссылка для входа (в мессенджер)</button>
+        ${isOwner?"":`<button class="btn" data-act="staffTmpPass" data-id="${esc(id)}">Задать временный пароль</button>`}
+        <button class="btn" data-act="staffEmail" data-id="${esc(id)}">Сменить email</button>
+      </div>
+      <div id="staffOut">${App.ui.staffOut&&App.ui.staffOut.id===id?App.ui.staffOut.html:""}</div>
+      ${isOwner?"":`<h3 class="sub-h">Опасные действия</h3><div class="acts" style="justify-content:flex-start;flex-wrap:wrap">
+        ${blocked?`<button class="btn" data-act="staffUnblock" data-id="${esc(id)}">Разблокировать</button>`:`<button class="btn danger" data-act="staffBlock" data-id="${esc(id)}">Заблокировать доступ</button>`}
+        ${blocked?"":`<button class="btn ghost" data-act="staffOwner" data-id="${esc(id)}">Передать права владельца</button>`}</div>
+        <p class="muted small">Блокировка сразу закрывает вход и все сеансы сотрудника; его продажи и действия в журнале сохраняются.</p>`}`:me?`<p class="muted">Свои данные, пароль и email меняйте в профиле.</p><div class="acts"><button class="btn" data-act="profile">Мой профиль</button></div>`:""}`);
+  };
+  App.openModal("",{wide:true,refresh:draw});draw();
+};
+let curStaff=null;
+const out=html=>{App.ui.staffOut={id:curStaff,html};const o=document.getElementById("staffOut");if(o)o.innerHTML=html};
+ACT.staffSave=(id,btn)=>run(btn,async()=>{
+  const role=App.val("soRole"),pt=App.val("soPoint")||null;
+  if(["seller","master","storekeeper"].includes(role)&&!pt)return App.toast("Для этой роли выберите точку");
+  await App.api.update("staff",id,{role,point_id:pt});await App.api.audit("Изменён сотрудник",App.nameOf(id),App.ROLES[role]+" · "+(pt?App.pointName(pt):"все точки"));App.toast("Сохранено");
+});
+ACT.staffResetMail=(id,btn)=>run(btn,async()=>{const r=await sa({action:"reset_email",id});out(`<div class="banner ok">Ссылка для смены пароля отправлена на ${esc(r.email)}.</div>`)});
+ACT.staffResetLink=(id,btn)=>run(btn,async()=>{const r=await sa({action:"reset_link",id});
+  out(`<div class="banner info">Одноразовая ссылка для входа — перешлите сотруднику лично (WhatsApp, Telegram). По ней он войдёт и задаст новый пароль. Ссылка действует ограниченное время.</div><div class="kvcopy"><span>Ссылка</span><code>${esc(r.link)}</code><button class="btn sm" data-act="copyTxt" data-id="${esc(r.link)}">Копировать</button></div>`)});
+ACT.staffTmpPass=(id)=>{const p=genPass();out(`<div class="form">${App.fld("tpPass","Временный пароль",App.inp("tpPass",p,"text","",'autocomplete="off"'),"full")}</div><div class="acts"><button class="btn pri" data-act="staffTmpOk" data-id="${esc(id)}">Установить</button></div><p class="muted small">Текущий пароль сотрудника перестанет работать. При входе CRM попросит придумать свой.</p>`)};
+ACT.staffTmpOk=(id,btn)=>run(btn,async()=>{const p=App.val("tpPass");await sa({action:"set_password",id,password:p});out(`<div class="banner ok">Пароль установлен. Передайте сотруднику лично:</div><div class="kvcopy"><span>Временный пароль</span><code>${esc(p)}</code><button class="btn sm" data-act="copyTxt" data-id="${esc(p)}">Копировать</button></div>`)});
+ACT.staffEmail=(id)=>{const s=App.byId("staff",id);out(`<div class="form">${App.fld("seEmail","Новый email",App.inp("seEmail",s.email||"","email"),"full")}</div><div class="acts"><button class="btn pri" data-act="staffEmailOk" data-id="${esc(id)}">Сменить</button></div>`)};
+ACT.staffEmailOk=(id,btn)=>run(btn,async()=>{await sa({action:"change_email",id,email:App.val("seEmail")});out('<div class="banner ok">Email изменён — входить теперь по новому адресу.</div>')});
+ACT.staffBlock=(id,btn)=>{if(!App.confirm2(btn,"Нажмите ещё раз — сотрудник сразу потеряет доступ"))return;run(btn,async()=>{await sa({action:"block",id});App.toast("Доступ заблокирован")})};
+ACT.staffUnblock=(id,btn)=>run(btn,async()=>{await sa({action:"unblock",id});App.toast("Доступ восстановлен")});
+ACT.staffOwner=(id,btn)=>{if(!App.confirm2(btn,"Нажмите ещё раз: сотрудник станет владельцем, а вы — управляющим"))return;
+  run(btn,async()=>{await App.api.rpc("transfer_owner",{p_to:id},["staff","log"]);App.toast("Права владельца переданы");setTimeout(()=>location.reload(),900)})};
 ACT.staffAdd=(id,btn)=>run(btn,async()=>{
   const r=App.byId("staffreq",id),role=App.val("rq_"+id),pt=App.val("rqp_"+id)||null;
   if(["seller","master","storekeeper"].includes(role)&&!pt)return App.toast("Для этой роли выберите точку");
-  await App.api.insert("staff",{id,full_name:r.fullName||r.email,role,point_id:pt});
+  await App.api.insert("staff",{id,full_name:r.fullName||r.email,role,point_id:pt,email:r.email||null});
   await App.api.remove("staff_requests",id);
   await App.api.audit("Принят сотрудник",r.fullName||r.email,App.ROLES[role]);App.toast("Сотрудник добавлен");
 });
 ACT.staffReject=(id,el)=>run(null,async()=>{if(!App.confirm2(el,"Отклонить заявку?"))return;await App.api.remove("staff_requests",id);App.toast("Заявка отклонена")});
-ACT.staffSave=(id,btn)=>run(btn,async()=>{
-  const role=App.val("role_"+id),pt=App.val("pt_"+id)||null;
-  if(["seller","master","storekeeper"].includes(role)&&!pt)return App.toast("Для этой роли выберите точку");
-  await App.api.update("staff",id,{role,point_id:pt});await App.api.audit("Изменён сотрудник",App.nameOf(id),App.ROLES[role]+" · "+(pt?App.pointName(pt):"все точки"));App.toast("Сохранено");
-});
-ACT.staffToggle=(id,btn)=>run(btn,async()=>{const s=App.byId("staff",id);await App.api.update("staff",id,{is_active:s.active===false});await App.api.audit(s.active===false?"Сотрудник включён":"Сотрудник отключён",App.nameOf(id),"")});
 
 /* ---------- журнал ---------- */
 App.ui.logQ="";
