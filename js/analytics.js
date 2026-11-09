@@ -4,7 +4,7 @@
 const {S,$,esc,num,money,ACT,VIEWS,TITLES}=App;
 TITLES.analytics="Аналитика";
 const LS=(k,v)=>{try{if(v===undefined)return JSON.parse(localStorage.getItem(k)||"null");localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}};
-Object.assign(App.ui,{anTab:"over",anPer:"30",anPoint:"",anQ:"",anSort:"rev",anCat:"",anAbc:"",anSc:{chk:0,avg:0,mar:0},anPlan:LS("icase_plan")||0});
+Object.assign(App.ui,{anTab:"over",anPer:"30",anPoint:"",anQ:"",anSort:"rev",anCat:"",anAbc:"",anSc:{chk:0,avg:0,mar:0},anCmp:false,anFrom:"",anTo:"",anPlan:LS("icase_plan")||0});
 const DAY=864e5;
 const d0=d=>{const x=new Date(d);x.setHours(0,0,0,0);return x};
 const dk=d=>{const x=new Date(d);return x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0")};
@@ -15,27 +15,31 @@ const wd=d=>(new Date(d).getDay()+6)%7;
 const pct=(v,dig=0)=>(isFinite(v)?(v*100).toFixed(dig).replace(".",","):"—")+"%";
 const sgn=v=>v>0?"+":v<0?"−":"";
 const delta=(c,p)=>p?(c-p)/Math.abs(p):c?1:0;
-const dTag=(c,p,inv)=>{if(!p&&!c)return "";const d=delta(c,p),good=inv?d<0:d>0;return `<span class="dlt ${Math.abs(d)<0.005?"":good?"up":"down"}">${sgn(d)}${pct(Math.abs(d))}</span>`};
+const dTag=(c,p,inv)=>{if(!p)return "";const d=delta(c,p),good=inv?d<0:d>0;return `<span class="dlt ${Math.abs(d)<0.005?"":good?"up":"down"}">${sgn(d)}${pct(Math.abs(d))}</span>`};
 const short=v=>{const a=Math.abs(v);return a>=1e6?(v/1e6).toFixed(1).replace(".",",")+" млн":a>=1e4?Math.round(v/1e3)+" тыс":Math.round(v).toLocaleString("ru-RU")};
+const saleVal=s=>num(s.total)+num(s.tradeIn&&s.tradeIn.amount);
 const plural=(n,a,b,c)=>{const x=n%10,y=n%100;return x===1&&y!==11?a:x>=2&&x<=4&&(y<12||y>14)?b:c};
 
 /* ---------- период ---------- */
-const PERS=[["7","7 дней"],["30","30 дней"],["90","90 дней"],["180","Полгода"],["365","Год"],["month","Этот месяц"],["prev","Прошлый месяц"],["all","Всё время"]];
+const PERS=[["7","7 дней"],["30","30 дней"],["90","90 дней"],["180","Полгода"],["365","Год"],["month","Этот месяц"],["prev","Прошлый месяц"],["all","Всё время"],["custom","Свой период"]];
 function range(p){
   const t=d0(Date.now()),tom=new Date(+t+DAY);
   if(p==="month")return [new Date(t.getFullYear(),t.getMonth(),1),tom];
   if(p==="prev")return [new Date(t.getFullYear(),t.getMonth()-1,1),new Date(t.getFullYear(),t.getMonth(),1)];
+  if(p==="custom"){const a=App.ui.anFrom?d0(App.ui.anFrom+"T12:00"):new Date(+tom-30*DAY),b=App.ui.anTo?new Date(+d0(App.ui.anTo+"T12:00")+DAY):tom;return a<b?[a,b]:[new Date(+b-DAY),b]}
   if(p==="all"){const f=S.sales.reduce((m,s)=>Math.min(m,+new Date(s.createdAt)),+t);return [d0(f),tom]}
   return [new Date(+tom-num(p)*DAY),tom];
 }
 
 /* ---------- факты: строки продаж и возвратов ---------- */
-let cache={key:"",lines:null};
+let cache={key:null,lines:null};
+const sameRefs=(a,b)=>a&&b&&a.length===b.length&&a.every((x,i)=>x===b[i]);
+const dataRefs=()=>[S.sales,S.returns,S.products,S.categories];
 function catOf(p){if(!p)return{top:"Услуги и прочее",sub:"Услуги и прочее"};const c=App.byId("categories",p.categoryId);if(!c)return{top:"Без категории",sub:"Без категории"};
   const par=c.parentId?App.byId("categories",c.parentId):null;return{top:par?par.name:c.name,sub:c.name}}
 function allLines(){
-  const key=S.sales.length+"|"+S.returns.length+"|"+(S.sales[0]||{}).id+"|"+S.products.length;
-  if(cache.key===key)return cache.lines;
+  const key=dataRefs();
+  if(sameRefs(cache.key,key))return cache.lines;
   const L=[];const fac={};
   for(const s of S.sales){
     const its=s.items||[],net=its.reduce((a,i)=>a+num(i.qty)*num(i.price)-num(i.disc),0),f=net>0?Math.max(0,(net-num(s.discount))/net):0;fac[s.id]=f;
@@ -44,10 +48,13 @@ function allLines(){
       L.push({t,day:dk(t),sale:s.id,pid:i.productId||"",name:i.name,top:c.top,sub:c.sub,brand:(p&&p.brand)||"—",cond:/б\/у/i.test((p&&p.condition)||i.condition||"")?"Б/у":p?"Новый":"—",
         kind:i.productId?"goods":(i.kind||"service"),qty:num(i.qty),rev,cost:num(i.cost)*num(i.qty),by:s.by,point:s.pointId,cust:s.customerId||"",channel:s.channel||"store",price:num(i.price),ret:false})}
   }
-  for(const r of S.returns){const s=App.byId("sales",r.saleId)||{},f=fac[r.saleId]==null?1:fac[r.saleId],t=new Date(r.createdAt);
-    for(const i of r.items||[]){const p=i.productId?App.byId("products",i.productId):null,c=catOf(p);
+  for(const r of S.returns){const s=App.byId("sales",r.saleId)||{},f=fac[r.saleId]==null?1:fac[r.saleId],t=new Date(r.createdAt),its=r.items||[];
+    // распределяем фактически возвращённую сумму по позициям пропорционально цене
+    const base=its.reduce((a,i)=>a+num(i.qty)*num(i.price)*f,0),k=base>0&&num(r.amount)>0?num(r.amount)/base:1;
+    for(const i of its){const p=i.productId?App.byId("products",i.productId):null,c=catOf(p);
       L.push({t,day:dk(t),sale:r.saleId,pid:i.productId||"",name:i.name||"",top:c.top,sub:c.sub,brand:(p&&p.brand)||"—",cond:/б\/у/i.test((p&&p.condition)||"")?"Б/у":p?"Новый":"—",
-        kind:i.productId?"goods":"service",qty:-num(i.qty),rev:-num(i.qty)*num(i.price)*f,cost:-num(i.qty)*num(i.cost),by:s.by,point:s.pointId,cust:s.customerId||"",channel:s.channel||"store",price:num(i.price),ret:true})}}
+        kind:i.productId?"goods":"service",qty:-num(i.qty),rev:-num(i.qty)*num(i.price)*f*k,cost:-num(i.qty)*num(i.cost),by:s.by,point:s.pointId,cust:s.customerId||"",channel:s.channel||"store",price:num(i.price),ret:true})}
+    if(!its.length&&num(r.amount)>0)L.push({t,day:dk(t),sale:r.saleId,pid:"",name:"Возврат",top:"Услуги и прочее",sub:"Услуги и прочее",brand:"—",cond:"—",kind:"service",qty:0,rev:-num(r.amount),cost:0,by:s.by,point:s.pointId,cust:s.customerId||"",channel:s.channel||"store",price:0,ret:true})}
   cache={key,lines:L};return L;
 }
 const linesIn=(from,to,pt)=>allLines().filter(l=>l.t>=from&&l.t<to&&(!pt||l.point===pt));
@@ -66,8 +73,8 @@ function kpi(from,to,pt){
   return{rev,cost,profit:rev-cost,margin:rev>0?(rev-cost)/rev:0,checks:n,avg:n?gross/n:0,ipc:n?items/n:0,custs:custs.size,newC,retC:custs.size-newC,
     anon:n?sales.filter(s=>!s.customerId).length/n:0,retRate:gross?retRev/gross:0,retRev,repRev,repProfit,days:Math.max(1,Math.round((to-from)/DAY)),L,sales};
 }
-let fbCache={k:"",v:null};
-function firstBuy(){const k=S.sales.length+"|"+(S.sales[0]||{}).id;if(fbCache.k===k)return fbCache.v;const f={};
+let fbCache={k:null,v:null};
+function firstBuy(){const k=S.sales;if(fbCache.k===k)return fbCache.v;const f={};
   for(const s of S.sales)if(s.customerId){const t=new Date(s.createdAt);if(!f[s.customerId]||t<f[s.customerId])f[s.customerId]=t}fbCache={k,v:f};return f}
 
 /* ---------- графики (SVG, один оттенок; подсказки при наведении) ---------- */
@@ -80,8 +87,10 @@ function chart(o){
   let g="";for(let v=min;v<=max+1e-9;v+=step)g+=`<line x1="${pl}" x2="${W-pr}" y1="${y(v)}" y2="${y(v)}" class="cg"/><text x="${pl-6}" y="${y(v)+4}" class="ca" text-anchor="end">${short(v)}</text>`;
   const every=Math.max(1,Math.ceil(n/(nar?Math.min(6,o.maxLabels||6):(o.maxLabels||10))));
   const xl=o.labels.map((l,i)=>i%every===0?`<text x="${x(i)}" y="${H-8}" class="ca" text-anchor="middle">${esc(l)}</text>`:"").join("");
-  let band="";if(o.band&&o.whisk){band=o.band.map((b,i)=>b?`<line x1="${x(i)}" x2="${x(i)}" y1="${y(b[0])}" y2="${y(b[1])}" class="cwh"/><line x1="${x(i)-5}" x2="${x(i)+5}" y1="${y(b[0])}" y2="${y(b[0])}" class="cwh"/><line x1="${x(i)-5}" x2="${x(i)+5}" y1="${y(b[1])}" y2="${y(b[1])}" class="cwh"/>`:"").join("")}else if(o.band){const pts=o.band.map((b,i)=>b?[x(i),y(b[0]),y(b[1])]:null).filter(Boolean);if(pts.length>1)band=`<path class="cband" d="M${pts.map(p=>p[0]+","+p[2]).join("L")}L${pts.slice().reverse().map(p=>p[0]+","+p[1]).join("L")}Z"/>`}
-  let marks="";const bars=o.series.filter(s=>s.kind==="bar"||s.kind==="ghost"),bwid=Math.max(2,Math.min(28,bw*.62)/Math.max(1,bars.length));
+  const bars=o.series.filter(s=>s.kind==="bar"||s.kind==="ghost"),bwid=Math.max(2,Math.min(28,bw*.62)/Math.max(1,bars.length));
+  const xw=i=>x(i)-bwid*bars.length/2+bwid*(bars.length-1)+bwid/2; // усы — по центру последнего столбика (прогноза)
+  let band="";if(o.band&&o.whisk){band=o.band.map((b,i)=>b?`<line x1="${xw(i)}" x2="${xw(i)}" y1="${y(b[0])}" y2="${y(b[1])}" class="cwh"/><line x1="${xw(i)-5}" x2="${xw(i)+5}" y1="${y(b[0])}" y2="${y(b[0])}" class="cwh"/><line x1="${xw(i)-5}" x2="${xw(i)+5}" y1="${y(b[1])}" y2="${y(b[1])}" class="cwh"/>`:"").join("")}else if(o.band){const pts=o.band.map((b,i)=>b?[x(i),y(b[0]),y(b[1])]:null).filter(Boolean);if(pts.length>1)band=`<path class="cband" d="M${pts.map(p=>p[0]+","+p[2]).join("L")}L${pts.slice().reverse().map(p=>p[0]+","+p[1]).join("L")}Z"/>`}
+  let marks="";
   bars.forEach((s,k)=>s.values.forEach((v,i)=>{if(v==null)return;const x0=x(i)-bwid*bars.length/2+bwid*k+1,y0=y(Math.max(v,0)),hh=Math.abs(y(v)-y(0));
     marks+=`<rect x="${x0}" y="${y0}" width="${Math.max(1,bwid-2)}" height="${Math.max(0,hh)}" rx="${Math.min(4,bwid/3)}" class="${s.kind==="ghost"?"cbar ghost":"cbar"}"/>`}));
   o.series.filter(s=>s.kind==="line"||s.kind==="dash"||s.kind==="thin").forEach(s=>{let d="",pen=false;s.values.forEach((v,i)=>{if(v==null){pen=false;return}d+=(pen?"L":"M")+x(i)+","+y(v);pen=true});
@@ -102,7 +111,9 @@ function heat(m,rowL,colL,fmt){const max=Math.max(1,...m.flat());
 function daily(pt){const m={};for(const l of allLines())if(!pt||l.point===pt)m[l.day]=(m[l.day]||0)+l.rev;
   const S2=S.repairs.filter(r=>r.status==="done"&&r.closedAt&&(!pt||r.pointId===pt));for(const r of S2){const k=dk(r.closedAt);m[k]=(m[k]||0)+num(r.finalPrice)}return m}
 function regress(ys){const n=ys.length;if(n<2)return{a:ys[0]||0,b:0};const mx=(n-1)/2,my=ys.reduce((a,v)=>a+v,0)/n;let sxy=0,sxx=0;ys.forEach((v,i)=>{sxy+=(i-mx)*(v-my);sxx+=(i-mx)*(i-mx)});const b=sxx?sxy/sxx:0;return{a:my-b*mx,b}}
-App.anForecast=function(pt){
+let fcCache={k:null,v:null};
+App.anForecast=function(pt){const ck=[...dataRefs(),S.repairs,pt||"",dk(Date.now())];if(sameRefs(fcCache.k,ck))return fcCache.v;const v=forecast(pt);fcCache={k:ck,v};return v};
+function forecast(pt){
   const m=daily(pt),keys=Object.keys(m).sort();if(!keys.length)return null;
   const today=d0(Date.now()),start=d0(keys[0]+"T12:00"),hist=Math.round((today-start)/DAY);
   const val=d=>m[dk(d)]||0;
@@ -111,18 +122,30 @@ App.anForecast=function(pt){
     const av=s.reduce((a,v)=>a+v,0)/Math.max(1,c.reduce((a,v)=>a+v,0));if(av>0)for(let k=0;k<7;k++)wdF[k]=c[k]?Math.max(.2,(s[k]/c[k])/av):1}
   // недельные суммы (последние до 26 полных недель) → тренд
   const weeks=[];for(let w=Math.min(26,Math.floor(hist/7));w>=1;w--){let s=0;for(let i=0;i<7;i++)s+=val(new Date(+today-(w*7-i)*DAY));weeks.push(s)}
-  const rg=regress(weeks),meanW=weeks.length?weeks.reduce((a,v)=>a+v,0)/weeks.length:0;
-  let gMonth=weeks.length>=4&&meanW>0?rg.b*4.345/Math.max(meanW,rg.a+rg.b*(weeks.length-1)):0;gMonth=Math.max(-.3,Math.min(.5,gMonth));
-  const resid=weeks.map((v,i)=>v-(rg.a+rg.b*i)),sd=weeks.length>2?Math.sqrt(resid.reduce((a,v)=>a+v*v,0)/(weeks.length-2)):0,rel=meanW>0?Math.min(.6,sd/meanW):.3;
+  // тренд: регрессия по логарифму недельной выручки (рост в процентах, а не в рублях)
+  const meanW=weeks.length?weeks.reduce((a,v)=>a+v,0)/weeks.length:0,floorW=Math.max(1,meanW*.05);
+  const lw=weeks.map(v=>Math.log(Math.max(v,floorW))),rg=regress(lw);
+  let gMonth=weeks.length>=4&&meanW>0?Math.exp(rg.b*4.345)-1:0;gMonth=Math.max(-.3,Math.min(.5,gMonth));
+  const resid=lw.map((v,i)=>v-(rg.a+rg.b*i)),rel=weeks.length>2?Math.min(.6,Math.sqrt(resid.reduce((a,v)=>a+v*v,0)/(weeks.length-2))):.3;
   // текущий уровень: средний день за 28 дней без учёта дня недели
   const L=Math.min(28,Math.max(1,hist));let lv=0;for(let i=1;i<=L;i++){const d=new Date(+today-i*DAY);lv+=val(d)/wdF[wd(d)]}lv/=L;
-  const fc=d=>{const k=(d-today)/DAY;return lv*Math.pow(1+gMonth,k/30.4)*wdF[wd(d)]};
+  lv*=Math.pow(1+gMonth,(L/2)/30.4); // среднее за 4 недели отстаёт от «сегодня» на половину окна
+  // сезонность по месяцам — только когда есть больше года истории
+  const byM={};keys.forEach(k=>{const x=k.slice(0,7);byM[x]=(byM[x]||0)+m[k]});
+  let sea=()=>1,seasonal=false;
+  if(hist>=395){const idx={},full=[];for(let k=1;k<=12;k++){const d=new Date(today.getFullYear(),today.getMonth()-k,1);full.push([d.getMonth(),(byM[mk(d)]||0)/new Date(d.getFullYear(),d.getMonth()+1,0).getDate()])}
+    const avg=full.reduce((a,x)=>a+x[1],0)/12;if(avg>0){full.forEach(([mo,v])=>idx[mo]=Math.max(.4,Math.min(2.5,v/avg)));const cur=idx[today.getMonth()]||1;
+      sea=d=>1+((idx[d.getMonth()]||1)/cur-1)*.6;seasonal=true}}
+  const fc=d=>{const k=(d-today)/DAY;return Math.max(0,lv*Math.pow(1+gMonth,k/30.4)*wdF[wd(d)]*sea(d))};
   const monthStart=new Date(today.getFullYear(),today.getMonth(),1),monthEnd=new Date(today.getFullYear(),today.getMonth()+1,1);
   let mtd=0;for(let d=new Date(monthStart);d<=today;d=new Date(+d+DAY))mtd+=val(d);
-  let rest=0;for(let d=new Date(+today+DAY);d<monthEnd;d=new Date(+d+DAY))rest+=fc(d);
-  const months=[];for(let k=1;k<=3;k++){const a=new Date(today.getFullYear(),today.getMonth()+k,1),b=new Date(today.getFullYear(),today.getMonth()+k+1,1);let s=0;for(let d=a;d<b;d=new Date(+d+DAY))s+=fc(d);months.push({key:mk(a),label:MON[a.getMonth()]+" "+a.getFullYear(),v:s,lo:s*(1-1.28*rel/Math.sqrt(4.3)*1.6),hi:s*(1+1.28*rel/Math.sqrt(4.3)*1.6)})}
-  const byM={};keys.forEach(k=>{const x=k.slice(0,7);byM[x]=(byM[x]||0)+m[k]});
-  return{hist,start,wdF,gMonth,lv,mtd,rest,monthEnd:mtd+rest,months,byM,weeks,rel,fc,val,today,quality:hist>=90?"хорошая":hist>=28?"средняя":"низкая"};
+  // остаток сегодняшнего дня + следующие дни месяца
+  let rest=Math.max(0,fc(today)-val(today));for(let d=new Date(+today+DAY);d<monthEnd;d=new Date(+d+DAY))rest+=fc(d);
+  const relM=rel/Math.sqrt(4.35),z=1.28;
+  const months=[];for(let k=1;k<=3;k++){const a=new Date(today.getFullYear(),today.getMonth()+k,1),b=new Date(today.getFullYear(),today.getMonth()+k+1,1);let s=0;for(let d=a;d<b;d=new Date(+d+DAY))s+=fc(d);
+    const e=z*relM*Math.sqrt(k)+Math.abs(gMonth)*.5*(k-1)/3;months.push({key:mk(a),label:MON[a.getMonth()]+" "+a.getFullYear(),v:s,lo:Math.max(0,s*(1-e)),hi:s*(1+e)})}
+  const curLo=mtd+Math.max(0,rest*(1-z*relM)),curHi=mtd+rest*(1+z*relM);
+  return{hist,start,wdF,gMonth,lv,mtd,rest,monthEnd:mtd+rest,curLo,curHi,seasonal,months,byM,weeks,rel,fc,val,today,quality:hist>=90?"хорошая":hist>=28?"средняя":"низкая"};
 };
 
 /* ---------- экран ---------- */
@@ -135,7 +158,7 @@ VIEWS.analytics={
     const per=t==="fc"||t==="stock"?"":App.sel("anPer",PERS,u.anPer,'data-filter-sel="anPer" aria-label="Период"');
     const pt=pts.length>1&&t!=="stock"?App.sel("anPoint",[["","Все точки"],...pts.map(p=>[p.id,p.name])],u.anPoint,'data-filter-sel="anPoint" aria-label="Точка"'):"";
     return `<div class="tabs">${TABS.map(([k,l])=>`<button class="tab ${t===k?"on":""}" data-act="anTab" data-id="${k}">${l}</button>`).join("")}</div>
-      ${per||pt?`<div class="anbar">${per}${pt}${per?`<span class="muted">${perText()}</span>`:""}</div>`:""}
+      ${per||pt?`<div class="anbar">${per}${per&&u.anPer==="custom"?App.inp("anFrom",u.anFrom||"","date","",'data-filter-sel="anFrom" aria-label="С"')+App.inp("anTo",u.anTo||"","date","",'data-filter-sel="anTo" aria-label="По"'):""}${pt}${per?`<span class="muted">${perText()}</span>`:""}</div>`:""}
       <div class="an" data-nodirty>${S.sales.length?({over,fc,prod,cat,cust,time,team,stock})[t]():`<section class="card"><div class="empty">Продаж пока нет — аналитика появится после первых продаж.</div></section>`}</div>`;
   }
 };
@@ -146,10 +169,13 @@ const prevRange=(f,t)=>[new Date(+f-(t-f)),f];
 /* --- обзор --- */
 function over(){
   const u=App.ui,[f,t]=range(u.anPer),[pf,ptt]=prevRange(f,t),pt=u.anPoint,c=kpi(f,t,pt),p=kpi(pf,ptt,pt);
+  if(!c.checks&&!c.L.length)return emptyPer();
   const tile=(l,v,d,small)=>`<div class="tile"><span>${l}</span><b>${v}</b><small>${d||""}${small?" "+small:""}</small></div>`;
   const days=c.days,byDay=days<=92;
   const lab=[],vals=[],ma=[];
-  if(byDay){const m={};c.L.forEach(l=>m[l.day]=(m[l.day]||0)+l.rev);for(let d=new Date(f);d<t;d=new Date(+d+DAY)){lab.push(d.getDate()+" "+MON[d.getMonth()]);vals.push(m[dk(d)]||0)}
+  const prevV=[];
+  if(byDay){const m={},pm={};c.L.forEach(l=>m[l.day]=(m[l.day]||0)+l.rev);p.L.forEach(l=>pm[l.day]=(pm[l.day]||0)+l.rev);const sh=t-f;
+    for(let d=new Date(f);d<t;d=new Date(+d+DAY)){lab.push(d.getDate()+" "+MON[d.getMonth()]);vals.push(m[dk(d)]||0);prevV.push(pm[dk(new Date(+d-sh))]||0)}
     vals.forEach((v,i)=>{const a=vals.slice(Math.max(0,i-6),i+1);ma.push(i>=6?a.reduce((x,y)=>x+y,0)/a.length:null)})}
   else{const m={};c.L.forEach(l=>{const k=mk(l.t);m[k]=(m[k]||0)+l.rev});for(let d=new Date(f.getFullYear(),f.getMonth(),1);d<t;d=new Date(d.getFullYear(),d.getMonth()+1,1)){lab.push(MON[d.getMonth()]+" "+String(d.getFullYear()).slice(2));vals.push(m[mk(d)]||0)}}
   const topP=agg(c.L,l=>l.pid||"svc:"+l.name).sort((a,b)=>b.rev-a.rev).slice(0,7);
@@ -162,14 +188,15 @@ function over(){
       ${tile("Средний чек",money(c.avg),dTag(c.avg,p.avg),"· "+c.ipc.toFixed(1).replace(".",",")+" товара в чеке")}
       ${tile("Покупатели",c.custs,dTag(c.custs,p.custs),"· новых "+c.newC+" · повторных "+c.retC)}
       ${tile("Без контакта",pct(c.anon),"","чеков без телефона")}
-      ${tile("Возвраты",pct(c.retRate,1),c.retRev>0.5?dTag(c.retRate,p.retRate,true):"",c.retRev>0.5?"· "+money(c.retRev):"возвратов не было")}
+      ${tile("Возвраты",c.retRate>0&&c.retRate<.001?"<0,1%":pct(c.retRate,1),c.retRev>0.5?dTag(c.retRate,p.retRate,true):"",c.retRev>0.5?"· "+money(c.retRev):"возвратов не было")}
       ${tile("Выручка в день",money(c.rev/days),dTag(c.rev/days,p.rev/p.days))}
     </div>
     <section class="card"><div class="card-h"><h2>Выручка ${byDay?"по дням":"по месяцам"}</h2></div>
-      ${chart({labels:lab,series:[{name:"Выручка",values:vals,kind:"bar"},...(byDay&&days>=14?[{name:"Среднее за 7 дней",values:ma,kind:"line"}]:[])],maxLabels:byDay?10:12})}</section>
+      ${chart({labels:lab,series:[{name:"Выручка",values:vals,kind:"bar"},...(byDay&&days>=14?[{name:"Среднее за 7 дней",values:ma,kind:"line"}]:[]),...(byDay&&p.rev&&u.anCmp?[{name:"Прошлый период",values:prevV,kind:"dash"}]:[])],maxLabels:byDay?10:12})}
+      ${byDay&&p.rev?`<label class="chk sm"><input type="checkbox" data-filter-sel="anCmp" ${u.anCmp?"checked":""}> Показать прошлый период пунктиром</label>`:""}</section>
     <section class="card"><div class="card-h"><h2>Что важно</h2></div><ul class="insights">${insights(c,p,f,t).map(x=>`<li class="${x[0]}">${x[1]}</li>`).join("")}</ul></section>
     <div class="fgrid">
-      <section class="card"><div class="card-h"><h2>Лучшие товары</h2><button class="btn sm" data-act="anTab" data-id="prod">Все</button></div>${hbars(topP.map(a=>[a.key.startsWith("svc:")?a.key.slice(4):(App.byId("products",a.key)||{}).name||"Товар",a.rev,`${a.key.startsWith("svc:")?"услуга":esc(catOf(App.byId("products",a.key)).sub)} · ${a.qty} шт${App.can("cost")?" · маржа "+pct(a.margin):""}`,a.key.startsWith("svc:")?null:["openProduct",a.key]]))}</section>
+      <section class="card"><div class="card-h"><h2>Лучшие товары</h2><button class="btn sm" data-act="anTab" data-id="prod">Все</button></div>${hbars(topP.map(a=>[a.key.startsWith("svc:")?a.key.slice(4):(App.byId("products",a.key)||{}).name||"Товар",a.rev,`${a.key.startsWith("svc:")?"услуга":esc(catOf(App.byId("products",a.key)).sub)} · ${a.qty} шт${App.can("cost")?" · маржа "+pct(a.margin):""}`,a.key.startsWith("svc:")||!App.byId("products",a.key)?null:["openProduct",a.key]]))}</section>
       <section class="card"><div class="card-h"><h2>Категории</h2><button class="btn sm" data-act="anTab" data-id="cat">Подробно</button></div>${hbars(topC.map(a=>[a.key,a.rev,pct(c.rev?a.rev/c.rev:0)+" выручки"]))}
         <h3 class="sub-h">Способы оплаты</h3>${hbars(Object.entries(pays).sort((a,b)=>b[1]-a[1]).map(([m,v])=>[App.payLabel(m),v]))}</section>
     </div>`;
@@ -183,29 +210,31 @@ function insights(c,p,f,t){
   const w=Array(7).fill(0),wc=Array(7).fill(0);for(let d=new Date(f);d<t;d=new Date(+d+DAY))wc[wd(d)]++;c.L.forEach(l=>w[wd(l.t)]+=l.rev);
   const avgW=w.map((v,i)=>wc[i]?v/wc[i]:0),best=avgW.indexOf(Math.max(...avgW)),worst=avgW.indexOf(Math.min(...avgW.map((v,i)=>wc[i]?v:Infinity)));
   if(c.checks>=10&&avgW[worst]>0)out.push(["info",`Лучший день — <b>${WD[best].toLowerCase()}</b> (в среднем ${money(avgW[best])}), слабее всего — ${WD[worst].toLowerCase()} (${money(avgW[worst])}).`]);
-  const pr=prodStats(90);const soon=pr.filter(r=>r.rate>0&&r.cover<10&&r.stock>=0&&!r.p.archived).length,dead=pr.filter(r=>r.stock>0&&r.idle>=num(App.settings().deadDays||60));
+  const pr=prodStats(90,App.ui.anPoint);const soon=pr.filter(r=>r.rate>0&&r.cover<10&&r.stock>=0&&!r.p.archived).length,dead=pr.filter(r=>r.stock>0&&r.idle>=num(App.settings().deadDays||60));
   if(soon)out.push(["warn",`<b>${soon}</b> ${plural(soon,"товар закончится","товара закончатся","товаров закончатся")} в ближайшие 10 дней при текущих продажах — см. «Товары», колонка «Хватит на».`]);
   if(dead.length&&cost)out.push(["warn",`В товарах без продаж ${App.settings().deadDays||60}+ дней заморожено <b>${money(dead.reduce((a,r)=>a+r.stock*r.costU,0))}</b> (${dead.length} поз.).`]);
-  const fb=firstBuy(),rep=c.sales.filter(s=>s.customerId&&fb[s.customerId]<f),repRev=rep.reduce((a,s)=>a+num(s.total),0),tot=c.sales.reduce((a,s)=>a+num(s.total),0);
+  const fb=firstBuy(),rep=c.sales.filter(s=>s.customerId&&fb[s.customerId]<f),repRev=rep.reduce((a,s)=>a+saleVal(s),0),tot=c.sales.reduce((a,s)=>a+saleVal(s),0);
   if(tot)out.push(["info",`Повторные покупатели дают <b>${pct(repRev/tot)}</b> выручки. ${c.anon>.4?`У ${pct(c.anon)} чеков нет телефона покупателя — их невозможно вернуть рассылкой.`:""}`]);
   if(cost&&c.margin&&p.margin&&Math.abs(c.margin-p.margin)>.02)out.push([c.margin>p.margin?"good":"bad",`Маржа ${c.margin>p.margin?"выросла":"упала"}: ${pct(p.margin)} → ${pct(c.margin)}.`]);
   if(c.retRate>.05)out.push(["bad",`Возвраты ${pct(c.retRate,1)} выручки — выше обычного, проверьте товары с возвратами.`]);
   return out.length?out:[["info","Пока мало данных для выводов."]];
 }
 
+const emptyPer=()=>`<section class="card"><div class="empty">За выбранный период${App.ui.anPoint?" на этой точке":""} продаж нет. Выберите другой период${App.ui.anPoint?" или точку":""}.</div></section>`;
 /* --- прогноз --- */
 function fc(){
-  const u=App.ui,F=App.anForecast(u.anPoint);if(!F)return '<section class="card"><div class="empty">Нет данных</div></section>';
-  const [f90,t90]=[new Date(+F.today-89*DAY),new Date(+F.today+DAY)],k90=kpi(f90,t90,u.anPoint),cost=App.can("cost");
+  const u=App.ui,F=App.anForecast(u.anPoint);
+  if(!F||F.hist<7)return `<section class="card"><div class="empty">Для прогноза нужна история продаж хотя бы за неделю${u.anPoint?" на этой точке":""}.${F?` Сейчас — ${F.hist+1} ${plural(F.hist+1,"день","дня","дней")}, выручка за месяц ${money(F.mtd)}.`:""}<br>Чем длиннее история, тем точнее прогноз: с 3 месяцев учитывается тренд, с года — сезонность.</div></section>`;
+  const k90v=k90(u.anPoint,F),cost=App.can("cost");
   // месяцы: 12 назад + 3 вперёд
   const lab=[],act=[],fut=[],band=[];const now=F.today;
   for(let k=-11;k<=3;k++){const d=new Date(now.getFullYear(),now.getMonth()+k,1),key=mk(d);lab.push(MON[d.getMonth()]+" "+String(d.getFullYear()).slice(2));
-    if(k<0){act.push(F.byM[key]||0);fut.push(null);band.push(null)}else if(k===0){act.push(F.mtd);fut.push(F.monthEnd);band.push([F.monthEnd*(1-F.rel*.5),F.monthEnd*(1+F.rel*.5)])}
+    if(k<0){act.push(F.byM[key]||0);fut.push(null);band.push(null)}else if(k===0){act.push(F.mtd);fut.push(F.monthEnd);band.push([F.curLo,F.curHi])}
     else{const m=F.months[k-1];act.push(null);fut.push(m.v);band.push([m.lo,m.hi])}}
   const fl=lab.findIndex((_,i)=>act[i]>0);const sl=Math.max(0,Math.min(fl<0?11:fl,11));
   // дни: 30 назад + 30 вперёд
   const dl=[],da=[],df=[];for(let i=-29;i<=30;i++){const d=new Date(+now+i*DAY);dl.push(d.getDate()+" "+MON[d.getMonth()]);da.push(i<=0?F.val(d):null);df.push(i>=0?F.fc(d):null)}
-  const sc=u.anSc,base=F.months[0].v,scRev=base*(1+sc.chk/100)*(1+sc.avg/100),mar=Math.max(0,k90.margin+sc.mar/100);
+  const sc=u.anSc,base=F.months[0].v,scRev=base*(1+sc.chk/100)*(1+sc.avg/100),mar=Math.max(0,k90v.margin+sc.mar/100);
   const lm=new Date(now.getFullYear(),now.getMonth()-1,1),pm=new Date(now.getFullYear(),now.getMonth()-2,1),lmv=F.byM[mk(lm)]||0,pmv=F.byM[mk(pm)]||0;
   const ly=F.byM[mk(new Date(now.getFullYear()-1,now.getMonth(),1))];
   const plan=num(u.anPlan),daysLeft=Math.round((new Date(now.getFullYear(),now.getMonth()+1,1)-now)/DAY)-1;
@@ -217,19 +246,19 @@ function fc(){
       <div class="tile"><span>Темп роста</span><b class="${F.gMonth>=0?"okc":"badc"}">${sgn(F.gMonth)}${pct(Math.abs(F.gMonth),1)}</b><small>в месяц, по тренду ${F.weeks.length} недель</small></div>
       <div class="tile"><span>Прошлый месяц к позапрошлому</span><b>${pmv?`${sgn(lmv-pmv)}${pct(Math.abs(delta(lmv,pmv)))}`:"—"}</b><small>${money(lmv)} против ${money(pmv)}</small></div>
       <div class="tile"><span>К прошлому году</span><b>${ly?`${sgn(F.monthEnd-ly)}${pct(Math.abs(delta(F.monthEnd,ly)))}`:"—"}</b><small>${ly?"прогноз месяца против "+money(ly):"истории меньше года"}</small></div>
-      ${cost?`<div class="tile"><span>Прибыль в следующем месяце</span><b>${money(base*k90.margin)}</b><small>при марже ${pct(k90.margin)} (90 дней)</small></div>`:""}
+      ${cost?`<div class="tile"><span>Прибыль в следующем месяце</span><b>${money(base*k90v.margin)}</b><small>при марже ${pct(k90v.margin)} (90 дней)</small></div>`:""}
     </div>
     <section class="card"><div class="card-h"><h2>Выручка по месяцам и прогноз</h2></div>
       ${chart({labels:lab.slice(sl),series:[{name:"Факт",values:act.slice(sl),kind:"bar"},{name:"Прогноз",values:fut.slice(sl),kind:"ghost"}],band:band.slice(sl),whisk:true,maxLabels:15})}</section>
     <section class="card"><div class="card-h"><h2>Ближайшие 30 дней</h2></div>
       ${chart({labels:dl,series:[{name:"Факт",values:da,kind:"line"},{name:"Прогноз",values:df,kind:"dash"}],maxLabels:12})}
-      <p class="muted">Прогноз учитывает средний день за последние 4 недели, разницу между днями недели (${WD.map((w,i)=>w+" "+Math.round(F.wdF[i]*100)+"%").join(", ")}) и тренд. Надёжность: <b>${F.quality}</b> — история ${F.hist} ${plural(F.hist,"день","дня","дней")}${F.hist<90?"; станет точнее, когда наберётся 3 месяца":""}.</p></section>
+      <p class="muted">Прогноз учитывает средний день за последние 4 недели, разницу между днями недели (${WD.map((w,i)=>w+" "+Math.round(F.wdF[i]*100)+"%").join(", ")}) и тренд. ${F.seasonal?"Учтена сезонность по прошлому году. ":""}Надёжность: <b>${F.quality}</b> — история ${F.hist} ${plural(F.hist,"день","дня","дней")}${F.hist<90?"; станет точнее, когда наберётся 3 месяца":""}.</p></section>
     <div class="fgrid">
       <section class="card"><div class="card-h"><h2>Что если…</h2></div>
         <p class="muted">Двигайте ползунки — увидите, как изменится следующий месяц (${F.months[0].label}).</p>
         ${slider("chk","Чеков больше / меньше",sc.chk,-30,50)}${slider("avg","Средний чек",sc.avg,-30,50)}${cost?slider("mar","Маржа, п.п.",sc.mar,-10,10,"п.п."):""}
         <div class="pl tot"><span>Выручка</span><b id="scRev">${money(scRev)}</b></div>${cost?`<div class="pl tot"><span>Валовая прибыль</span><b id="scPr">${money(scRev*mar)}</b></div>`:""}
-        <p class="muted">Средний чек сейчас ${money(k90.avg)}, чеков в день ${(k90.checks/90).toFixed(1).replace(".",",")}. Например, +1 аксессуар к каждому 5-му телефону поднимает средний чек; рассылка повторным покупателям — число чеков.</p></section>
+        <p class="muted">Средний чек сейчас ${money(k90v.avg)}, чеков в день ${(k90v.checks/90).toFixed(1).replace(".",",")}. Например, +1 аксессуар к каждому 5-му телефону поднимает средний чек; рассылка повторным покупателям — число чеков.</p></section>
       <section class="card"><div class="card-h"><h2>План на месяц</h2></div>
         ${App.fld("anPlanI","Цель по выручке, ₽",App.inp("anPlanI",plan||"","number",String(Math.round(F.monthEnd/1e4)*1e4)))}
         ${plan?`<div class="prog"><i style="width:${Math.min(100,F.mtd/plan*100)}%"></i><i class="fc" style="width:${Math.min(100,F.monthEnd/plan*100)}%"></i></div>
@@ -237,37 +266,44 @@ function fc(){
           <div class="pl"><span>По прогнозу к концу месяца</span><b class="${F.monthEnd>=plan?"okc":"badc"}">${money(F.monthEnd)} · ${pct(F.monthEnd/plan)}</b></div>
           <div class="pl"><span>Нужно в день до конца месяца</span><b>${daysLeft>0?money(Math.max(0,plan-F.mtd)/daysLeft):"—"}</b></div>
           <div class="pl"><span>Сейчас в среднем в день</span><b>${money(F.lv)}</b></div>
-          <p class="muted">${F.monthEnd>=plan?"План выполняется по текущему темпу.":`Не хватает ≈ ${money(plan-F.monthEnd)}: это ≈ ${Math.ceil((plan-F.monthEnd)/Math.max(1,k90.avg))} чеков по ${money(k90.avg)}.`}</p>`:'<p class="muted">Укажите цель — покажу, сколько нужно продавать в день, чтобы её выполнить.</p>'}</section>
+          <p class="muted">${F.monthEnd>=plan?"План выполняется по текущему темпу.":`Не хватает ≈ ${money(plan-F.monthEnd)}: это ≈ ${Math.ceil((plan-F.monthEnd)/Math.max(1,k90v.avg))} чеков по ${money(k90v.avg)}.`}</p>`:'<p class="muted">Укажите цель — покажу, сколько нужно продавать в день, чтобы её выполнить.</p>'}</section>
     </div>`;
 }
+let k90c={k:null,v:null};
+function k90(pt,F){const key=[...dataRefs(),pt||""];if(sameRefs(k90c.k,key))return k90c.v;const v=kpi(new Date(+F.today-89*DAY),new Date(+F.today+DAY),pt);k90c={k:key,v};return v}
 const slider=(k,l,v,min,max,u="%")=>`<div class="sld"><label for="sc_${k}">${l}: <b id="scv_${k}">${v>0?"+":""}${v} ${u}</b></label><input id="sc_${k}" type="range" min="${min}" max="${max}" step="1" value="${v}" data-sc="${k}"></div>`;
 document.addEventListener("input",e=>{const t=e.target;
   if(t.dataset&&t.dataset.sc){const sc=App.ui.anSc;sc[t.dataset.sc]=num(t.value);const l=$("#scv_"+t.dataset.sc);if(l)l.textContent=(sc[t.dataset.sc]>0?"+":"")+sc[t.dataset.sc]+" "+(t.dataset.sc==="mar"?"п.п.":"%");
-    const F=App.anForecast(App.ui.anPoint);if(!F)return;const [f,to]=[new Date(+F.today-89*DAY),new Date(+F.today+DAY)],k=kpi(f,to,App.ui.anPoint);
+    const F=App.anForecast(App.ui.anPoint);if(!F)return;const k=k90(App.ui.anPoint,F);
     const r=F.months[0].v*(1+sc.chk/100)*(1+sc.avg/100);const a=$("#scRev");if(a)a.textContent=money(r);const b=$("#scPr");if(b)b.textContent=money(r*Math.max(0,k.margin+sc.mar/100))}
-  if(t.id==="anPlanI"){clearTimeout(planT);planT=setTimeout(()=>{App.ui.anPlan=num(t.value);LS("icase_plan",App.ui.anPlan);App.render();const i=$("#anPlanI");if(i){i.focus();i.setSelectionRange&&0}},700)}
 });
-let planT=0;
+document.addEventListener("change",e=>{const t=e.target;if(t.id==="anPlanI"){App.ui.anPlan=Math.max(0,num(t.value));LS("icase_plan",App.ui.anPlan);App.render()}});
 
 /* --- товары: спрос, ABC/XYZ, запас, что заказать --- */
-let psCache={k:"",v:null};
+let psCache={k:null,v:null};
 function prodStats(days,pt){
-  const k=days+"|"+(pt||"")+"|"+cache.key+"|"+S.products.length+"|"+S.units.length;if(psCache.k===k&&allLines()===cache.lines)return psCache.v;
-  const to=new Date(+d0(Date.now())+DAY),from=new Date(+to-days*DAY),mid=new Date(+to-days/2*DAY);
-  const L=linesIn(from,to,pt).filter(l=>l.pid);
-  const last={};for(const l of allLines())if(l.pid&&!l.ret&&(!last[l.pid]||l.t>last[l.pid]))last[l.pid]=l.t;
-  const weeks=Math.max(1,Math.floor(days/7)),by={};
-  for(const l of L){const a=by[l.pid]||(by[l.pid]={qty:0,rev:0,cost:0,q1:0,q2:0,w:Array(weeks).fill(0)});a.qty+=l.qty;a.rev+=l.rev;a.cost+=l.cost;if(l.t<mid)a.q1+=l.qty;else a.q2+=l.qty;
-    const wi=Math.min(weeks-1,Math.floor((to-l.t)/DAY/7));if(wi>=0)a.w[weeks-1-wi]+=l.qty}
-  const rows=S.products.filter(p=>!p.archived||by[p.id]).map(p=>{const a=by[p.id]||{qty:0,rev:0,cost:0,q1:0,q2:0,w:Array(weeks).fill(0)};
-    const born=p.createdAt?new Date(p.createdAt):from,eff=Math.max(7,Math.min(days,(to-Math.max(+from,+born))/DAY));
-    const rate=Math.max(0,a.qty)/eff,tr=a.q1>0?a.q2/a.q1:a.q2>0?2:1,tf=Math.sqrt(Math.max(.5,Math.min(2,tr)));
-    const stock=pt?(()=>{const whs=App.whs().filter(w=>w.pointId===pt).map(w=>w.id);return whs.reduce((s,w)=>s+num((p.stock||{})[w]),0)})():App.qtyTotal(p);
-    const mean=a.w.reduce((s,v)=>s+v,0)/weeks,sd=Math.sqrt(a.w.reduce((s,v)=>s+(v-mean)*(v-mean),0)/weeks),cv=mean>0?sd/mean:9;
-    const r2=rate*tf,cover=r2>0?stock/r2:Infinity,need=Math.max(0,Math.ceil(r2*30+r2*7-stock));
-    const idle=last[p.id]?Math.round((Date.now()-last[p.id])/DAY):Math.round((Date.now()-(p.createdAt?+new Date(p.createdAt):Date.now()))/DAY);
-    return{p,qty:a.qty,rev:a.rev,cost:a.cost,profit:a.rev-a.cost,margin:a.rev>0?(a.rev-a.cost)/a.rev:0,rate,trend:tr,stock,cover,f30:Math.round(r2*30),need,
-      xyz:a.qty<=0?"—":cv<.5?"X":cv<1?"Y":"Z",idle,last:last[p.id]||null,costU:num(p.cost),cat:catOf(p)}});
+  const k=[...dataRefs(),S.units,S.warehouses,days,pt||""];if(sameRefs(psCache.k,k))return psCache.v;
+  const to=new Date(+d0(Date.now())+DAY),from=new Date(+to-days*DAY);
+  const per={},last={};
+  for(const l of allLines()){if(!l.pid||(pt&&l.point!==pt))continue;
+    if(!l.ret&&(!last[l.pid]||l.t>last[l.pid]))last[l.pid]=l.t;
+    if(l.t>=from&&l.t<to)(per[l.pid]||(per[l.pid]=[])).push(l)}
+  const ptWh=pt?App.whs(true).filter(w=>w.pointId===pt).map(w=>w.id):null;
+  const rows=S.products.filter(p=>!p.archived||per[p.id]).map(p=>{
+    const L=per[p.id]||[],born=p.createdAt?new Date(p.createdAt):from,start=new Date(Math.max(+from,+born)),eff=Math.max(7,Math.min(days,(to-start)/DAY));
+    const qty=L.reduce((a,l)=>a+l.qty,0),rev=L.reduce((a,l)=>a+l.rev,0),cost=L.reduce((a,l)=>a+l.cost,0);
+    // тренд: вторая половина «живого» периода против первой
+    const mid=new Date(+to-eff/2*DAY);let q1=0,q2=0;L.forEach(l=>{if(l.t<mid)q1+=l.qty;else q2+=l.qty});
+    const tr=q1>0?q2/q1:q2>0?2:1,tf=qty>=5?Math.sqrt(Math.max(.5,Math.min(2,tr))):1;
+    // стабильность: недельные продажи только за время, пока товар есть в базе
+    const wk=Math.max(1,Math.floor(eff/7)),w=Array(wk).fill(0);L.forEach(l=>{const i=Math.floor((to-l.t)/DAY/7);if(i<wk)w[i]+=l.qty});
+    const mean=w.reduce((s,v)=>s+v,0)/wk,sd=Math.sqrt(w.reduce((s,v)=>s+(v-mean)*(v-mean),0)/wk),cv=mean>0?sd/mean:9;
+    const rate=Math.max(0,qty)/eff,r2=rate*tf;
+    const stock=ptWh?ptWh.reduce((s,id)=>s+num((p.stock||{})[id]),0):App.qtyTotal(p);
+    const cover=r2>0?Math.max(0,stock)/r2:Infinity,need=r2>0?Math.max(0,Math.ceil(r2*37-Math.max(0,stock))):0;
+    const ref=last[p.id]||(p.createdAt?new Date(p.createdAt):null),idle=ref?Math.max(0,Math.round((Date.now()-ref)/DAY)):0;
+    return{p,qty,rev,cost,profit:rev-cost,margin:rev>0?(rev-cost)/rev:0,rate,trend:tr,stock,cover,f30:Math.round(r2*30),need,
+      xyz:qty<=0?"—":wk<4?"—":cv<.5?"X":cv<1?"Y":"Z",idle,last:last[p.id]||null,costU:num(p.cost),cat:catOf(p)}});
   const abc=(key,field)=>{const s=rows.filter(r=>r[field]>0).sort((a,b)=>b[field]-a[field]),tot=s.reduce((a,r)=>a+r[field],0);let c=0;s.forEach(r=>{c+=r[field];r[key]=c/tot<=.8||c===r[field]?"A":c/tot<=.95?"B":"C"});rows.forEach(r=>{if(!r[key])r[key]="—"})};
   abc("abc","rev");abc("abcP","profit");
   rows.forEach(r=>{const dd=num(App.settings().deadDays||60);
@@ -309,7 +345,8 @@ ACT.anExport=()=>{const [f,t]=range(App.ui.anPer),days=Math.max(7,Math.round((t-
 /* --- категории, бренды, состояние, цены --- */
 function cat(){
   const u=App.ui,[f,t]=range(u.anPer),[pf,ptt]=prevRange(f,t),L=linesIn(f,t,u.anPoint),P=linesIn(pf,ptt,u.anPoint),cost=App.can("cost");
-  const tot=L.reduce((a,l)=>a+l.rev,0);
+  const tot=L.reduce((a,l)=>a+l.rev,0);if(!L.length)return emptyPer();
+  const ti=S.sales.filter(s=>s.tradeIn&&new Date(s.createdAt)>=f&&new Date(s.createdAt)<t&&(!u.anPoint||s.pointId===u.anPoint)).reduce((a,s)=>({n:a.n+1,sum:a.sum+num(s.tradeIn.amount)}),{n:0,sum:0});
   const table=(title,fn)=>{const cur=agg(L,fn).sort((a,b)=>b.rev-a.rev),pm=Object.fromEntries(agg(P,fn).map(a=>[a.key,a.rev]));
     return `<section class="card"><div class="card-h"><h2>${title}</h2></div><div class="tbl-wrap"><table><thead><tr><th></th><th class="n">Выручка</th><th class="n">Доля</th><th class="n">К прошлому</th>${cost?'<th class="n">Прибыль</th><th class="n">Маржа</th>':""}<th class="n">Шт</th></tr></thead><tbody>
       ${cur.map(a=>`<tr><td><b>${esc(a.key)}</b></td><td class="n">${money(a.rev)}</td><td class="n"><span class="share"><i style="width:${tot?a.rev/tot*100:0}%"></i></span>${pct(tot?a.rev/tot:0)}</td><td class="n">${dTag(a.rev,pm[a.key]||0)||"—"}</td>${cost?`<td class="n">${money(a.profit)}</td><td class="n">${pct(a.margin)}</td>`:""}<td class="n">${a.qty}</td></tr>`).join("")||'<tr><td colspan="7" class="empty">Нет данных</td></tr>'}
@@ -322,7 +359,7 @@ function cat(){
   const devs=Object.values(bySale).filter(ls=>ls.some(l=>{const p=App.byId("products",l.pid);return p&&App.isDevice&&App.isDevice(p)}));
   const attach=devs.filter(ls=>ls.some(l=>{const p=l.pid?App.byId("products",l.pid):null;return !p||!(App.isDevice&&App.isDevice(p))})).length;
   return `<div class="tiles t4"><div class="tile"><span>Чеков с устройством</span><b>${devs.length}</b></div><div class="tile"><span>Из них с аксессуаром или услугой</span><b>${devs.length?pct(attach/devs.length):"—"}</b><small>чем выше, тем больше средний чек</small></div>
-      <div class="tile"><span>Услуги</span><b>${money(L.filter(l=>l.kind==="service").reduce((a,l)=>a+l.rev,0))}</b></div><div class="tile"><span>Б/у техника</span><b>${money(L.filter(l=>l.cond==="Б/у").reduce((a,l)=>a+l.rev,0))}</b></div></div>
+      <div class="tile"><span>Услуги</span><b>${money(L.filter(l=>l.kind==="service").reduce((a,l)=>a+l.rev,0))}</b></div><div class="tile"><span>Б/у техника</span><b>${money(L.filter(l=>l.cond==="Б/у").reduce((a,l)=>a+l.rev,0))}</b>${ti.n?`<small>trade-in: ${ti.n} шт на ${money(ti.sum)}</small>`:""}</div></div>
     <div class="fgrid">${table("Категории",l=>l.top)}${table("Подкатегории",l=>l.sub)}</div>
     <div class="fgrid">${table("Бренды",l=>l.brand)}${table("Новое и б/у",l=>l.kind==="service"?"Услуги":l.cond)}</div>
     <section class="card"><div class="card-h"><h2>Ценовые сегменты</h2></div>${hbars(bands.map(a=>[a.key,a.rev,`${a.qty} шт${cost?" · маржа "+pct(a.margin):""}`]))}</section>`;
@@ -331,16 +368,14 @@ function cat(){
 /* --- клиенты --- */
 function cust(){
   const u=App.ui,[f,t]=range(u.anPer),c=kpi(f,t,u.anPoint),fb=firstBuy();
-  const now=Date.now(),by={};
-  for(const s of S.sales){if(!s.customerId)continue;const a=by[s.customerId]||(by[s.customerId]={n:0,sum:0,last:0});a.n++;a.sum+=num(s.total);a.last=Math.max(a.last,+new Date(s.createdAt))}
-  const seg=a=>{const r=(now-a.last)/DAY;return a.n>=3&&r<=30?"Чемпионы":a.n>=3&&r<=90?"Лояльные":a.n===1&&r<=30?"Новые":a.n===2&&r<=60?"Перспективные":a.n>=2&&r<=180?"Под угрозой ухода":r>180||(a.n===1&&r>90)?"Ушедшие":"Обычные"};
+  const by=custStats();
   const SEG={"Чемпионы":"часто и недавно — ваша опора","Лояльные":"покупают регулярно","Новые":"первая покупка за 30 дней — пригласите снова","Перспективные":"вторая покупка — закрепите","Под угрозой ухода":"давно не было — напомните о себе","Ушедшие":"больше полугода без покупок","Обычные":""};
-  const segs={};Object.entries(by).forEach(([id,a])=>{const k=seg(a);(segs[k]||(segs[k]={n:0,sum:0,ids:[]})).n++;segs[k].sum+=a.sum;segs[k].ids.push(id)});
-  const cs=c.sales.filter(s=>s.customerId),cur={};cs.forEach(s=>{const a=cur[s.customerId]||(cur[s.customerId]={n:0,sum:0});a.n++;a.sum+=num(s.total)});
+  const segs={};Object.entries(by).forEach(([id,a])=>{const k=segOf(a);(segs[k]||(segs[k]={n:0,sum:0,ids:[]})).n++;segs[k].sum+=a.sum;segs[k].ids.push(id)});
+  const cs=c.sales.filter(s=>s.customerId),cur={};cs.forEach(s=>{const a=cur[s.customerId]||(cur[s.customerId]={n:0,sum:0});a.n++;a.sum+=saleVal(s)});
   const top=Object.entries(cur).sort((a,b)=>b[1].sum-a[1].sum).slice(0,10);
   const repeaters=Object.values(by).filter(a=>a.n>=2).length,total=Object.keys(by).length;
-  const avgId=cs.length?cs.reduce((a,s)=>a+num(s.total),0)/cs.length:0,an=c.sales.filter(s=>!s.customerId),avgAn=an.length?an.reduce((a,s)=>a+num(s.total),0)/an.length:0;
-  const src={};cs.forEach(s=>{const k=(App.cust(s.customerId)||{}).source||"Не указан";src[k]=(src[k]||0)+num(s.total)});
+  const avgId=cs.length?cs.reduce((a,s)=>a+saleVal(s),0)/cs.length:0,an=c.sales.filter(s=>!s.customerId),avgAn=an.length?an.reduce((a,s)=>a+saleVal(s),0)/an.length:0;
+  const src={};cs.forEach(s=>{const k=(App.cust(s.customerId)||{}).source||"Не указан";src[k]=(src[k]||0)+saleVal(s)});
   const ltv=total?Object.values(by).reduce((a,x)=>a+x.sum,0)/total:0;
   // новые клиенты по месяцам
   const nm={};Object.values(fb).forEach(d=>{const k=mk(d);nm[k]=(nm[k]||0)+1});const ml=[],mv=[];const n0=new Date();for(let k=-11;k<=0;k++){const d=new Date(n0.getFullYear(),n0.getMonth()+k,1);ml.push(MON[d.getMonth()]);mv.push(nm[mk(d)]||0)}
@@ -357,19 +392,24 @@ function cust(){
         <h3 class="sub-h">Откуда клиенты (выручка)</h3>${hbars(Object.entries(src).sort((a,b)=>b[1]-a[1]))}</section>
     </div>`;
   }
-ACT.anSeg=k=>{const now=Date.now(),by={};for(const s of S.sales){if(!s.customerId)continue;const a=by[s.customerId]||(by[s.customerId]={n:0,sum:0,last:0});a.n++;a.sum+=num(s.total);a.last=Math.max(a.last,+new Date(s.createdAt))}
-  const seg=a=>{const r=(now-a.last)/DAY;return a.n>=3&&r<=30?"Чемпионы":a.n>=3&&r<=90?"Лояльные":a.n===1&&r<=30?"Новые":a.n===2&&r<=60?"Перспективные":a.n>=2&&r<=180?"Под угрозой ухода":r>180||(a.n===1&&r>90)?"Ушедшие":"Обычные"};
-  const list=Object.entries(by).filter(([,a])=>seg(a)===k).sort((a,b)=>b[1].sum-a[1].sum);
-  App.openModal(App.head(esc(k)+" · "+list.length)+`<div class="flist">${list.slice(0,200).map(([id,a])=>{const c=App.cust(id)||{};return `<button class="frow" data-act="openClient" data-id="${esc(id)}"><span class="fic">${esc((c.name||"?").slice(0,1))}</span><span class="cnm"><b>${esc(c.name||"Клиент")}</b><small>${esc(c.phone||"")} · ${a.n} ${plural(a.n,"покупка","покупки","покупок")} · последняя ${App.dt(new Date(a.last).toISOString())}</small></span><span class="csum">${money(a.sum)}</span></button>`}).join("")}</div>
+/* сегменты: давность, частота и сумма покупок (возвраты вычитаются) */
+let csCache={k:null,v:null};
+function custStats(){const k=[S.sales,S.returns,S.customers];if(sameRefs(csCache.k,k))return csCache.v;const by={};
+  for(const s of S.sales){if(!s.customerId)continue;const c=App.cust(s.customerId);if(c&&c.mergedInto)continue;const a=by[s.customerId]||(by[s.customerId]={n:0,sum:0,last:0});a.n++;a.sum+=saleVal(s);a.last=Math.max(a.last,+new Date(s.createdAt))}
+  for(const r of S.returns){const s=App.byId("sales",r.saleId);const id=r.customerId||(s&&s.customerId);if(id&&by[id])by[id].sum-=num(r.amount)}
+  csCache={k,v:by};return by}
+const segOf=a=>{const r=(Date.now()-a.last)/DAY;return a.n>=3&&r<=30?"Чемпионы":a.n>=3&&r<=90?"Лояльные":a.n===1&&r<=30?"Новые":a.n===2&&r<=60?"Перспективные":a.n>=2&&r<=180?"Под угрозой ухода":r>180||(a.n===1&&r>90)?"Ушедшие":"Обычные"};
+const segList=k=>Object.entries(custStats()).filter(([,a])=>segOf(a)===k).sort((a,b)=>b[1].sum-a[1].sum);
+ACT.anSeg=k=>{const list=segList(k);
+  App.openModal(App.head(esc(k)+" · "+list.length)+`<div class="flist">${list.slice(0,300).map(([id,a])=>{const c=App.cust(id)||{};return `<button class="frow" data-act="openClient" data-id="${esc(id)}"><span class="fic">${esc((c.name||"?").slice(0,1))}</span><span class="cnm"><b>${esc(c.name||"Клиент")}</b><small>${esc(c.phone||"")} · ${a.n} ${plural(a.n,"покупка","покупки","покупок")} · последняя ${App.dt(new Date(a.last).toISOString())}</small></span><span class="csum">${money(a.sum)}</span></button>`}).join("")}</div>
+    ${list.length>300?`<p class="muted">Показаны первые 300 из ${list.length} — полный список в файле.</p>`:""}
     <div class="acts"><button class="btn" data-act="anSegCsv" data-id="${esc(k)}">Скачать список с телефонами</button></div>`,{wide:true})};
-ACT.anSegCsv=k=>{const now=Date.now(),by={};for(const s of S.sales){if(!s.customerId)continue;const a=by[s.customerId]||(by[s.customerId]={n:0,sum:0,last:0});a.n++;a.sum+=num(s.total);a.last=Math.max(a.last,+new Date(s.createdAt))}
-  const seg=a=>{const r=(now-a.last)/DAY;return a.n>=3&&r<=30?"Чемпионы":a.n>=3&&r<=90?"Лояльные":a.n===1&&r<=30?"Новые":a.n===2&&r<=60?"Перспективные":a.n>=2&&r<=180?"Под угрозой ухода":r>180||(a.n===1&&r>90)?"Ушедшие":"Обычные"};
-  const rows=[["Имя","Телефон","Покупок","Сумма","Последняя покупка"],...Object.entries(by).filter(([,a])=>seg(a)===k).map(([id,a])=>{const c=App.cust(id)||{};return [c.name,c.phone,a.n,Math.round(a.sum),new Date(a.last).toLocaleDateString("ru-RU")]})];
-  App.download(`icase-clients-${k}.csv`,App.toCSV(rows))};
+ACT.anSegCsv=k=>{const rows=[["Имя","Телефон","Покупок","Сумма","Последняя покупка","Сегмент"],...segList(k).map(([id,a])=>{const c=App.cust(id)||{};return [c.name,c.phone,a.n,Math.round(a.sum),new Date(a.last).toLocaleDateString("ru-RU"),k]})];
+  App.download(`icase-clients-${k}.csv`,App.toCSV(rows));App.api.audit("Экспорт","Клиенты: "+k,rows.length-1+" шт")};
 
 /* --- время --- */
 function time(){
-  const u=App.ui,[f,t]=range(u.anPer),c=kpi(f,t,u.anPoint);
+  const u=App.ui,[f,t]=range(u.anPer),c=kpi(f,t,u.anPoint);if(!c.sales.length)return emptyPer();
   const m=Array.from({length:7},()=>Array(14).fill(0)),hr=Array(24).fill(0),wv=Array(7).fill(0),wc=Array(7).fill(0);
   for(let d=new Date(f);d<t;d=new Date(+d+DAY))wc[wd(d)]++;
   c.sales.forEach(s=>{const d=new Date(s.createdAt),h=d.getHours();hr[h]++;if(h>=8&&h<22)m[wd(d)][h-8]++});
@@ -389,15 +429,17 @@ function team(){
   const u=App.ui,[f,t]=range(u.anPer),c=kpi(f,t,u.anPoint),cost=App.can("cost");
   const row=(lines,sales)=>{const rev=lines.reduce((a,l)=>a+l.rev,0),cst=lines.reduce((a,l)=>a+l.cost,0),items=lines.filter(l=>!l.ret).reduce((a,l)=>a+l.qty,0),ret=-lines.filter(l=>l.ret).reduce((a,l)=>a+l.rev,0);
     const svc=lines.filter(l=>l.kind==="service"&&!l.ret).reduce((a,l)=>a+l.rev,0);
-    return{rev,profit:rev-cst,margin:rev?(rev-cst)/rev:0,n:sales.length,avg:sales.length?sales.reduce((a,s)=>a+num(s.total)+num(s.tradeIn&&s.tradeIn.amount),0)/sales.length:0,ipc:sales.length?items/sales.length:0,ret,svc,cust:sales.length?sales.filter(s=>s.customerId).length/sales.length:0}};
-  const tbl=(title,groups,label)=>`<section class="card"><div class="card-h"><h2>${title}</h2></div><div class="tbl-wrap"><table><thead><tr><th></th><th class="n">Выручка</th><th class="n">Чеков</th><th class="n">Средний чек</th><th class="n">Товаров в чеке</th>${cost?'<th class="n">Маржа</th>':""}<th class="n">Услуги</th><th class="n">С телефоном</th><th class="n">Возвраты</th></tr></thead><tbody>
-    ${groups.map(([k,r])=>`<tr><td><b>${esc(label(k))}</b></td><td class="n">${money(r.rev)}</td><td class="n">${r.n}</td><td class="n">${money(r.avg)}</td><td class="n">${r.ipc.toFixed(1).replace(".",",")}</td>${cost?`<td class="n">${pct(r.margin)}</td>`:""}<td class="n">${money(r.svc)}</td><td class="n">${pct(r.cust)}</td><td class="n">${r.ret>0.5?money(r.ret):"—"}</td></tr>`).join("")||'<tr><td colspan="9" class="empty">Нет данных</td></tr>'}</tbody></table></div></section>`;
+    const disc=sales.reduce((a,s)=>a+num(s.discount)+(s.items||[]).reduce((b,i)=>b+num(i.disc),0),0),list=sales.reduce((a,s)=>a+(s.items||[]).reduce((b,i)=>b+num(i.qty)*num(i.price),0),0);
+    return{disc,discP:list?disc/list:0,rev,profit:rev-cst,margin:rev?(rev-cst)/rev:0,n:sales.length,avg:sales.length?sales.reduce((a,s)=>a+saleVal(s),0)/sales.length:0,ipc:sales.length?items/sales.length:0,ret,svc,cust:sales.length?sales.filter(s=>s.customerId).length/sales.length:0}};
+  const tbl=(title,groups,label)=>`<section class="card"><div class="card-h"><h2>${title}</h2></div><div class="tbl-wrap"><table><thead><tr><th></th><th class="n">Выручка</th><th class="n">Чеков</th><th class="n">Средний чек</th><th class="n">Товаров в чеке</th>${cost?'<th class="n">Маржа</th>':""}<th class="n">Услуги</th><th class="n">Скидки</th><th class="n">С телефоном</th><th class="n">Возвраты</th></tr></thead><tbody>
+    ${groups.map(([k,r])=>`<tr><td><b>${esc(label(k))}</b></td><td class="n">${money(r.rev)}</td><td class="n">${r.n}</td><td class="n">${money(r.avg)}</td><td class="n">${r.ipc.toFixed(1).replace(".",",")}</td>${cost?`<td class="n">${pct(r.margin)}</td>`:""}<td class="n">${money(r.svc)}</td><td class="n">${r.disc>0.5?money(r.disc)+`<span class="sub">${pct(r.discP,1)}</span>`:"—"}</td><td class="n">${pct(r.cust)}</td><td class="n">${r.ret>0.5?money(r.ret):"—"}</td></tr>`).join("")||'<tr><td colspan="10" class="empty">Нет данных</td></tr>'}</tbody></table></div></section>`;
+  if(!c.sales.length)return emptyPer();
   const keys=(fn)=>[...new Set(c.sales.map(fn))];
   const staff=keys(s=>s.by||"").map(k=>[k,row(c.L.filter(l=>(l.by||"")===k),c.sales.filter(s=>(s.by||"")===k))]).sort((a,b)=>b[1].rev-a[1].rev);
   const pts=keys(s=>s.pointId||"").map(k=>[k,row(c.L.filter(l=>(l.point||"")===k),c.sales.filter(s=>(s.pointId||"")===k))]).sort((a,b)=>b[1].rev-a[1].rev);
   const ch=keys(s=>s.channel||"store").map(k=>[k,row(c.L.filter(l=>l.channel===k),c.sales.filter(s=>(s.channel||"store")===k))]);
   return tbl("Сотрудники",staff,k=>App.nameOf(k)||"—")+tbl("Точки",pts,k=>(App.byId("points",k)||{}).name||"Без точки")+tbl("Каналы продаж",ch,k=>({store:"Магазин",site:"Сайт",avito:"Авито"})[k]||k)+
-    `<p class="muted">«Товаров в чеке» и «Услуги» показывают, кто лучше допродаёт. «С телефоном» — доля чеков, где продавец записал телефон покупателя.</p>`;
+    `<p class="muted">«Товаров в чеке» и «Услуги» показывают, кто лучше допродаёт. «Скидки» — сколько скидок дал сотрудник и какую долю от цен по прайсу. «С телефоном» — доля чеков, где продавец записал телефон покупателя.</p>`;
 }
 
 /* --- склад --- */
