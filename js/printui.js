@@ -52,24 +52,24 @@ function found(){
 const plural=n=>{const a=n%10,b=n%100;return a===1&&b!==11?"ценник":a>=2&&a<=4&&(b<12||b>14)?"ценника":"ценников"};
 function tags(){
   const items=queueItems(),total=printList().reduce((a,x)=>a+num(x.copies),0),res=found();
-  return `<div class="pgrid">
+  return `<div class="pgrid pset">
   <section class="card"><div class="card-h"><h2>Что печатаем</h2>${items.length?`<span class="pill">${items.length} товаров · ${total} ценников</span>`:""}</div>
-    <input type="search" id="tagQ" placeholder="Найти товар: название, артикул, штрихкод, IMEI" value="${esc(App.ui.tagQ)}" data-filter="tagQ" aria-label="Поиск товара">
-    ${res.length?`<div class="list-mini" style="margin-top:8px">${res.slice(0,8).map(p=>`<button data-act="tagAdd" data-id="${esc(p.id)}"><span>${esc(p.name)}<small>${esc(App.catName(p))} · остаток ${App.qtyTotal(p)}</small></span><b>${money(p.price)}</b></button>`).join("")}</div>
-      ${res.length>1?`<div class="acts" style="justify-content:flex-start;margin-top:6px"><button class="btn sm" data-act="tagAddFound">Добавить все найденные (${res.length})</button></div>`:""}`:App.ui.tagQ?'<p class="muted">Ничего не найдено</p>':""}
-    <p class="muted" style="margin:10px 0 0">Можно отметить товары галочками в разделе «Товары» и нажать «Ценники».</p>
-    ${items.length?`<div class="tbl-wrap" style="margin-top:10px"><table class="tagtbl"><thead><tr><th>Товар</th><th class="n">Цена</th><th class="n">Остаток</th><th class="n">Копий</th><th></th></tr></thead><tbody>
+    <div class="tsec"><input type="search" id="tagQ" class="wide" placeholder="Найти товар: название, артикул, штрихкод, IMEI" value="${esc(App.ui.tagQ)}" data-filter="tagQ" aria-label="Поиск товара">
+    ${res.length?`<div class="list-mini tgap">${res.slice(0,8).map(p=>`<button data-act="tagAdd" data-id="${esc(p.id)}"><span>${esc(p.name)}<small>${esc(App.catName(p))} · остаток ${App.qtyTotal(p)}</small></span><b>${money(p.price)}</b></button>`).join("")}</div>
+      ${res.length>1?`<div class="tgap"><button class="btn sm" data-act="tagAddFound">Добавить все найденные (${res.length})</button></div>`:""}`:App.ui.tagQ?'<p class="muted">Ничего не найдено</p>':""}
+    <p class="szhint">Можно отметить товары галочками в разделе «Товары» и нажать «Ценники».</p></div>
+    ${items.length?`<div class="tsec"><div class="tbl-wrap"><table class="tagtbl"><thead><tr><th>Товар</th><th class="n">Цена</th><th class="n">Остаток</th><th class="n">Копий</th><th></th></tr></thead><tbody>
       ${items.map(({q,p},i)=>`<tr><td><b>${esc(p.name)}</b><span class="sub">${esc([p.memory,p.color,p.condition].filter(Boolean).join(" · "))}</span>${p.trackSerial?`<label class="unitmode"><input type="checkbox" data-act="tagUnitMode" data-id="${i}" ${q.perUnit!==false?"checked":""}> по экземплярам: ${unitsForTags(p).length} шт.<small>свои IMEI, АКБ и цена</small></label>`:""}</td><td class="n">${money(p.price)}</td><td class="n">${qtyHere(p)}</td>
         <td class="n"><input type="number" min="0" max="200" value="${num(q.copies)}" data-tagcopy="${i}" aria-label="Копий" style="width:70px"></td><td class="n"><button class="btn sm ghost" data-act="tagDel" data-id="${i}" aria-label="Убрать">✕</button></td></tr>`).join("")}
       </tbody></table></div>
-      <div class="acts" style="justify-content:flex-start"><button class="btn sm" data-act="tagByStock">Копий по остатку на точке</button><button class="btn sm" data-act="tagOnes">По одному</button><button class="btn sm danger" data-act="tagClear">Очистить</button></div>`
-      :'<div class="empty">Список пуст</div>'}
+      <div class="chips tgap"><button class="btn sm" data-act="tagByStock">Копий по остатку на точке</button><button class="btn sm" data-act="tagOnes">По одному</button><button class="btn sm danger" data-act="tagClear">Очистить</button></div></div>`
+      :'<div class="tsec"><div class="empty">Список пуст</div></div>'}
   </section>
   <section class="card"><div class="card-h"><h2>Шаблон</h2>${canTpl()?'<button class="btn sm" data-act="printTab" data-id="tagtpl">Настроить</button>':""}</div>
-    ${App.sel("tagTplSel",App.tagTemplates().map(t=>[t.id,t.name+(t.builtin?"":" · свой")]),App.ui.tagTpl,'data-filter-sel="tagTpl" aria-label="Шаблон ценника"')}
-    <div class="prevbox"><iframe id="tagPrev" title="Предпросмотр ценников"></iframe></div>
+    <div class="tsec">${App.sel("tagTplSel",App.tagTemplates().map(t=>[t.id,t.name+(t.builtin?"":" · свой")]),App.ui.tagTpl,'data-filter-sel="tagTpl" aria-label="Шаблон ценника"')}
+    <div class="prevbox tgap"><iframe id="tagPrev" title="Предпросмотр ценников"></iframe></div>
     <div class="printbar"><span class="muted">${total?`${total} ${plural(total)} · ${esc(App.tagTemplate(App.ui.tagTpl).name)}`:"Добавьте товары слева"}</span>
-      <button class="btn pri" data-act="tagPrint" id="tagPrintBtn" ${total?"":"disabled"}>🖨 Печать${total?" · "+total+" шт.":""}</button></div>
+      <button class="btn pri" data-act="tagPrint" id="tagPrintBtn" ${total?"":"disabled"}>🖨 Печать${total?" · "+total+" шт.":""}</button></div></div>
   </section></div>
   ${total?`<div class="printfab"><button class="btn pri" data-act="tagPrint">🖨 Печать · ${total} шт.</button></div>`:""}`;
 }
@@ -266,25 +266,27 @@ function receipt(){
   const d=docDraft();
   const ck=(k,l)=>`<label class="chk"><input type="checkbox" data-dcfg="${k}" ${d[k]?"checked":""}> ${l}</label>`;
   const tx=(k,l,ph="")=>App.fld("dc_"+k,l,`<input id="dc_${k}" type="text" value="${esc(d[k]||"")}" data-dcfg="${k}" placeholder="${esc(ph)}">`,"full");
-  return `<div class="pgrid">
+  return `<div class="pgrid pset">
   <section class="card"><div class="card-h"><h2>Товарный чек</h2></div>
-    <div class="fld full"><label>Шаблон</label><div class="tplpick">${App.DOC_TEMPLATES.map(([k,l])=>`<button class="tplbtn ${d.template===k?"on":""}" data-act="docTpl" data-id="${k}"><span class="tpl-${k}"></span>${l}</button>`).join("")}</div></div>
-    <div class="form">
+    <div class="tsec"><h3 class="sub">Шаблон</h3><div class="tplpick">${App.DOC_TEMPLATES.map(([k,l])=>`<button class="tplbtn ${d.template===k?"on":""}" data-act="docTpl" data-id="${k}"><span class="tpl-${k}"></span>${l}</button>`).join("")}</div></div>
+    <div class="tsec"><h3 class="sub">Тексты</h3><div class="form">
       ${tx("title","Заголовок","Товарный чек")}
-      ${App.fld("dc_ackText","Отметка покупателя",`<textarea id="dc_ackText" rows="2" data-dcfg="ackText">${esc(d.ackText||"")}</textarea>`,"full")}
+      ${App.fld("dc_ackText","Отметка покупателя",`<textarea id="dc_ackText" rows="3" data-dcfg="ackText">${esc(d.ackText||"")}</textarea>`,"full")}
       ${tx("thanks","Надпись внизу","Спасибо за покупку!")}
       ${tx("legal1","Юридическая строка 1")}${tx("legal2","Юридическая строка 2")}
+    </div></div>
+    <div class="tsec"><h3 class="sub">Вид</h3><div class="form">
       ${App.fld("dc_scale","Размер текста: <b id=\"dcScaleV\">"+num(d.scale)+"%</b>",`<input id="dc_scale" type="range" min="85" max="115" step="5" value="${num(d.scale)||100}" data-dcfg="scale">`,"full")}
-      <div class="fld full"><label>Блоки</label><div class="chips">
+      <div class="fld full"><label>Что печатать</label><div class="chips">
         ${ck("showPoint","Название точки")}${ck("showStaff","Имя продавца")}${ck("chips","Память, цвет, гарантия")}${ck("tradein","Блок trade-in")}
         ${ck("words","Сумма прописью")}${ck("ack","Отметка покупателя")}${ck("legal","Юридические строки")}${ck("qrSite","QR на сайт")}${ck("qrReview","QR на отзывы")}</div></div>
     </div>
-    <p class="muted">Реквизиты ИП, адрес и ссылки для QR-кодов — в «Настройки → Магазин». QR без ссылки не печатается.</p>
+    <p class="szhint">Реквизиты ИП, адрес и ссылки для QR-кодов — в «Настройки → Магазин». QR без ссылки не печатается.</p></div>
     <div class="acts"><button class="btn" data-act="docReset">Стандартные настройки</button><button class="btn pri" data-act="docSave">Сохранить</button></div>
   </section>
   <section class="card"><div class="card-h"><h2>Предпросмотр</h2><div class="seg"><button class="${App.ui.docPrev==="a4"?"on":""}" data-act="docPrev" data-id="a4">A4</button><button class="${App.ui.docPrev==="80"?"on":""}" data-act="docPrev" data-id="80">80 мм</button></div></div>
-    <div class="prevbox doc ${App.ui.docPrev==="80"?"tape":""}"><iframe id="docPrev" title="Предпросмотр товарного чека"></iframe></div>
-    <p class="muted">${S.sales.length?"Показана последняя продажа":"Продаж ещё нет — показан пример"}.</p></section></div>`;
+    <div class="tsec"><div class="prevbox doc ${App.ui.docPrev==="80"?"tape":""}"><iframe id="docPrev" title="Предпросмотр товарного чека"></iframe></div>
+    <p class="szhint">${S.sales.length?"Показана последняя продажа":"Продаж ещё нет — показан пример"}.</p></div></section></div>`;
 }
 ACT.docTpl=k=>{docDraft().template=k;App.render()};
 ACT.docPrev=k=>{App.ui.docPrev=k;App.render()};

@@ -514,7 +514,7 @@ label.chip{cursor:pointer}
 .stafflist .row-f{gap:8px;align-items:center;flex-wrap:wrap}
 .banner.info{background:#E6EEF6;color:#2A4A6B}
 /* конструктор ценников */
-.tedit h3.sub{font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:16px 0 8px}
+.pset h3.sub,.tedit h3.sub{font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:16px 0 8px}
 .tedit .form p.full{grid-column:1/-1;margin:-4px 0 0;font-size:.8rem}
 .tcard{position:sticky;top:12px}
 @media (max-width:1000px){.tcard{position:static}}
@@ -564,7 +564,7 @@ label.chip{cursor:pointer}
 @media (max-width:600px){.tagtbl th:nth-child(2),.tagtbl td:nth-child(2){display:none}.tagtbl td,.tagtbl th{padding-left:6px;padding-right:6px}.tagtbl input[data-tagcopy]{width:56px!important}}
 .tsec{padding:18px 0;border-top:1px solid var(--line)}
 .card-h+.tsec{border-top:0;padding-top:4px}
-.tedit h3.sub{margin:0 0 12px}
+.pset h3.sub,.tedit h3.sub{margin:0 0 12px}
 .tsec-extra{margin-top:16px}.tsec-extra.none{display:none}
 .tsec .form p.full{margin:0}
 .sizebox{display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap}
@@ -577,5 +577,22 @@ label.chip{cursor:pointer}
 .sizewarn{margin:4px 0 0;font-size:.8rem;color:#b3261e;font-weight:600}.sizewarn .ok{color:var(--ink);font-weight:600}
 .szgroups{display:flex;flex-direction:column;gap:12px;margin-top:16px}
 .szlab{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px}
-.tedit .acts{margin-top:0;padding-top:18px;border-top:1px solid var(--line)}
+.pset .acts,.tedit .acts{margin-top:0;padding-top:18px;border-top:1px solid var(--line)}
 @media (max-width:600px){.szgap{margin-left:0}}
+
+.pset .tsec:last-child{padding-bottom:0}
+.tgap{margin-top:12px}
+.pset .wide,.pset .tsec>select,.pset input[type=search].wide{width:100%;max-width:none}
+.pset .prevbox{margin-top:0}.pset .prevbox.tgap{margin-top:12px}
+.pset .printbar{margin-top:14px}
+.pset .tplpick{margin:0}
+.pset .tsec .szhint{margin-top:10px}
+.pset input[type=range]{margin:4px 0 0;height:auto;padding:0}
+.tplpick{grid-template-columns:repeat(3,minmax(0,1fr))}
+.tplbtn{min-width:0}
+@media (max-width:600px){
+  .tplpick{gap:6px}.tplbtn{padding:6px;font-size:.8rem;gap:6px}.tplbtn span{height:56px}
+  .prevbox.doc{height:500px}
+  .prevbox.doc iframe{transform:scale(.4);left:calc(50% - 159px)}
+  .prevbox.doc.tape iframe{transform:scale(1);left:calc(50% - 151px)}
+}
