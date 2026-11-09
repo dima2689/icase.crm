@@ -71,14 +71,14 @@ const P=App.pos;
 App.pointWhOpts=()=>{const p=App.point();const ws=App.whs().filter(w=>p&&w.pointId===p.id);return (ws.length?ws:App.whs()).map(w=>[w.id,w.name])};
 const posWh=()=>App.cashWh(); // продажа всегда со склада кассы текущей точки
 /* выручка точки за сегодня: продажи минус возвраты, по способам оплаты */
-App.posToday=pid=>{const now=new Date(),r={cash:0,non:0,n:0,ret:0};
-  S.sales.filter(x=>x.pointId===pid&&App.sameDay(x.createdAt,now)).forEach(x=>{r.n++;(x.payments||[]).forEach(p=>{if(p.method==="cash")r.cash+=p.amount;else r.non+=p.amount})});
+App.posToday=pid=>{const now=new Date(),r={cash:0,non:0,n:0,ret:0,debt:0};
+  S.sales.filter(x=>x.pointId===pid&&App.sameDay(x.createdAt,now)).forEach(x=>{r.n++;(x.payments||[]).forEach(p=>{if(p.method==="cash")r.cash+=p.amount;else if(p.method==="debt")r.debt+=p.amount;else r.non+=p.amount})});
   S.returns.filter(x=>App.sameDay(x.createdAt,now)&&((App.byId("sales",x.saleId)||{}).pointId===pid)).forEach(x=>{r.ret+=x.amount;if(x.method==="cash")r.cash-=x.amount;else r.non-=x.amount});
   r.total=r.cash+r.non;return r};
 function posToday(){const pt=App.point();if(!pt)return "";const t=App.posToday(pt.id),sh=App.openShift(),open=!!App.ui.posTodayOpen;
   const nw=t.n%10===1&&t.n%100!==11?"чек":t.n%10>=2&&t.n%10<=4&&(t.n%100<10||t.n%100>=20)?"чека":"чеков";
-  return `<div class="totbox todaybox ${open?"open":""}"><button class="fsh" data-act="posTodayT" aria-expanded="${open}"><span class="ft">Сегодня</span><span class="fsum">${money(t.total)} · нал. ${money(t.cash)} · безнал ${money(t.non)}</span><span class="car"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform:rotate(${open?180:0}deg);transition:transform .15s"><path d="M6 9l6 6 6-6"/></svg></span><span class="totbtn">${open?"Свернуть":"Развернуть"}</span></button>
-    ${open?`<div class="tb-body"><div class="tb-h muted">${esc(pt.name)} · ${t.n} ${nw}${t.ret?" · возвраты "+money(t.ret):""}</div>
+  return `<div class="totbox todaybox ${open?"open":""}"><button class="fsh" data-act="posTodayT" aria-expanded="${open}"><span class="ft">Сегодня</span><span class="fsum">${money(t.total)} · нал. ${money(t.cash)} · безнал ${money(t.non)}${t.debt?" · в долг "+money(t.debt):""}</span><span class="car"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform:rotate(${open?180:0}deg);transition:transform .15s"><path d="M6 9l6 6 6-6"/></svg></span><span class="totbtn">${open?"Свернуть":"Развернуть"}</span></button>
+    ${open?`<div class="tb-body"><div class="tb-h muted">${esc(pt.name)} · ${t.n} ${nw}${t.ret?" · возвраты "+money(t.ret):""}${t.debt?" · продано в долг "+money(t.debt):""}</div>
     <div class="tb-row"><div><span>Наличные</span><b>${money(t.cash)}</b>${sh?`<small>в ящике ${money(App.shiftTotals(sh).expectedCash)}</small>`:""}</div><div><span>Безналичные</span><b>${money(t.non)}</b><small>карта, СБП, перевод</small></div><div class="tb-tot"><span>Всего</span><b>${money(t.total)}</b></div></div></div>`:""}</div>`}
 ACT.posTodayT=()=>{App.ui.posTodayOpen=!App.ui.posTodayOpen;App.render()};
 function posTotals(){
@@ -223,6 +223,7 @@ ACT.posClear=()=>{Object.assign(P,{cart:[],phone:"",name:"",discPct:0,discSum:0,
 ACT.posCat=id=>{App.ui.posCat=id;App.render()};
 ACT.saleFor=id=>{const c=App.cust(id);ACT.posClear();P.phone=c.phone;P.name=c.name;P.discPct=num(c.discount);location.hash="pos";App.render()};
 
+const PAYK=()=>Object.keys(App.PAY).concat(document.getElementById("pay_debt")?["debt"]:[]);
 ACT.posPay=()=>{
   if(!App.can("sale"))return App.toast("Нет права проводить продажи");
   if(!P.cart.length)return;
@@ -233,22 +234,26 @@ ACT.posPay=()=>{
   App.openModal(App.head("Оплата · "+money(t.total))+`
     ${c&&c.blacklisted?`<div class="banner err">Клиент в чёрном списке: ${esc(c.blackReason||"без причины")}</div>`:""}
     <div class="paygrid">${Object.entries(App.PAY).map(([m,l])=>`<div class="fld"><label for="pay_${m}">${l}</label><div class="row-f">${App.inp("pay_"+m,"","number","0")}<button class="btn sm" data-act="payAll" data-id="${m}">Всё</button></div></div>`).join("")}</div>
+    ${App.phoneKey(P.phone).length===10?`<div class="paydebt"><div class="fld"><label for="pay_debt">В долг</label><div class="row-f">${App.inp("pay_debt","","number","0")}<button class="btn sm" data-act="payAll" data-id="debt">Всё</button></div></div>
+      ${App.fld("payDue","Вернуть до",App.inp("payDue","","date"))}</div>`:`<p class="muted paydebt-hint">Чтобы продать в долг, укажите телефон покупателя.</p>`}
     <div class="form" style="margin-top:10px">${App.fld("payGot","Получено наличными (для сдачи)",App.inp("payGot","","number"))}<div class="fld"><label>Сдача</label><b id="payChange" class="big-n">—</b></div></div>
     <div class="total"><span>Осталось распределить</span><b id="payLeft">${money(t.total)}</b></div>
     ${App.fld("payWarr","Гарантия на устройства, мес.",App.inp("payWarr",App.settings().deviceWarrantyMonths,"number"))}
     <div class="acts"><button class="btn" data-act="close">Назад</button><button class="btn pri" data-act="posConfirm" id="payOk">Провести продажу</button></div>`);
-  const upd=()=>{const paid=Object.keys(App.PAY).reduce((a,m)=>a+num(App.val("pay_"+m)),0);const left=t.total-paid;
+  const upd=()=>{const paid=PAYK().reduce((a,m)=>a+num(App.val("pay_"+m)),0);const left=t.total-paid;
     $("#payLeft").textContent=money(left);$("#payLeft").className=Math.abs(left)<0.5?"ok":"bad";
     const got=num(App.val("payGot")),cash=num(App.val("pay_cash"));$("#payChange").textContent=got?money(got-cash):"—"};
   document.querySelectorAll("#modal input").forEach(el=>el.addEventListener("input",upd));
-  ACT.payAll=m=>{Object.keys(App.PAY).forEach(k=>{document.getElementById("pay_"+k).value=k===m?t.total:""});upd()};
+  ACT.payAll=m=>{PAYK().forEach(k=>{document.getElementById("pay_"+k).value=k===m?t.total:""});upd()};
   if(t.total===0){upd()}
 };
 ACT.posConfirm=async(_,btn)=>{
   if(btn.disabled)return;
   const t=posTotals(),wh=posWh();
-  const payments=Object.keys(App.PAY).map(m=>({method:m,amount:num(App.val("pay_"+m))})).filter(p=>p.amount);
-  const paid=payments.reduce((a,p)=>a+p.amount,0);
+  const payments=PAYK().map(m=>({method:m,amount:num(App.val("pay_"+m))})).filter(p=>p.amount);
+  const paid=payments.reduce((a,p)=>a+p.amount,0),debt=payments.filter(p=>p.method==="debt").reduce((a,p)=>a+p.amount,0);
+  if(payments.some(p=>p.amount<0))return App.toast("Суммы оплат не могут быть отрицательными");
+  if(debt&&App.phoneKey(P.phone).length!==10)return App.toast("Для продажи в долг укажите телефон покупателя");
   if(Math.abs(paid-t.total)>=0.5)return App.toast("Сумма оплат ("+money(paid)+") не равна сумме чека ("+money(t.total)+")");
   const sh=App.openShift();
   if(!sh&&(App.settings().requireShift||payments.some(p=>p.method==="cash")))return App.toast("Для этой оплаты нужна открытая смена");
@@ -257,10 +262,12 @@ ACT.posConfirm=async(_,btn)=>{
     const customerId=(P.phone||P.name)?await App.api.customer(P.phone,P.name,"Магазин"):null;
     const items=P.cart.map(i=>i.productId?{product_id:i.productId,unit_id:i.unitId||null,qty:num(i.qty),price:num(i.price),discount:num(i.disc)}
       :{product_id:null,name:i.name,kind:i.kind,serial:i.serial||null,qty:num(i.qty),price:num(i.price),discount:num(i.disc),cost:num(i.cost),warranty:num(i.warranty)});
-    const id=await App.api.rpc("create_sale",{p_wh:wh,p_customer:customerId,p_items:items,p_payments:payments,p_discount:t.disc,
-      p_tradein_device:P.tiDev||null,p_tradein_amount:num(P.tiAmt),p_tradein_imei:P.tiImei||null},["sales","stock","stock_movements","cash_ops","products","audit_log","units"]);
+    const args={p_wh:wh,p_customer:customerId,p_items:items,p_payments:payments,p_discount:t.disc,p_tradein_device:P.tiDev||null,p_tradein_amount:num(P.tiAmt),p_tradein_imei:P.tiImei||null};
+    if(debt)args.p_due=App.val("payDue")||null;
+    const id=await App.api.rpc(debt?"create_sale_debt":"create_sale",args,["sales","stock","stock_movements","cash_ops","products","audit_log","units","debts"]);
+    if(debt)App.toast("В долг: "+money(debt));
     ACT.posClear();App.closeModal();App.toast("Продажа проведена");
-    await App.reload(["sales","products","cashops","units"]);
+    await App.reload(["sales","products","cashops","units","debts"]);
     if(App.byId("sales",id))ACT.openSale(id);
   }catch(e){btn.disabled=false;btn.textContent="Провести продажу";App.toast(e.message||"Ошибка продажи")}
 };

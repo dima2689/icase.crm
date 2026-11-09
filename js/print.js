@@ -43,7 +43,7 @@ App.saleDocData=function(s){
     seller:[st.legalName||st.shopName,st.inn?"ИНН "+st.inn:"",st.ogrnip?"ОГРНИП "+st.ogrnip:""].filter(Boolean).join(", "),
     address:[st.city,pt&&pt.address||st.address].filter(Boolean).join(", "),phone:pt&&pt.phone||st.phone,site:st.siteUrl,
     pointName:pt?pt.name:"",staff:App.nameOf(s.by),
-    pays:(s.payments||[]).filter(p=>num(p.amount)).map(p=>(App.PAY[p.method]||p.method)+" "+rub(p.amount)).join(", ")||"—"};
+    pays:(s.payments||[]).filter(p=>num(p.amount)).map(p=>(App.PAYALL[p.method]||p.method)+" "+rub(p.amount)).join(", ")||"—"};
 };
 const siteLabel=u=>String(u||"").replace(/^https?:\/\//,"").replace(/\/$/,"");
 

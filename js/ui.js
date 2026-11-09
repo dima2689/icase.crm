@@ -19,6 +19,7 @@ App.NAV = [
   ["suppliers","Поставщики",'<path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/>',"cost"],
   ["clients","Клиенты",'<circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M16 4a4 4 0 0 1 0 8M19 15c2 .8 3 2.6 3 6"/>',"clients"],
   ["reports","Отчёты",'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',"reports"],
+  ["finance","Финансы",'<rect x="2.5" y="6" width="19" height="13" rx="2"/><path d="M2.5 10h19M16 15h2"/><path d="M6 6V4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V6"/>',"finance"],
   ["print","Печать",'<path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M6 14h12v7H6z"/><path d="M17 12h.01"/>',null],
   ["settings","Настройки",'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',"settings"]
 ];
@@ -84,7 +85,7 @@ App.chk = (id,label,on)=>`<label class="chk"><input type="checkbox" id="${id}" $
 App.whOpts = (all=false)=>App.whs().map(w=>[w.id,w.name]).concat(all?[]:[]);
 App.catOpts = (withEmpty=true)=>{const out=withEmpty?[["","Без категории"]]:[];App.catChildren("").forEach(c=>{out.push([c.id,c.name]);App.catChildren(c.id).forEach(s=>out.push([s.id,"— "+s.name]))});return out};
 App.statusPill = s=>{const x=App.RS[s]||{label:s,cls:"mute"};return `<span class="pill ${x.cls}">${esc(x.label)}</span>`};
-App.payLabel = m=>App.PAY[m]||m||"—";
+App.payLabel = m=>App.PAYALL[m]||m||"—";
 App.paysText = pays=>(pays||[]).filter(p=>num(p.amount)).map(p=>App.payLabel(p.method)+" "+money(p.amount)).join(" + ");
 App.confirm2 = function(el,text){if(el.dataset.sure)return true;el.dataset.sure="1";const o=el.textContent;el.textContent=text||"Нажмите ещё раз для подтверждения";setTimeout(()=>{if(document.body.contains(el)){delete el.dataset.sure;el.textContent=o}},4000);return false};
 

@@ -4,7 +4,7 @@
 const {S,$,esc,num,money,ACT,VIEWS,TITLES}=App;
 TITLES.receive="Приёмка";
 const LS=(k,v)=>{try{if(v===undefined)return JSON.parse(localStorage.getItem(k)||"null");localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}};
-const blank=()=>({wh:"",supplierId:"",invoice:"",note:"",lines:[]});
+const blank=()=>({wh:"",supplierId:"",invoice:"",note:"",payAcc:"",lines:[]});
 let R=LS("icase_recv")||blank();
 let last=null; // последняя проведённая приёмка
 const save=()=>LS("icase_recv",R);
@@ -28,6 +28,7 @@ VIEWS.receive={
         ${App.fld("rcvWh","На склад",App.sel("rcvWh",App.whOpts(),R.wh,'data-rh="wh"'))}
         <div class="fld"><label for="rcvSup">Поставщик</label><div class="row-f nowrap">${App.sel("rcvSup",[["","—"],...S.suppliers.map(s=>[s.id,s.name])],R.supplierId,'data-rh="supplierId"')}<button class="btn sm" data-act="rcvSupNew" aria-label="Новый поставщик">+</button></div></div>
         ${App.fld("rcvInv","Накладная / основание",App.inp("rcvInv",R.invoice,"text","№ и дата",'data-rh="invoice"'))}
+        ${App.can("finance")&&R.supplierId?App.fld("rcvPay","Оплата поставщику",App.sel("rcvPay",[["","В долг — оплачу позже"],...S.finaccounts.filter(a=>a.active).map(a=>[a.id,"Оплачено сразу: "+a.name])],R.payAcc||"",'data-rh="payAcc"')):""}
         ${App.fld("rcvNote","Комментарий",App.inp("rcvNote",R.note,"text","",'data-rh="note"'))}
       </div>
       <div class="scanbar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 17v3h-3M7 8v8M10 8v8M13 8v8M16 8v8"/></svg>
@@ -119,7 +120,7 @@ document.addEventListener("input",e=>{const t=e.target;
   if(t.dataset.rl){const [i,f]=t.dataset.rl.split("|");const l=R.lines[+i];if(!l)return;l[f]=f==="qty"?Math.max(1,num(t.value)):t.value;save();totals();return}
   if(t.dataset.ru){const [i,j,f]=t.dataset.ru.split("|");const u=(R.lines[+i]||{}).units&&R.lines[+i].units[+j];if(u){u[f]=t.value;save()}}
 });
-document.addEventListener("change",e=>{const t=e.target;if(t.dataset.rh||t.dataset.ru)t.dispatchEvent(new Event("input",{bubbles:true}))});
+document.addEventListener("change",e=>{const t=e.target;if(t.dataset.rh||t.dataset.ru)t.dispatchEvent(new Event("input",{bubbles:true}));if(t.dataset.rh==="supplierId"&&App.can("finance"))App.render()});
 function totals(){const a=$("#rcvTq"),b=$("#rcvTc");if(a)a.textContent=R.lines.reduce((x,l)=>x+lineQty(l),0);if(b)b.textContent=money(R.lines.reduce((x,l)=>x+lineQty(l)*num(l.cost),0))}
 ACT.rcvQty=v=>{const [i,d]=v.split("|").map(Number),l=R.lines[i];if(!l)return;l.qty=Math.max(1,num(l.qty)+d);save();App.render()};
 ACT.rcvDel=i=>{R.lines.splice(+i,1);save();App.render()};
@@ -139,7 +140,7 @@ ACT.rcvPost=async(_,btn)=>{
     if(App.can("price"))for(const l of R.lines){const p=P(l.productId);if(l.price!==""&&l.price!=null&&num(l.price)!==num(p.price))await App.api.update("products",p.id,{price:num(l.price)})}
     const clean=u=>{const o={};["imei","serial_no","condition","battery_health","price","kit"].forEach(k=>{if(u[k]!==""&&u[k]!=null)o[k]=String(u[k]).trim()});if(u.attrs&&Object.keys(u.attrs).length)o.attrs=u.attrs;return o};
     const lines=R.lines.map(l=>{const p=P(l.productId);return {product_id:p.id,qty:lineQty(l),cost:num(l.cost),new_units:p.trackSerial?l.units.map(clean):[]}});
-    doc=await App.api.insert("stock_docs",{type:"in",wh_to:R.wh,supplier_id:R.supplierId||null,invoice:R.invoice||null,note:R.note||"Приёмка"});
+    doc=await App.api.insert("stock_docs",{type:"in",wh_to:R.wh,supplier_id:R.supplierId||null,invoice:R.invoice||null,note:R.note||"Приёмка",pay_account:R.supplierId&&R.payAcc?R.payAcc:null});
     await App.api.insertMany("stock_doc_lines",lines.map(l=>Object.assign({doc_id:doc.id},l)));
     await App.api.rpc("post_doc",{p_doc:doc.id},["stock_docs","stock","stock_movements","products","audit_log","units"]);
     last={id:doc.id,num:doc.num,wh:R.wh,qty:lines.reduce((a,l)=>a+l.qty,0),productIds:R.lines.map(l=>l.productId)};

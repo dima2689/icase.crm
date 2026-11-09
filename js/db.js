@@ -66,6 +66,13 @@ const M={
   staffreq:r=>({id:r.id,email:r.email||"",fullName:r.full_name||"",at:r.created_at}),
   siteorders:r=>({id:r.id,wooId:r.woo_id,num:r.num,status:r.status,wooStatus:r.woo_status||"",customerId:r.customer_id||"",name:r.name||"",phone:r.phone||"",email:r.email||"",address:r.address||"",delivery:r.delivery||"",payment:r.payment||"",paid:!!r.paid,total:num(r.total),note:r.note||"",problems:r.problems||"",saleId:r.sale_id||"",createdAt:r.created_at,
     items:(r.items||[]).map(i=>({productId:i.product_id||"",unitId:i.unit_id||"",name:i.name||"",sku:i.sku||"",qty:num(i.qty),price:num(i.price),from:i.from||[],problem:i.problem||""}))}),
+  finaccounts:r=>({id:r.id,name:r.name,kind:r.kind,pointId:r.point_id||"",opening:num(r.opening),noncash:!!r.noncash,active:r.is_active!==false,sort:r.sort||0,createdAt:r.created_at}),
+  fincats:r=>({id:r.id,name:r.name,kind:r.kind,inPnl:r.in_pnl!==false,active:r.is_active!==false,sort:r.sort||0}),
+  finops:r=>({id:r.id,num:r.num,date:r.op_date,kind:r.kind,accountId:r.account_id,toAccountId:r.to_account_id||"",amount:num(r.amount),catId:r.category_id||"",debtId:r.debt_id||"",planId:r.plan_id||"",
+    counterparty:r.counterparty||"",note:r.note||"",cashOpIds:r.cash_op_ids||[],by:r.staff_id,createdAt:r.created_at,cancelledAt:r.cancelled_at||""}),
+  debts:r=>({id:r.id,num:r.num,direction:r.direction,kind:r.kind,counterparty:r.counterparty||"",supplierId:r.supplier_id||"",customerId:r.customer_id||"",saleId:r.sale_id||"",docId:r.doc_id||"",
+    amount:num(r.amount),dueDate:r.due_date||"",note:r.note||"",status:r.status,createdAt:r.created_at,closedAt:r.closed_at||""}),
+  finplans:r=>({id:r.id,name:r.name,kind:r.kind,amount:num(r.amount),catId:r.category_id||"",accountId:r.account_id||"",counterparty:r.counterparty||"",period:r.period,nextDate:r.next_date,note:r.note||"",active:r.is_active!==false}),
   log:r=>({id:r.id,at:r.created_at,by:r.staff_id,action:r.action,ref:r.ref||"",details:r.details||""})
 };
 /* что загружать для каждого раздела */
@@ -91,13 +98,19 @@ const L={
   models:async()=>(await all("apple_models","*",r=>r.order("sort"))).map(M.models),
   siteorders:async()=>(await all("site_orders","*",r=>r.order("created_at",{ascending:false}))).map(M.siteorders),
   sprices:async()=>App.can("cost")?(await all("supplier_prices")).map(M.sprices):[],
+  finaccounts:async()=>App.can("finance")?(await all("fin_accounts")).map(M.finaccounts):[],
+  fincats:async()=>App.can("finance")?(await all("fin_categories")).map(M.fincats):[],
+  finops:async()=>App.can("finance")?(await all("fin_ops")).map(M.finops):[],
+  debts:async()=>App.can("finance")?(await all("debts")).map(M.debts):[],
+  finplans:async()=>App.can("finance")?(await all("fin_plans")).map(M.finplans):[],
   log:async()=>(await q(sb.from("audit_log").select("*").order("created_at",{ascending:false}).limit(500),"log")).map(M.log)
 };
 /* таблица базы → разделы, которые нужно перечитать */
 const T={settings:["settings"],points:["points"],warehouses:["warehouses"],categories:["categories"],suppliers:["suppliers"],services:["services"],
   customers:["customers"],products:["products"],stock:["products"],stock_movements:["movements"],stock_docs:["docs"],stock_doc_lines:["docs"],
   sales:["sales"],sale_items:["sales"],sale_payments:["sales"],returns:["returns"],return_items:["returns"],shifts:["shifts"],cash_ops:["cashops"],
-  staff:["staff"],staff_requests:["staffreq"],audit_log:["log"],units:["units"],apple_models:["models"],site_orders:["siteorders"],supplier_prices:["sprices"]};
+  staff:["staff"],staff_requests:["staffreq"],audit_log:["log"],units:["units"],apple_models:["models"],site_orders:["siteorders"],supplier_prices:["sprices"],
+  fin_accounts:["finaccounts"],fin_categories:["fincats"],fin_ops:["finops"],debts:["debts"],fin_plans:["finplans"]};
 
 App.reload = async function(cols){
   cols=[...new Set(cols)].filter(c=>L[c]);

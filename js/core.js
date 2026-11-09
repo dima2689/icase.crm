@@ -11,6 +11,7 @@ App.RSTAT = [
 App.RS = Object.fromEntries(App.RSTAT.map(s=>[s[0],{label:s[1],cls:s[2]}]));
 App.ACTIVE = ["new","diag","approve","work","parts","ready"];
 App.PAY = {cash:"Наличные", card:"Карта", sbp:"QR (СБП)", transfer:"Перевод"};
+App.PAYALL = Object.assign({}, App.PAY, {debt:"В долг"});
 App.CONDS = ["Новый","Б/у отличное","Б/у хорошее","Б/у среднее","Восстановленный","На запчасти"];
 App.SOURCES = ["Магазин","Сайт","Авито","Рекомендация","Соцсети","Другое"];
 App.DOCT = {
@@ -34,7 +35,7 @@ const PERMS = {
   stock:["owner","manager","storekeeper"], docPost:["owner","manager","storekeeper"], docCancel:["owner","manager"],
   price:["owner","manager","storekeeper"], cost:["owner","manager","storekeeper"],
   settings:["owner","manager"], staff:["owner"], del:["owner","manager"], reports:["owner","manager"],
-  io:["owner","manager"], clients:["owner","manager","seller","master"], log:["owner","manager"], allPoints:["owner","manager"]
+  io:["owner","manager"], clients:["owner","manager","seller","master"], log:["owner","manager"], allPoints:["owner","manager"], finance:["owner","manager"]
 };
 App.can = a => (PERMS[a]||[]).includes(App.me.role);
 
@@ -43,7 +44,7 @@ App.DEFAULTS = {shopName:"iCase", city:"", address:"", phone:"", inn:"", deviceW
   receiptAck:"Устройство осмотрено, проверено, претензий к внешнему виду и комплектации не имею."};
 
 /* ---------- состояние ---------- */
-App.COLS = ["settings","points","warehouses","categories","suppliers","services","products","customers","sales","returns","docs","movements","shifts","cashops","staff","staffreq","log","repairs","units","models","siteorders","sprices"];
+App.COLS = ["settings","points","warehouses","categories","suppliers","services","products","customers","sales","returns","docs","movements","shifts","cashops","staff","staffreq","log","repairs","units","models","siteorders","sprices","finaccounts","fincats","finops","debts","finplans"];
 const S = App.S = {}; App.COLS.forEach(c=>S[c]=[]);
 App.ui = {view:"dashboard"};
 App.me = {id:null, role:null, pointId:null, name:"", email:""};
