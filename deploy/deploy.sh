@@ -26,7 +26,7 @@ done
 
 log "запуск сервисов"
 dc up -d --remove-orphans
-wait_healthy 420 || die "сервисы не поднялись"
+wait_healthy 420 && wait_db 120 || die "сервисы не поднялись"
 dc restart functions >/dev/null; wait_healthy 120 || die "функции не поднялись"
 
 log "миграции базы"

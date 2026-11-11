@@ -5,7 +5,7 @@ T="$1"; shift
 L=$(mktemp)
 "$@" 2>&1 | tee "$L"; rc=${PIPESTATUS[0]}
 if [ "$rc" != 0 ]; then
-  tail -n 120 "$L" | cut -c1-300 | sed -e 's/%/%25/g' -e 's/\r//g' | awk 'BEGIN{ORS="%0A"}{print}' > "$L.e"
+  grep -Ev ' (Container|Volume|Network) ' "$L" | tail -n 150 | cut -c1-300 | sed -e 's/%/%25/g' -e 's/\r//g' | awk 'BEGIN{ORS="%0A"}{print}' > "$L.e"
   echo "::error title=$T (код $rc)::$(cat "$L.e")"
 fi
 exit "$rc"

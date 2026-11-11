@@ -31,16 +31,16 @@ if [ $FRESH = 1 ]; then
 fi
 
 log "запуск базы"
-dc up -d db; wait_healthy 180 || die "база не поднялась"
+dc up -d db; wait_healthy 180 && wait_db 180 || die "база не поднялась"
 [ -z "$(psql_db -qAt -c "select to_regclass('public.settings')")" ] || die "база не пустая: восстанавливать можно только на чистый стек (используйте --fresh)"
 if [ -s "$D/pgsodium_root.key" ]; then
   log "ключ шифрования Vault"
   docker cp "$D/pgsodium_root.key" supabase-db:/etc/postgresql-custom/pgsodium_root.key
   docker exec -u root supabase-db sh -c 'chown postgres:postgres /etc/postgresql-custom/pgsodium_root.key; chmod 600 /etc/postgresql-custom/pgsodium_root.key'
-  dc restart db; wait_healthy 180 || die "база не поднялась после смены ключа"
+  dc restart db; wait_healthy 180 && wait_db 180 || die "база не поднялась после смены ключа"
 fi
 log "запуск остальных сервисов (создают свои схемы)"
-dc up -d; wait_healthy 420 || die "сервисы не поднялись"
+dc up -d; wait_healthy 420 && wait_db 120 || die "сервисы не поднялись"
 
 log "восстановление данных"
 psql_admin -q -f - < "$ROOT/db/prelude.sql"

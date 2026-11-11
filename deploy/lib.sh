@@ -31,7 +31,7 @@ open(f,'w').write('\n'.join(L))
 PY
   else printf '%s=%s\n' "$k" "$v" >> "$f"; fi
 }
-dc() { (cd "$SB_DIR" && docker compose "$@"); }
+dc() { (cd "$SB_DIR" && docker compose --progress quiet "$@"); }
 psql_db() { docker exec -i supabase-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 "$@"; }
 psql_admin() { docker exec -i supabase-db psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 "$@"; }
 alert() {
@@ -48,4 +48,12 @@ wait_healthy() {  # дождаться, пока все контейнеры п�
     sleep 5; t=$((t+5))
   done
   echo "$bad" >&2; return 1
+}
+wait_db() {  # база принимает запросы (образ Supabase после первого старта ещё раз перезапускает Postgres)
+  local t=0 ok=0
+  while [ $t -lt "${1:-180}" ]; do
+    if docker exec supabase-db psql -U postgres -d postgres -qAt -c 'select 1' >/dev/null 2>&1; then ok=$((ok+1)); [ $ok -ge 3 ] && return 0; else ok=0; fi
+    sleep 3; t=$((t+3))
+  done
+  return 1
 }
