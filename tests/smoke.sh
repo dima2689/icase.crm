@@ -14,10 +14,10 @@ H=(-H "apikey: $ANON" -H "Authorization: Bearer $TOK")
 r=$(curl -fsS "${H[@]}" "$API/rest/v1/staff?select=role"); [[ "$r" == *owner* ]] && ok "владелец видит сотрудников" || bad "staff: $r"
 c=$(curl -s -o /dev/null -w '%{http_code}' "${H[@]}" -X POST -H "Content-Type: application/json" -d '{}' "$API/rest/v1/rpc/staff_touch"); [[ "$c" == 20* ]] && ok "RPC staff_touch $c" || bad "RPC staff_touch $c"
 r=$(curl -fsS "${H[@]}" "$API/rest/v1/settings?select=shop_name"); [[ "$r" == *iCase* ]] && ok "настройки читаются" || bad "settings: $r"
-r=$(curl -s "${H[@]}" -X POST -H "Content-Type: application/json" -d '{"name":"Smoke-точка"}' -H "Prefer: return=representation" "$API/rest/v1/points"); [[ "$r" == *Smoke* ]] && ok "запись (точка) создаётся" || bad "points insert: $r"
+r=$(curl -s "${H[@]}" -X POST -H "Content-Type: application/json" -d "{\"name\":\"Smoke-точка-$RANDOM$RANDOM\"}" -H "Prefer: return=representation" "$API/rest/v1/points"); [[ "$r" == *Smoke* ]] && ok "запись (точка) создаётся" || bad "points insert: $r"
 
 printf '\xff\xd8\xff\xe0smoke' > /tmp/smoke.jpg
-c=$(curl -s -o /tmp/st.out -w '%{http_code}' "${H[@]}" -H "Content-Type: image/jpeg" --data-binary @/tmp/smoke.jpg "$API/storage/v1/object/repair-photos/smoke/test.jpg")
+c=$(curl -s -o /tmp/st.out -w '%{http_code}' "${H[@]}" -H "Content-Type: image/jpeg" --data-binary @/tmp/smoke.jpg "$API/storage/v1/object/repair-photos/smoke/test-$RANDOM$RANDOM.jpg")
 [ "$c" = 200 ] && ok "фото загружается в repair-photos" || bad "storage upload $c $(cat /tmp/st.out)"
 c=$(curl -s -o /dev/null -w '%{http_code}' -H "apikey: $ANON" -H "Content-Type: image/jpeg" --data-binary @/tmp/smoke.jpg "$API/storage/v1/object/repair-photos/smoke/anon.jpg")
 [[ "$c" == 4* ]] && ok "аноним не загружает фото ($c)" || bad "аноним загрузил фото ($c)"

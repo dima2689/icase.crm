@@ -45,7 +45,12 @@ dc up -d; wait_healthy 420 && wait_db 120 || die "сервисы не подня
 log "восстановление данных"
 psql_admin -q -f - < "$ROOT/db/prelude.sql"
 docker exec -i supabase-db pg_restore -U supabase_admin -d postgres --data-only --disable-triggers < "$D/sys.dump" 2> "$W/sys.err" || true
+# права объектов берём только из копии: на время восстановления отключаем «права по умолчанию» Supabase,
+# иначе новые таблицы и функции получили бы лишние права для anon/authenticated
+DEFP="tables functions sequences"
+for k in $DEFP; do psql_admin -qc "alter default privileges for role supabase_admin in schema public revoke all on $k from anon, authenticated, service_role"; done
 docker exec -i supabase-db pg_restore -U supabase_admin -d postgres < "$D/public.dump" 2> "$W/pub.err" || true
+for k in $DEFP; do psql_admin -qc "alter default privileges for role supabase_admin in schema public grant all on $k to anon, authenticated, service_role"; done
 for e in sys pub; do
   n=$(grep '^pg_restore: error' "$W/$e.err" | grep -vc 'schema "public" already exists' || true)
   if [ "$n" != 0 ]; then warn "$e: ошибок $n"; { grep '^pg_restore: error' "$W/$e.err" | grep -v 'schema "public" already exists' || true; } | head -20 >&2; fi
