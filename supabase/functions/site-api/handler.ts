@@ -96,6 +96,7 @@ export async function handle(req: Request, rpc: Rpc): Promise<Response> {
   // ---------- статус заказа ----------
   if (req.method === "GET" && route === "order-status") {
     if (!authed) return json({ error: "Неверный ключ" }, 401);
+    if (!(await rpc("api_throttle_hit", { p_key: "order:" + String(P.get("num") || "").toUpperCase(), p_limit: 20, p_window_s: 3600 }))) return json({ error: "Слишком много попыток. Попробуйте через час или позвоните в магазин" }, 429);
     const r = await rpc("site_order_public", { p_num: P.get("num") || "", p_phone4: P.get("phone") || "" });
     return r ? json(r) : json({ error: "Заказ не найден" }, 404);
   }
@@ -103,6 +104,7 @@ export async function handle(req: Request, rpc: Rpc): Promise<Response> {
   // ---------- статус ремонта ----------
   if (req.method === "GET" && route === "repair-status") {
     if (!authed) return json({ error: "Неверный ключ" }, 401);
+    if (!(await rpc("api_throttle_hit", { p_key: "repair:" + String(P.get("num") || "").toUpperCase(), p_limit: 20, p_window_s: 3600 }))) return json({ error: "Слишком много попыток. Попробуйте через час или позвоните в магазин" }, 429);
     const r = await rpc("repair_public", { p_num: P.get("num") || "", p_phone4: P.get("phone") || "" });
     if (!r) return json({ error: "Ремонт не найден — проверьте номер квитанции и последние 4 цифры телефона" }, 404);
     const L: Record<string, string> = { new: "Принят", diag: "Диагностика", approve: "Ждём вашего согласия", work: "В работе", parts: "Ждём запчасть", ready: "Готов — можно забирать", done: "Выдан", cancel: "Отказ от ремонта" };

@@ -12,6 +12,7 @@ Deno.serve(async (req) => {
   try { return await handle(req, rpc); }
   catch (e) {
     console.error(e);
-    return new Response(JSON.stringify({ error: String((e as Error).message || e) }), { status: 500, headers: { ...cors, "Content-Type": "application/json" } });
+    const msg = String((e as Error).message || e);   // понятные сообщения CRM (по-русски) отдаём, технические — нет
+    return new Response(JSON.stringify({ error: /[А-Яа-яЁё]/.test(msg) ? msg : "Внутренняя ошибка CRM. Попробуйте позже" }), { status: 500, headers: { ...cors, "Content-Type": "application/json" } });
   }
 });

@@ -146,7 +146,7 @@ ACT.openRepair=id=>{
       ${flowHtml(r)}${nextHtml(r)}
       <div class="rgrid">
         <div class="rmain">
-          <section class="rblk"><h3>Диагноз и что сделано</h3>${canEdit?`<textarea id="reDiag" rows="2" data-rsave="diagnosis" placeholder="Причина неисправности, что заменили">${esc(r.diagnosis||"")}</textarea>`:`<p>${esc(r.diagnosis||"—")}</p>`}</section>
+          <section class="rblk"><h3>Диагноз и что сделано</h3>${canEdit?`<textarea id="reDiag" rows="2" aria-label="Диагноз и что сделано" data-rsave="diagnosis" placeholder="Причина неисправности, что заменили">${esc(r.diagnosis||"")}</textarea>`:`<p>${esc(r.diagnosis||"—")}</p>`}</section>
           <section class="rblk"><h3>Работы и запчасти</h3>
             <div class="rlns">${lineRows(r,open,cost)||'<div class="muted">Пока пусто. Добавьте работы из прайса — сумма для клиента посчитается сама.</div>'}</div>
             <div class="rtot"><span>${hasLines?"Сумма для клиента":num(r.approvedSum)?"Согласовано":"Предварительная оценка"}</span><b>${money(tot)}</b></div>
@@ -254,7 +254,7 @@ ACT.repIssue=id=>{const r=App.byId("repairs",id),tot=App.repairTotal(r),paid=App
     <section class="rblk"><h3>Проверьте устройство вместе с клиентом</h3>${ck.intake&&App.checkSummary?`<p class="muted">При приёме: ${esc(App.checkSummary(ck.intake))}</p>`:""}
       ${App.repIssueCheckHtml?App.repIssueCheckHtml():""}</section>
     <section class="rblk"><h3>Оплата</h3>
-      <div class="form">${App.fld("riFinal","Итого за ремонт, ₽",App.inp("riFinal",r.warrantyOf?0:tot,"number"))}<div class="fld"><label>Уже оплачено</label><b class="big-n">${money(paid)}</b></div></div>
+      <div class="form">${App.fld("riFinal","Итого за ремонт, ₽"+(["owner","manager"].includes(App.me.role)?"":' <small class="muted">скидку даёт управляющий</small>'),App.inp("riFinal",r.warrantyOf?0:tot,"number","",["owner","manager"].includes(App.me.role)||r.warrantyOf?"":"readonly"))}<div class="fld"><label>Уже оплачено</label><b class="big-n">${money(paid)}</b></div></div>
       <div class="total"><span>К оплате</span><b id="riDue">${money(Math.max(0,tot-paid))}</b></div>
       <div class="paygrid">${Object.entries(App.PAY).map(([m,l])=>`<div class="fld"><label for="ri_${m}">${l}</label><div class="row-f">${App.inp("ri_"+m,"","number","0")}<button class="btn sm" data-act="riAll" data-id="${m}">Всё</button></div></div>`).join("")}</div></section>
     <p class="muted">После выдачи начнётся гарантия ${num(r.warrantyDays)} дн. Откроется акт выдачи — клиент подписывает, что устройство получил и претензий нет.</p>
