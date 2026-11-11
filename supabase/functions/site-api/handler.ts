@@ -5,6 +5,8 @@
 //   POST /site-api/order        — заказ с сайта (простой формат или формат WooCommerce), товар резервируется в CRM
 //   GET  /site-api/order-status — статус заказа для покупателя: ?num=С-…&phone=последние 4 цифры
 //   GET  /site-api/repair-status — статус ремонта: ?num=Р-…&phone=последние 4 цифры
+//   GET  /site-api/repair-quote  — смета ремонта по ссылке из сообщения клиенту: ?num=Р-…&t=токен
+//   POST /site-api/repair-decide — решение клиента по смете: {num, t, decision:"yes"|"no", comment}
 //   POST /site-api/woo-order    — веб-хук WooCommerce (подпись X-WC-Webhook-Signature)
 //   GET  /site-api/feed         — весь каталог одним списком (совместимость)
 import { fieldsOf, shape, slugOf } from "./shape.ts";
@@ -107,6 +109,22 @@ export async function handle(req: Request, rpc: Rpc): Promise<Response> {
     return json({ ...r, status_label: L[r.status] || r.status, history: (r.history || []).map((h: any) => ({ ...h, label: L[h.status] || h.status })) });
   }
 
+  // ---------- согласование ремонта клиентом по ссылке ----------
+  if (req.method === "GET" && route === "repair-quote") {
+    if (!authed) return json({ error: "Неверный ключ" }, 401);
+    const r = await rpc("repair_quote", { p_num: P.get("num") || "", p_token: P.get("t") || "" });
+    return r ? json(r) : json({ error: "Ссылка недействительна" }, 404);
+  }
+  if (req.method === "POST" && route === "repair-decide") {
+    if (!authed) return json({ error: "Неверный ключ" }, 401);
+    let b: any; try { b = await req.json(); } catch { return json({ error: "Ожидается JSON" }, 400); }
+    if (!["yes", "no"].includes(b?.decision)) return json({ error: "decision: yes или no" }, 400);
+    try {
+      const r = await rpc("repair_client_decide", { p_num: String(b.num || ""), p_token: String(b.t || ""), p_decision: b.decision, p_comment: String(b.comment || "").slice(0, 500) });
+      return json({ ok: true, ...r });
+    } catch (e) { return json({ error: (e as Error).message || "Не удалось сохранить решение" }, 409); }
+  }
+
   // ---------- заказы ----------
   if ((route === "woo-order" || route === "order") && req.method === "POST") {
     const raw = await req.text();
@@ -128,5 +146,5 @@ export async function handle(req: Request, rpc: Rpc): Promise<Response> {
     const st = id ? await rpc("site_order_public", { p_num: "С-" + order.number, p_phone4: String(order.billing?.phone || "") }) : null;
     return json({ ok: true, crm_order: id, num: st ? st.num : null, status: st ? st.status : null });
   }
-  return json({ error: "Неизвестный адрес. Доступно: GET catalog, product, categories, order-status, repair-status, feed; POST order, woo-order" }, 404);
+  return json({ error: "Неизвестный адрес. Доступно: GET catalog, product, categories, order-status, repair-status, repair-quote, feed; POST order, woo-order, repair-decide" }, 404);
 }

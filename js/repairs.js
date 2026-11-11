@@ -30,7 +30,7 @@ VIEWS.repairs={
   actions:()=>App.can("repair")?'<button class="btn pri" data-act="newRepair">+ Принять в ремонт</button>':"",
   render(){
     const u=App.ui,q=u.repQ.trim().toLowerCase(),pt=App.can("allPoints")?null:(App.point()||{}).id;
-    const base=S.repairs.filter(r=>(!pt||r.pointId===pt)&&(!u.repMaster||r.masterId===u.repMaster)&&(!q||[r.num,r.device,r.imei,r.problem,(App.cust(r.customerId)||{}).name,(App.cust(r.customerId)||{}).phone].join(" ").toLowerCase().includes(q)));
+    const base=S.repairs.filter(r=>(!pt||r.pointId===pt)&&(!u.repMaster||(u.repMaster==="__none"?!r.masterId:r.masterId===u.repMaster))&&(!q||[r.num,r.device,r.imei,r.problem,(App.cust(r.customerId)||{}).name,(App.cust(r.customerId)||{}).phone].join(" ").toLowerCase().includes(q)));
     const list=App.sortDesc(base.filter(r=>flt(u.repFilter,r)));
     const board=u.repView==="board"&&u.repFilter==="active";
     const cols=App.RSTAT.filter(s=>App.ACTIVE.includes(s[0]));
@@ -57,6 +57,7 @@ ACT.newRepair=(arg)=>{
       <p class="muted full" id="rCust"></p>
       ${App.fld("rDevice","Устройство",App.inp("rDevice",pre.device||"","text","iPhone 13, синий, 128 ГБ",'list="rDevList"'),"")}
       ${App.fld("rImei","IMEI / серийный номер",App.inp("rImei",pre.imei||""))}
+      ${App.repIntakeTop?App.repIntakeTop():""}
       ${App.fld("rProblem","Неисправность со слов клиента",App.area("rProblem",pre.problem||"","Не заряжается, разбит дисплей"),"full")}
       ${App.fld("rKit","Комплектация",App.inp("rKit","","text","Без SIM, без чехла"))}
       ${App.fld("rLook","Внешний вид",App.inp("rLook","","text","Царапины на корпусе, скол в углу"))}
@@ -68,10 +69,12 @@ ACT.newRepair=(arg)=>{
       ${App.fld("rPreM","Способ предоплаты",App.sel("rPreM",Object.entries(App.PAY)))}
       ${App.fld("rWar","Гарантия на работы, дней",App.inp("rWar",st.repairWarrantyDays||90,"number"))}
       ${App.fld("rSrc","Как узнал о нас",App.sel("rSrc",App.SOURCES))}
+      ${App.repIntakeExtra?App.repIntakeExtra(pre):""}
     </div><datalist id="rDevList">${[...new Set(S.repairs.map(r=>r.device))].slice(0,200).map(d=>`<option value="${esc(d)}">`).join("")}</datalist>
     <div class="acts"><button class="btn" data-act="close">Отмена</button><button class="btn pri" data-act="saveRepair" data-id="${esc(pre.warrantyOf||"")}">Принять и распечатать квитанцию</button></div>`,{wide:true});
   const ph=$("#rPhone");if(ph)ph.addEventListener("input",()=>{const c2=App.findCustomerByPhone(ph.value),box=$("#rCust");
     if(c2){if(!App.val("rName"))$("#rName").value=c2.name;const n=S.repairs.filter(r=>r.customerId===c2.id).length;box.innerHTML=`Клиент найден: <b>${esc(c2.name)}</b>${n?` · ремонтов: ${n}`:""}${c2.blacklisted?' · <span class="badc">в чёрном списке</span>':""}`}else box.textContent=""});
+  if(App.repIntakeBind)App.repIntakeBind();
 };
 ACT.saveRepair=(warrantyOf,btn)=>run(btn,async()=>{
   const V=App.val;if(App.phoneKey(V("rPhone")).length!==10)throw new Error("Укажите телефон клиента — по нему он узнает статус и получит уведомление");
@@ -80,6 +83,7 @@ ACT.saveRepair=(warrantyOf,btn)=>run(btn,async()=>{
   const cid=await App.api.customer(V("rPhone"),V("rName"),V("rSrc")||"Магазин");
   const id=await App.api.rpc("repair_create",{p:{customer_id:cid,point_id:pt.id,device:V("rDevice"),imei:V("rImei"),problem:V("rProblem"),kit:V("rKit"),appearance:V("rLook"),
     device_pass:V("rPass"),master_id:V("rMaster"),estimate:V("rEst"),due_date:V("rDue"),warranty_days:V("rWar"),source:V("rSrc"),warranty_of:warrantyOf||null,prepay:V("rPre"),prepay_method:V("rPreM")}});
+  if(App.repAfterCreate)try{await App.repAfterCreate(id)}catch(e){App.toast(e.message)}
   await App.reload(["repairs","cashops","customers"]);App.closeModal();App.toast("Принят в ремонт");
   const r=App.byId("repairs",id);if(r){ACT.repReceipt(id);ACT.openRepair(id)}
 });
@@ -111,11 +115,13 @@ ACT.openRepair=id=>{
         ${App.fld("reWar","Гарантия, дней",App.inp("reWar",r.warrantyDays,"number"))}
         ${App.fld("reNote","Комментарий в историю",App.inp("reNote","","text","Позвонили клиенту, согласовал замену"),"full")}
       </div>`:""}
+      ${App.repCardExtra?App.repCardExtra(r):""}
       <h3 class="sub-h">Работы</h3>
       <div class="rpl">${(r.services||[]).map(s=>`<div class="rpr"><span>${esc(s.name)}${num(s.qty)>1?" × "+s.qty:""}</span><b>${money(num(s.price)*num(s.qty||1))}</b>${open?`<button class="btn sm ghost" data-act="repSvcDel" data-id="${r.id}|${s.id}" aria-label="Убрать">✕</button>`:""}</div>`).join("")||'<div class="muted">Работ пока нет</div>'}</div>
       ${open?`<div class="row-f addrow">${App.sel("rsSvc",[["","Из прайса…"],...S.services.filter(s=>s.active!==false).map(s=>[s.id,s.name+" · "+money(s.price)])],"",'aria-label="Работа из прайса"')}
         <input id="rsName" placeholder="или своя работа" aria-label="Название работы"><input id="rsPrice" type="number" inputmode="decimal" placeholder="Цена" aria-label="Цена" style="width:110px">
         <button class="btn sm" data-act="repSvcAdd" data-id="${r.id}">Добавить</button></div>`:""}
+      ${App.repWorksExtra?App.repWorksExtra(r):""}
       <h3 class="sub-h">Запчасти</h3>
       <div class="rpl">${(r.parts||[]).map(p=>`<div class="rpr ${p.returned?"off":""}"><span>${esc(p.name)}${num(p.qty)>1?" × "+p.qty:""}<small>${esc(App.whName(p.whId))}${cost?" · закупка "+money(p.cost):""}${p.returned?" · возвращена на склад":""}</small></span><b>${money(num(p.price)*num(p.qty))}</b>${open&&!p.returned?`<button class="btn sm ghost" data-act="repPartBack" data-id="${r.id}|${p.id}" title="Вернуть на склад">↩</button>`:""}</div>`).join("")||'<div class="muted">Запчастей нет</div>'}</div>
       ${open&&App.can("repairWork")?`<div class="fld addrow"><input id="rpQ" type="search" placeholder="Найти запчасть на складе сервиса: название, артикул, штрихкод" autocomplete="off" aria-label="Запчасть"><div id="rpBox" class="pick" hidden></div></div>`:""}
@@ -123,6 +129,9 @@ ACT.openRepair=id=>{
       <div class="rhst">${histRows(r)}</div>
       <div class="acts">
         <button class="btn" data-act="repReceipt" data-id="${r.id}">Квитанция</button>
+        <button class="btn" data-act="repLabel" data-id="${r.id}">Наклейка</button>
+        ${open&&["new","diag","approve"].includes(r.status)?`<button class="btn" data-act="repLink" data-id="${r.id}">Ссылка на согласование</button>`:""}
+        ${open&&r.masterId!==App.me.id&&App.can("repairWork")?`<button class="btn" data-act="repTake" data-id="${r.id}">Взять себе</button>`:""}
         ${r.status==="done"?`<button class="btn" data-act="repAct" data-id="${r.id}">Акт выдачи</button>`:""}
         <button class="btn" data-act="repMsg" data-id="${r.id}">Сообщение клиенту</button>
         ${r.status==="done"&&inWarranty(r)?`<button class="btn" data-act="repWarranty" data-id="${r.id}">Гарантийный ремонт</button>`:""}
@@ -131,6 +140,7 @@ ACT.openRepair=id=>{
         ${open?`<button class="btn pri" data-act="repIssue" data-id="${r.id}">Выдать клиенту</button>`:""}
       </div>`);
     if(document.getElementById("rpQ"))App.productPicker("rpQ","rpBox",{wh:()=>App.serviceWhOf(r),inStock:true,showCost:cost,onPick:p=>partAdd(r,p)});
+    if(App.fillPhotos)App.fillPhotos();
   };
   App.openModal("",{wide:true,refresh:draw});draw();
 };

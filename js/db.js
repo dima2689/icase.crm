@@ -93,7 +93,9 @@ const M={
   repairs:r=>({id:r.id,num:r.num,pointId:r.point_id||"",customerId:r.customer_id,device:r.device,imei:r.imei||"",problem:r.problem||"",kit:r.kit||"",appearance:r.appearance||"",devicePass:r.device_pass||"",
     status:r.status,master:r.master||"",masterId:r.master_id||"",diagnosis:r.diagnosis||"",estimate:num(r.estimate),approved:r.approved,approvedSum:r.approved_sum==null?null:num(r.approved_sum),finalPrice:num(r.final_price),
     dueDate:r.due_date||"",readyAt:r.ready_at||"",closedAt:r.closed_at||"",warrantyDays:num(r.warranty_days),warrantyOf:r.warranty_of||"",cancelReason:r.cancel_reason||"",source:r.source||"",diagFee:num(r.diag_fee),saleId:r.sale_id||"",unitId:r.unit_id||"",
-    by:r.created_by,createdAt:r.created_at,
+    by:r.created_by,createdAt:r.created_at,checklist:r.checklist||{},modelId:r.model_id||"",approveToken:r.approve_token||"",clientDecision:r.client_decision||null,
+    photos:(r.repair_photos||[]).map(x=>({id:x.id,path:x.path,kind:x.kind,by:x.created_by,at:x.created_at})).sort((a,b)=>String(a.at).localeCompare(b.at)),
+    partReqs:(r.repair_part_requests||[]).map(x=>({id:x.id,productId:x.product_id||"",name:x.name,qty:num(x.qty)||1,status:x.status,note:x.note||"",at:x.created_at,arrivedAt:x.arrived_at||""})).sort((a,b)=>String(a.at).localeCompare(b.at)),
     services:(r.repair_services||[]).map(x=>({id:x.id,serviceId:x.service_id||"",name:x.name,price:num(x.price),qty:num(x.qty)||1})).sort((a,b)=>a.id-b.id),
     parts:(r.repair_parts||[]).map(x=>({id:x.id,productId:x.product_id,whId:x.warehouse_id,name:x.name,qty:num(x.qty),price:num(x.price),cost:num(x.cost),returned:!!x.returned})).sort((a,b)=>a.id-b.id),
     history:(r.repair_history||[]).map(h=>({id:h.id,status:h.status,note:h.note||"",by:h.staff_id,at:h.created_at})).sort((a,b)=>String(a.at).localeCompare(b.at))}),
@@ -121,6 +123,7 @@ const L={
   categories:async()=>(await all("categories")).map(M.categories),
   suppliers:async()=>(await all("suppliers")).map(M.suppliers),
   services:async()=>(await all("services")).map(M.services),
+  svcprices:async()=>(await all("service_prices")).map(r=>({id:r.id,serviceId:r.service_id,modelId:r.model_id,price:num(r.price),partId:r.part_product_id||""})),
   customers:async()=>(await all("customers")).map(M.customers),
   products:async()=>{const [ps,st]=await Promise.all([all("products",sel("products")),all("stock")]);const list=ps.map(M.products);const by=Object.fromEntries(list.map(p=>[p.id,p]));
     st.forEach(s=>{const p=by[s.product_id];if(p)p.stock[s.warehouse_id]=s.qty});return list},
@@ -141,7 +144,7 @@ const L={
   finops:async()=>App.can("finance")?(await all("fin_ops")).map(M.finops):[],
   debts:async()=>App.can("finance")?(await all("debts")).map(M.debts):[],
   finplans:async()=>App.can("finance")?(await all("fin_plans")).map(M.finplans):[],
-  repairs:async()=>(await all("repairs","*,repair_services(*),repair_parts("+sel("repair_parts")+"),repair_history(*)",r=>r.order("created_at",{ascending:false}))).map(M.repairs),
+  repairs:async()=>(await all("repairs","*,repair_services(*),repair_parts("+sel("repair_parts")+"),repair_history(*),repair_photos(*),repair_part_requests(*)",r=>r.order("created_at",{ascending:false}))).map(M.repairs),
   porders:async()=>App.can("stock")?(await all("purchase_orders","*,purchase_order_lines(*)",r=>r.order("created_at",{ascending:false}))).map(M.porders):[],
   payrules:async()=>(await all("pay_rules")).map(M.payrules),
   unitcosts:async()=>App.can("cost")||App.me.role==="master"?(await all("unit_costs")).map(M.unitcosts):[],
@@ -160,7 +163,7 @@ const T={settings:["settings"],points:["points"],warehouses:["warehouses"],categ
   sales:["sales"],sale_items:["sales"],sale_payments:["sales"],returns:["returns"],return_items:["returns"],shifts:["shifts"],cash_ops:["cashops"],
   staff:["staff"],staff_requests:["staffreq"],audit_log:["log"],units:["units"],apple_models:["models"],site_orders:["siteorders"],supplier_prices:["sprices"],
   fin_accounts:["finaccounts"],fin_categories:["fincats"],fin_ops:["finops"],debts:["debts"],fin_plans:["finplans"],
-  repairs:["repairs"],repair_services:["repairs"],repair_parts:["repairs"],repair_history:["repairs"],
+  repairs:["repairs"],repair_services:["repairs"],repair_parts:["repairs"],repair_history:["repairs"],repair_photos:["repairs"],repair_part_requests:["repairs"],service_prices:["svcprices"],
   purchase_orders:["porders"],purchase_order_lines:["porders"],pay_rules:["payrules"],
   unit_costs:["unitcosts"],waitlist:["waitlist"],lost_demand:["lostdemand"],tasks:["tasks"],bonus_ops:["bonusops"],buy_deals:["deals"],preorders:["preorders"],evotor_receipts:["evotor"]};
 

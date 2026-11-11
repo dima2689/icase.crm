@@ -58,3 +58,26 @@ export async function getOrderStatus(num: string, phone4: string) {
     { headers: { "X-Api-Key": KEY }, cache: "no-store" });
   return r.ok ? (await r.json() as { num: string; status: "new" | "confirmed" | "done" | "cancelled"; paid: boolean; total: number; items: { name: string; qty: number; price: number }[] }) : null;
 }
+
+/* ---------- согласование ремонта по ссылке ----------
+   Ссылка в сообщении клиенту: https://<сайт>/repair/approve?n=Р-1001&t=<токен>  (токен выдаёт CRM) */
+export type RepairQuote = {
+  num: string; device: string; status: string; problem: string; diagnosis: string | null;
+  works: { name: string; qty: number; price: number }[]; parts: { name: string; qty: number; price: number }[];
+  total: number; paid: number; due_date: string | null; can_decide: boolean;
+  decision: { decision: "yes" | "no"; at: string; sum: number; comment: string | null } | null;
+  shop: { name: string; phone: string | null; address: string | null };
+};
+export async function getRepairQuote(num: string, t: string): Promise<RepairQuote | null> {
+  const r = await fetch(`${BASE}/repair-quote?num=${encodeURIComponent(num)}&t=${encodeURIComponent(t)}`, { headers: { "X-Api-Key": KEY }, cache: "no-store" });
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(`iCase CRM ${r.status}: ${await r.text()}`);
+  return r.json();
+}
+export async function decideRepair(num: string, t: string, decision: "yes" | "no", comment = ""): Promise<RepairQuote & { ok: boolean }> {
+  const r = await fetch(`${BASE}/repair-decide`, { method: "POST", headers: { "X-Api-Key": KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ num, t, decision, comment }), cache: "no-store" });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || `iCase CRM ${r.status}`);
+  return j;
+}
