@@ -38,8 +38,8 @@ chmod 600 "$OUT"
 log "готово: $OUT ($(du -h "$OUT" | cut -f1))"
 
 # локально: 7 ночных и 5 предвыкладочных
-ls -t "$BK_DIR"/icase-*-nightly.tar.gpg 2>/dev/null | tail -n +8 | xargs -r rm -f
-ls -t "$BK_DIR"/icase-*-pre-*.tar.gpg 2>/dev/null | tail -n +6 | xargs -r rm -f
+{ ls -t "$BK_DIR"/icase-*-nightly.tar.gpg 2>/dev/null || true; } | tail -n +8 | xargs -r rm -f
+{ ls -t "$BK_DIR"/icase-*-pre-*.tar.gpg 2>/dev/null || true; } | tail -n +6 | xargs -r rm -f
 
 if [ $LOCAL = 0 ] && [ -n "${S3_BUCKET:-}" ] && [ -n "${S3_ACCESS_KEY:-}" ]; then
   export RCLONE_CONFIG_ICS3_TYPE=s3 RCLONE_CONFIG_ICS3_PROVIDER=Other RCLONE_CONFIG_ICS3_ENDPOINT="$S3_ENDPOINT" \
