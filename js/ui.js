@@ -226,6 +226,7 @@ function gsearch(){
   if(q.length>=4)S.units.filter(u=>[u.imei,u.imei2,u.serialNo].some(x=>x&&x.toLowerCase().includes(q))).slice(0,6).forEach(u=>{const p=App.byId("products",u.productId)||{};out.push(`<button data-act="unitHist" data-id="${esc(u.id)}"><b>${esc(App.unitCode(u))}</b> <small>${esc(p.name||"")} · ${esc((App.UNIT_ST[u.status]||[u.status])[0])}</small></button>`)});
   App.searchProducts(q,{limit:8}).forEach(p=>out.push(`<button data-act="openProduct" data-id="${esc(p.id)}"><b>${esc(p.name)}</b> <small>${App.qtyTotal(p)} шт · ${money(p.price)}</small></button>`));
   S.sales.forEach(s=>{if(String(s.num).toLowerCase().includes(q))out.push(`<button data-act="openSale" data-id="${esc(s.id)}"><b>Продажа ${esc(s.num)}</b> <small>${App.dtt(s.createdAt)} · ${money(s.total)}</small></button>`)});
+  (S.preorders||[]).forEach(o=>{if(String(o.num).toLowerCase().includes(q)){const c=App.cust(o.customerId)||{};out.push(`<button data-act="pzOpen" data-id="${esc(o.id)}"><b>Предзаказ ${esc(o.num)}</b> <small>${esc(c.name||"")} · ${esc((App.byId("products",o.productId)||{}).name||"")}</small></button>`)}});
   S.docs.forEach(d=>{if(String(d.num).toLowerCase().includes(q))out.push(`<button data-act="openDoc" data-id="${esc(d.id)}"><b>${esc(App.DOCT[d.type].one)} ${esc(d.num)}</b> <small>${App.dt(d.createdAt)}</small></button>`)});
   box.innerHTML=out.slice(0,14).join("")||'<div class="empty">Ничего не найдено</div>';box.hidden=false;
 }

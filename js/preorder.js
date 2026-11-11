@@ -85,7 +85,7 @@ ACT.pzOpen=id=>{const o=App.byId("preorders",id);if(!o)return;const c=App.cust(o
   App.openModal(App.head("Предзаказ "+esc(o.num),pill(o))+`
     <dl class="kv"><dt>Клиент</dt><dd><button class="linkbtn" data-act="openClient" data-id="${esc(o.customerId)}">${esc(c.name||"")}</button> ${esc(App.fmtPhone(c.phone))}</dd>
     <dt>Устройство</dt><dd>${App.can("stock")||App.can("sale")?`<button class="linkbtn" data-act="openProduct" data-id="${esc(o.productId)}">${esc(p.name||"")}</button>`:esc(p.name||"")}</dd>
-    ${un?`<dt>Экземпляр</dt><dd><button class="linkbtn" data-act="openUnit" data-id="${esc(un.id)}">${esc(App.unitCode(un))}</button> · ${esc(App.whName(un.whId))}</dd>`:""}
+    ${un?`<dt>Экземпляр</dt><dd><button class="linkbtn" data-act="openUnit" data-id="${esc(un.id)}">${esc(App.unitCode(un))}</button> · ${esc(App.whName(un.whId))}${pzAway(o)?` <span class="pill warn">не на точке клиента</span> <button class="btn sm" data-act="pzMove" data-id="${esc(o.id)}">Переместить на точку</button>`:""}</dd>`:""}
     <dt>Цена</dt><dd><b>${money(o.price)}</b></dd><dt>Внесено</dt><dd>${money(paid)}</dd><dt>К доплате</dt><dd><b>${money(Math.max(0,o.price-paid))}</b></dd>
     <dt>Принят</dt><dd>${App.dtt(o.createdAt)} · ${esc(App.nameOf(o.by))}${o.pointId?" · "+esc((App.byId("points",o.pointId)||{}).name||""):""}</dd>
     ${o.dueDate?`<dt>Ожидаем</dt><dd>${App.dt(o.dueDate)}</dd>`:""}${o.arrivedAt?`<dt>Поступил</dt><dd>${App.dtt(o.arrivedAt)}</dd>`:""}
@@ -125,6 +125,32 @@ ACT.pzCancel=id=>{const o=App.byId("preorders",id),paid=App.pzPaid(o),mgr=App.is
 ACT.pzCancelGo=(id,btn)=>run(btn,async()=>{if(!App.confirm2(btn,"Отменить? Нажмите ещё раз"))return;const o=App.byId("preorders",id),paid=App.pzPaid(o);
   await App.api.rpc("preorder_cancel",{p_id:id,p_refund:paid>0?num(App.val("pcR")):0,p_method:paid>0?App.val("pcM"):"cash",p_reason:App.val("pcW")});
   await App.reload(RL);App.toast("Предзаказ отменён");ACT.pzOpen(id)});
+
+/* ---------- устройство пришло на другую точку: переместить к клиенту ---------- */
+function pzAway(o){const un=unitOf(o);if(!un||!o.pointId||o.status!=="arrived")return false;const w=App.byId("warehouses",un.whId);return !w||w.pointId!==o.pointId}
+const pzWhs=o=>S.warehouses.filter(w=>w.pointId===o.pointId&&w.active!==false);
+ACT.pzMove=id=>{const o=App.byId("preorders",id),ws=pzWhs(o),pt=App.byId("points",o.pointId)||{};if(!ws.length)return App.toast("У точки «"+(pt.name||"")+"» нет складов");
+  const def=(ws.find(w=>w.id===pt.cashWh)||ws[0]).id;
+  App.openModal(App.head("Переместить · "+esc(o.num))+`<p>Экземпляр переедет со склада «${esc(App.whName(unitOf(o).whId))}» на склад точки клиента. Бронь сохраняется.</p>
+    <div class="form">${App.fld("pmW","На склад",App.sel("pmW",ws.map(w=>[w.id,w.name]),def),"full")}</div>
+    <div class="acts"><button class="btn" data-act="pzOpen" data-id="${esc(id)}">Назад</button><button class="btn pri" data-act="pzMoveGo" data-id="${esc(id)}">Переместить</button></div>`)};
+ACT.pzMoveGo=(id,btn)=>run(btn,async()=>{await App.api.rpc("preorder_move",{p_id:id,p_wh:App.val("pmW")});await App.reload(RL.concat(["stock","movements"]));App.toast("Перемещено");ACT.pzOpen(id)});
+
+/* ---------- закупка: ждущие предзаказы — первоочередной спрос ---------- */
+const dr=App.demandRows;if(dr)App.demandRows=function(){const rows=dr.apply(this,arguments),by=new Map(rows.map(x=>[x.p.id,x]));
+  S.preorders.filter(o=>o.status==="waiting").forEach(o=>{let x=by.get(o.productId);if(!x){const p=App.byId("products",o.productId);if(!p)return;x={p,wait:0,lost:0};by.set(p.id,x);rows.push(x)}x.wait+=1;x.pre=(x.pre||0)+1});
+  return rows};
+
+/* ---------- задачи: просроченные предзаказы; переход из задачи в предзаказ ---------- */
+let pzTaskAt=0;
+const at=App.autoTasks;if(at)App.autoTasks=async function(force){const r=await at.apply(this,arguments);
+  if(!App.me.role||!App.can("sale")||(!force&&Date.now()-pzTaskAt<10*60e3))return r;pzTaskAt=Date.now();
+  const t0=new Date().toISOString().slice(0,10),rows=[];
+  S.preorders.filter(o=>o.status==="waiting"&&o.dueDate&&o.dueDate<t0).forEach(o=>{const key="po-late-"+o.num;if(S.tasks.some(t=>t.autoKey===key))return;const c=App.cust(o.customerId)||{};
+    rows.push({auto_key:key,title:`Предзаказ ${o.num} задерживается: предупредить клиента и уточнить срок поставки`,due_date:t0,note:[c.name,App.fmtPhone(c.phone),(App.byId("products",o.productId)||{}).name].filter(Boolean).join(" · "),customer_id:o.customerId,ref_type:"preorder",ref_id:o.id,point_id:o.pointId||null})});
+  if(rows.length){try{await App.api.insertMany("tasks",rows);await App.reload(["tasks"])}catch(e){console.warn(e)}}
+  return r};
+const to=ACT.taskOpen;if(to)ACT.taskOpen=function(id){const t=S.tasks.find(x=>x.id===id);if(t&&t.refType==="preorder"&&t.refId&&App.byId("preorders",t.refId))return ACT.pzOpen(t.refId);return to.apply(this,arguments)};
 
 /* ---------- печать: квитанция клиенту ---------- */
 ACT.pzPrint=id=>{const o=App.byId("preorders",id),c=App.cust(o.customerId)||{},p=App.byId("products",o.productId)||{},paid=App.pzPaid(o),st=App.settings();
