@@ -369,7 +369,7 @@ VIEWS.sales={
   render(){
     const u=App.ui,[from,to]=App.periodRange(u.salesPeriod);
     const q=u.salesQ.toLowerCase();
-    const tabs=`<div class="tabs">${[["sales","Чеки"],["returns","Возвраты"],["shifts","Смены"],["cash","Кассовые операции"]].map(([k,l])=>`<button class="tab ${u.salesTab===k?"on":""}" data-act="salesTab" data-id="${k}">${l}</button>`).join("")}</div>`;
+    const tabs=`<div class="tabs">${[["sales","Чеки"],["returns","Возвраты"],["shifts","Смены"],["cash","Кассовые операции"],...(App.evoOn&&App.evoOn()?[["evotor","Сверка с Эвотором"]]:[])].map(([k,l])=>`<button class="tab ${u.salesTab===k?"on":""}" data-act="salesTab" data-id="${k}">${l}</button>`).join("")}</div>`;
     const filt=`<div class="row-f">${App.sel("salesPeriod",App.PERIODS,u.salesPeriod,'data-filter-sel="salesPeriod" aria-label="Период"')}${u.salesTab==="sales"?App.sel("salesPay",[["","Любая оплата"],...Object.entries(App.PAY)],u.salesPay,'data-filter-sel="salesPay" aria-label="Оплата"'):""}<input id="salesQ" type="search" placeholder="№, клиент, товар" value="${esc(u.salesQ)}" data-filter="salesQ" aria-label="Поиск"></div>`;
     const inP0=d=>{const t=new Date(d);return t>=from&&t<to};
     const myPt=App.can("allPoints")?null:(App.point()||{}).id;
@@ -382,6 +382,8 @@ VIEWS.sales={
       <section class="card"><div class="tbl-wrap"><table><thead><tr><th>№</th><th>Дата</th><th>Клиент</th><th>Товары</th><th>Оплата</th><th>Продавец</th><th class="n">Сумма</th></tr></thead><tbody>
       ${list.map(s=>{const c=App.cust(s.customerId);return `<tr class="rowlink" data-act="openSale" data-id="${esc(s.id)}"><td><b>${esc(s.num)}</b>${s.status==="returned"?' <span class="pill bad">возврат</span>':s.status==="partial"?' <span class="pill warn">частичный возврат</span>':""}</td><td>${App.dtt(s.createdAt)}</td><td>${esc(c?c.name:"—")}<span class="sub">${esc(c?c.phone:"")}</span></td><td>${esc((s.items||[]).map(i=>i.name+(i.qty>1?" ×"+i.qty:"")).join(", "))}${s.tradeIn?'<span class="sub">Trade-in: '+esc(s.tradeIn.device)+"</span>":""}</td><td>${esc(App.paysText(s.payments))}</td><td>${esc(App.nameOf(s.by))}</td><td class="n"><b>${money(s.total)}</b></td></tr>`}).join("")||'<tr><td colspan="7" class="empty">Нет продаж за период</td></tr>'}
       </tbody></table></div></section>`;
+    }else if(u.salesTab==="evotor"&&App.evoView){
+      body=App.evoView(from,to,myPt);
     }else if(u.salesTab==="returns"){
       const list=App.sortDesc(S.returns.filter(r=>inP(r.createdAt,r)&&(!q||[r.num,r.saleNum,r.reason].join(" ").toLowerCase().includes(q))));
       body=`<section class="card"><div class="tbl-wrap"><table><thead><tr><th>№</th><th>Дата</th><th>Продажа</th><th>Товары</th><th>Причина</th><th>Куда</th><th>Возврат денег</th><th class="n">Сумма</th></tr></thead><tbody>
@@ -410,7 +412,7 @@ ACT.openSale=id=>{
     const canRet=App.can("ret")&&(s.items||[]).some(i=>num(i.qty)-App.returnedQty(id,i.productId,i.line)>0);
     App.redrawModal(App.head("Продажа "+esc(s.num),s.status==="returned"?'<span class="pill bad">возвращена</span>':s.status==="partial"?'<span class="pill warn">частичный возврат</span>':"")+`
     <dl class="kv"><dt>Дата</dt><dd>${App.dtt(s.createdAt)}</dd><dt>Клиент</dt><dd>${c?`<button class="btn sm" data-act="openClient" data-id="${esc(c.id)}">${esc(c.name)}</button> ${esc(c.phone)}`:"—"}</dd>
-    <dt>Склад</dt><dd>${esc(App.whName(s.whId))}</dd><dt>Продавец</dt><dd>${esc(App.nameOf(s.by))}</dd><dt>Оплата</dt><dd>${esc(App.paysText(s.payments))}</dd>
+    <dt>Склад</dt><dd>${esc(App.whName(s.whId))}</dd><dt>Продавец</dt><dd>${esc(App.nameOf(s.by))}</dd>${App.evoBadge?App.evoBadge(s):""}<dt>Оплата</dt><dd>${esc(App.paysText(s.payments))}</dd>
     ${s.tradeIn?`<dt>Trade-in</dt><dd>${esc(s.tradeIn.device)} · ${money(s.tradeIn.amount)}</dd>`:""}</dl>
     <div class="tbl-wrap"><table><thead><tr><th>Товар</th><th class="n">Кол-во</th><th class="n">Цена</th><th class="n">Скидка</th><th class="n">Сумма</th><th class="n">Возвращено</th></tr></thead><tbody>
     ${(s.items||[]).map(i=>`<tr><td>${esc(i.name)}${i.serial?'<span class="sub">'+App.codeLbl(i.productId)+" "+esc(i.serial)+"</span>":""}</td><td class="n">${i.qty}</td><td class="n">${money(i.price)}</td><td class="n">${num(i.disc)?money(i.disc):"—"}</td><td class="n">${money(i.qty*i.price-num(i.disc))}</td><td class="n">${App.returnedQty(id,i.productId,i.line)||"—"}</td></tr>`).join("")}

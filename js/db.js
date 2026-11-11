@@ -48,7 +48,7 @@ async function all(table,select="*",mod){
 /* ---------- преобразование строк базы в объекты интерфейса ---------- */
 const M={
   settings:r=>({id:"main",shopName:r.shop_name,city:r.city||"",address:r.address||"",phone:r.phone||"",inn:r.inn||"",
-    deviceWarrantyMonths:r.device_warranty_months,repairWarrantyDays:r.repair_warranty_days,requireShift:r.require_shift,storageDays:r.storage_days,deadDays:r.dead_days,receiptFooter:r.receipt_footer||"",finConfig:r.fin_config||{},loyalty:r.loyalty||{},legalName:r.legal_name||"",ogrnip:r.ogrnip||"",siteUrl:r.site_url||"",reviewUrl:r.review_url||"",receiptAck:r.receipt_ack||"",docConfig:r.doc_config||{},siteSync:!!r.site_sync,siteOrders:!!r.site_orders,siteWarehouses:r.site_warehouses||[],siteNewStatus:r.site_new_status||"draft",siteReserveWh:r.site_reserve_wh||"",siteLastSync:r.site_last_sync||"",siteLastError:r.site_last_error||"",siteFields:r.site_fields||null,siteMode:r.site_mode||"custom",siteHookUrl:r.site_hook_url||"",tagTemplates:Array.isArray(r.tag_templates)?r.tag_templates:[]}),
+    deviceWarrantyMonths:r.device_warranty_months,repairWarrantyDays:r.repair_warranty_days,requireShift:r.require_shift,storageDays:r.storage_days,deadDays:r.dead_days,receiptFooter:r.receipt_footer||"",finConfig:r.fin_config||{},loyalty:r.loyalty||{},evotor:r.evotor||{},legalName:r.legal_name||"",ogrnip:r.ogrnip||"",siteUrl:r.site_url||"",reviewUrl:r.review_url||"",receiptAck:r.receipt_ack||"",docConfig:r.doc_config||{},siteSync:!!r.site_sync,siteOrders:!!r.site_orders,siteWarehouses:r.site_warehouses||[],siteNewStatus:r.site_new_status||"draft",siteReserveWh:r.site_reserve_wh||"",siteLastSync:r.site_last_sync||"",siteLastError:r.site_last_error||"",siteFields:r.site_fields||null,siteMode:r.site_mode||"custom",siteHookUrl:r.site_hook_url||"",tagTemplates:Array.isArray(r.tag_templates)?r.tag_templates:[]}),
   points:r=>({id:r.id,name:r.name,address:r.address||"",phone:r.phone||"",patentNo:r.patent_no||"",evotorStoreId:r.evotor_store_id||"",cashWh:r.cash_wh,serviceWh:r.service_wh,order:r.sort,active:r.is_active}),
   warehouses:r=>({id:r.id,name:r.name,kind:r.kind||"",address:r.address||"",pointId:r.point_id,order:r.sort,active:r.is_active}),
   categories:r=>({id:r.id,name:r.name,parentId:r.parent_id||"",isDevice:r.is_device,isUsed:!!r.is_used}),
@@ -107,6 +107,8 @@ const M={
   bonusops:r=>({id:r.id,customerId:r.customer_id,saleId:r.sale_id||"",kind:r.kind,amount:num(r.amount),note:r.note||"",by:r.staff_id,at:r.created_at}),
   deals:r=>({id:r.id,num:r.num,kind:r.kind,customerId:r.customer_id,pointId:r.point_id||"",productId:r.product_id||"",unitId:r.unit_id||"",device:r.device,imei:r.imei||"",amount:num(r.amount),price:r.price==null?null:num(r.price),
     termDays:r.term_days,payMethod:r.pay_method||"",person:r.person||{},status:r.status,saleId:r.sale_id||"",debtId:r.debt_id||"",note:r.note||"",by:r.created_by,createdAt:r.created_at,closedAt:r.closed_at||""}),
+  evotor:r=>({id:r.id,storeId:r.store_id,pointId:r.point_id||"",deviceId:r.device_id||"",type:r.doc_type,number:r.number||"",at:r.closed_at,total:num(r.total),payments:r.payments||{},items:r.items||[],
+    saleId:r.sale_id||"",returnId:r.return_id||"",status:r.status,note:r.note||""}),
   log:r=>({id:r.id,at:r.created_at,by:r.staff_id,action:r.action,ref:r.ref||"",details:r.details||""})
 };
 /* что загружать для каждого раздела */
@@ -146,6 +148,7 @@ const L={
   tasks:async()=>(await all("tasks","*",r=>r.order("created_at",{ascending:false}))).map(M.tasks),
   bonusops:async()=>(await all("bonus_ops")).map(M.bonusops),
   deals:async()=>(await all("buy_deals","*",r=>r.order("created_at",{ascending:false}))).map(M.deals),
+  evotor:async()=>App.can("sale")||App.can("reports")?(await q(sb.from("evotor_receipts").select("id,store_id,point_id,device_id,doc_type,number,closed_at,total,payments,items,sale_id,return_id,status,note").order("closed_at",{ascending:false}).limit(5000),"evotor")).map(M.evotor):[],
   log:async()=>(await q(sb.from("audit_log").select("*").order("created_at",{ascending:false}).limit(500),"log")).map(M.log)
 };
 /* таблица базы → разделы, которые нужно перечитать */
@@ -156,7 +159,7 @@ const T={settings:["settings"],points:["points"],warehouses:["warehouses"],categ
   fin_accounts:["finaccounts"],fin_categories:["fincats"],fin_ops:["finops"],debts:["debts"],fin_plans:["finplans"],
   repairs:["repairs"],repair_services:["repairs"],repair_parts:["repairs"],repair_history:["repairs"],
   purchase_orders:["porders"],purchase_order_lines:["porders"],pay_rules:["payrules"],
-  unit_costs:["unitcosts"],waitlist:["waitlist"],lost_demand:["lostdemand"],tasks:["tasks"],bonus_ops:["bonusops"],buy_deals:["deals"]};
+  unit_costs:["unitcosts"],waitlist:["waitlist"],lost_demand:["lostdemand"],tasks:["tasks"],bonus_ops:["bonusops"],buy_deals:["deals"],evotor_receipts:["evotor"]};
 
 App.reload = async function(cols){
   cols=[...new Set(cols)].filter(c=>L[c]);
