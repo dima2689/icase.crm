@@ -131,7 +131,7 @@ ACT.cpAll=k=>{const m=cpModel();if(!m)return;if(k==="mem")CP.mems=CP.mems.length
 App.familyCategory=family=>familyCategory(family);
 async function familyCategory(family){
   let c=S.categories.find(x=>!x.parentId&&x.name.toLowerCase()===family.toLowerCase());
-  if(!c){c=await App.api.insert("categories",{name:family,is_device:family!=="Другое"});await App.reload(["categories"]);c=App.byId("categories",c.id)||c}
+  if(!c){if(!App.can("stock"))throw new Error("Нет категории «"+family+"» — её создаёт управляющий в «Настройки → Категории»");c=await App.api.insert("categories",{name:family,is_device:family!=="Другое"});await App.reload(["categories"]);c=App.byId("categories",c.id)||c}
   return c.id;
 }
 ACT.cpCreate=async(_,btn)=>{
@@ -210,6 +210,7 @@ App.isUsedUnit=(u,p)=>!!(u&&((u.condition&&u.condition!=="Новый")||Object.k
 /* категория для б/у: «Б/у техника» → «iPhone» и т.д. */
 App.usedCategory=async function(family){
   let root=S.categories.find(c=>!c.parentId&&c.isUsed);
+  if(!App.can("stock")&&(!root||!S.categories.some(c=>c.parentId===root.id&&c.name.toLowerCase()===String(family).toLowerCase())))throw new Error("Нет категории «Б/у техника / "+family+"» — её создаёт управляющий в «Настройки → Категории»");
   if(!root){const r=await App.api.insert("categories",{name:"Б/у техника",is_device:true,is_used:true});await App.reload(["categories"]);root=App.byId("categories",r.id)}
   let kid=S.categories.find(c=>c.parentId===root.id&&c.name.toLowerCase()===String(family).toLowerCase());
   if(!kid){const r=await App.api.insert("categories",{name:family,parent_id:root.id,is_device:true,is_used:true});await App.reload(["categories"]);kid=App.byId("categories",r.id)}

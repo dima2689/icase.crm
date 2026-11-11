@@ -37,7 +37,7 @@ const PERMS = {
   settings:["owner","manager"], staff:["owner"], del:["owner","manager"], reports:["owner","manager"],
   io:["owner","manager"], clients:["owner","manager","seller","master"], log:["owner","manager"], allPoints:["owner","manager"], finance:["owner","manager"]
 };
-App.can = a => (PERMS[a]||[]).includes(App.me.role);
+App.can = a => a==="receive"?(PERMS.stock.includes(App.me.role)||(App.me.role==="seller"&&(App.settings().approvals||{}).sellerReceive!==false)):(PERMS[a]||[]).includes(App.me.role);
 
 App.DEFAULTS = {shopName:"iCase", city:"", address:"", phone:"", inn:"", deviceWarrantyMonths:0,
   repairWarrantyDays:90, requireShift:true, storageDays:30, deadDays:60, receiptFooter:"Спасибо за покупку!",legalName:"",ogrnip:"",siteUrl:"",reviewUrl:"",

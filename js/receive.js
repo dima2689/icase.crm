@@ -4,6 +4,8 @@
 const {S,$,esc,num,money,ACT,VIEWS,TITLES}=App;
 TITLES.receive="Приёмка";
 const LS=(k,v)=>{try{if(v===undefined)return JSON.parse(localStorage.getItem(k)||"null");localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}};
+/* склады для приёмки: продавец — только склады своей точки */
+function rcvWhOpts(){const all=App.whOpts();if(App.can("stock"))return all;const pt=(App.point()||{}).id;const mine=new Set(S.warehouses.filter(w=>w.pointId===pt).map(w=>w.id));return all.filter(o=>mine.has(o[0]))}
 const blank=()=>({wh:"",supplierId:"",invoice:"",note:"",payAcc:"",poId:"",lines:[]});
 let R=LS("icase_recv")||blank();
 let last=null; // последняя проведённая приёмка
@@ -22,7 +24,7 @@ VIEWS.receive={
   ownSearch:true,
   actions:()=>`<button class="btn" data-act="rcvNewItem">+ Новый товар</button><button class="btn pri" data-act="rcvDevice">+ Устройство Apple</button>`,
   render(){
-    if(!R.wh||!App.byId("warehouses",R.wh))R.wh=App.cashWh()||((App.whs()[0]||{}).id||"");
+    if(!R.wh||!App.byId("warehouses",R.wh)||!rcvWhOpts().some(o=>o[0]===R.wh))R.wh=(rcvWhOpts().find(o=>o[0]===App.cashWh())||rcvWhOpts()[0]||[""])[0];
     R.lines=R.lines.filter(l=>P(l.productId));
     const cost=App.can("cost"),price=App.can("price");
     const tq=R.lines.reduce((a,l)=>a+lineQty(l),0),tc=R.lines.reduce((a,l)=>a+lineQty(l)*num(l.cost),0);
@@ -31,12 +33,13 @@ VIEWS.receive={
     ${po?`<div class="fbox pobar">Приёмка по заказу <b>${esc(po.num)}</b> · ${esc((App.byId("suppliers",po.supplierId)||{}).name||"")} — после проведения в заказе отметится, что пришло. <button class="btn sm ghost" data-act="rcvPoOff">Не по заказу</button></div>`:""}
     <section class="card">
       <div class="form">
-        ${App.fld("rcvWh","На склад",App.sel("rcvWh",App.whOpts(),R.wh,'data-rh="wh"'))}
-        <div class="fld"><label for="rcvSup">Поставщик</label><div class="row-f nowrap">${App.sel("rcvSup",[["","—"],...S.suppliers.map(s=>[s.id,s.name])],R.supplierId,'data-rh="supplierId"')}<button class="btn sm" data-act="rcvSupNew" aria-label="Новый поставщик">+</button></div></div>
+        ${App.fld("rcvWh","На склад",App.sel("rcvWh",rcvWhOpts(),R.wh,'data-rh="wh"'))}
+        <div class="fld"><label for="rcvSup">Поставщик</label><div class="row-f nowrap">${App.sel("rcvSup",[["","—"],...S.suppliers.map(s=>[s.id,s.name])],R.supplierId,'data-rh="supplierId"')}${App.can("stock")?'<button class="btn sm" data-act="rcvSupNew" aria-label="Новый поставщик">+</button>':""}</div></div>
         ${App.fld("rcvInv","Накладная / основание",App.inp("rcvInv",R.invoice,"text","№ и дата",'data-rh="invoice"'))}
         ${App.can("finance")&&R.supplierId?App.fld("rcvPay","Оплата поставщику",App.sel("rcvPay",[["","В долг — оплачу позже"],...S.finaccounts.filter(a=>a.active).map(a=>[a.id,"Оплачено сразу: "+a.name])],R.payAcc||"",'data-rh="payAcc"')):""}
         ${App.fld("rcvNote","Комментарий",App.inp("rcvNote",R.note,"text","",'data-rh="note"'))}
       </div>
+      ${!App.can("stock")?'<p class="muted">Закупочные цены подставятся из карточек товаров — управляющий проверит их по задаче. Новые товары могут потребовать подтверждения.</p>':""}
       <div class="scanbar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 17v3h-3M7 8v8M10 8v8M13 8v8M16 8v8"/></svg>
         <input id="rcvQ" type="search" autocomplete="off" placeholder="Сканируйте штрихкод или IMEI, или найдите товар по названию" aria-label="Сканер или поиск товара"><div class="pick" id="rcvPick" hidden></div></div>
       <p class="muted hintline">Новый IMEI → выберите модель, и устройство создастся само. Новый штрихкод → откроется карточка нового товара.</p>
@@ -138,7 +141,7 @@ ACT.rcvClear=(_,el)=>{if(!App.confirm2(el,"Очистить список? Ещё
 ACT.rcvTags=()=>{if(!last)return;App.tagsAdd(last.productIds);App.ui.printTab="tags";location.hash="print"};
 
 ACT.rcvPost=async(_,btn)=>{
-  if(!App.can("stock"))return App.toast("Нет права принимать товар");
+  if(!App.can("receive"))return App.toast("Нет права принимать товар");
   if(!R.wh)return App.toast("Выберите склад");
   for(const l of R.lines){const p=P(l.productId);if(p.trackSerial&&!(l.units||[]).length)return App.toast("Отсканируйте "+App.codeName(p)+" для «"+p.name+"»");if(!p.trackSerial&&num(l.qty)<1)return App.toast("Количество для «"+p.name+"»")}
   if(btn.disabled)return;btn.disabled=true;btn.textContent="Проводим…";
@@ -175,7 +178,7 @@ ACT.rcvNewItem=(barcode="",name="")=>{
     ${App.fld("niCat","Категория",`<select id="niCat">${cats.map(([v,l])=>`<option value="${esc(v)}">${esc(l)}</option>`).join("")}<option value="__new">+ новая категория…</option></select>`)}
     ${App.fld("niCatNew","Новая категория",App.inp("niCatNew","","text","если выбрали «новая»"))}
     ${App.fld("niBar","Штрихкод",App.inp("niBar",barcode,"text","отсканируйте"))}${App.fld("niSku","Артикул",App.inp("niSku"))}
-    ${App.can("cost")?App.fld("niCost","Закупка, ₽",App.inp("niCost","","number")):""}${App.can("price")?App.fld("niPrice","Цена продажи, ₽",App.inp("niPrice","","number")):""}
+    ${App.can("cost")?App.fld("niCost","Закупка, ₽",App.inp("niCost","","number")):""}${App.can("price")||App.can("receive")?App.fld("niPrice","Цена продажи, ₽",App.inp("niPrice","","number")):""}
     ${App.fld("niQty","Количество",App.inp("niQty","1","number"))}${App.fld("niCond","Состояние",App.sel("niCond",App.CONDS,"Новый"))}
     <div class="fld full">${App.chk("niSer","Поштучный учёт (IMEI у телефонов, серийный номер у остальной техники)",false)}</div></div>
     <div class="acts"><button class="btn pri" data-act="rcvNewItemSave">Создать и добавить</button></div>`);
@@ -190,7 +193,7 @@ ACT.rcvNewItemSave=async(_,btn)=>{
     let cat=V("niCat");
     if(cat==="__new"||!cat){if(!V("niCatNew")){btn.disabled=false;return App.toast("Название новой категории")}const c=await App.api.insert("categories",{name:V("niCatNew")});await App.reload(["categories"]);cat=c.id}
     const p=await App.api.insert("products",{name:V("niName"),category_id:cat,barcode:V("niBar")||null,sku:V("niSku")||null,condition:V("niCond"),
-      price:App.can("price")?num(V("niPrice")):0,track_serial:App.checked("niSer"),on_site:false});
+      price:App.can("price")||App.can("receive")?num(V("niPrice")):0,track_serial:App.checked("niSer"),on_site:false});
     await App.reload(["products"]);App.closeModal();
     const prod=P(p.id),i=ensureLine(prod);R.lines[i].cost=cost;if(!prod.trackSerial)R.lines[i].qty=qty;
     save();App.render();setTimeout(()=>focus(prod.trackSerial?`[data-rscan="${i}"]`:"#rcvQ"),0);App.toast("Товар создан");
@@ -246,7 +249,7 @@ function drawDP(){
       ${App.fld("dpCond","Состояние",App.sel("dpCond",App.CONDS,DP.cond))}
       ${App.fld("dpBatt","Ёмкость АКБ, %",App.inp("dpBatt",DP.battery,"number","для б/у"))}
       ${App.can("cost")?App.fld("dpCost","Закупка, ₽",App.inp("dpCost",DP.cost,"number")):""}
-      ${App.can("price")?App.fld("dpPrice",DP.cond==="Новый"?"Цена продажи, ₽":"Цена этого экземпляра, ₽",App.inp("dpPrice",DP.price,"number",ex?String(num(ex.price)):"")):""}
+      ${App.can("price")||(!ex&&App.can("receive"))?App.fld("dpPrice",DP.cond==="Новый"?"Цена продажи, ₽":"Цена этого экземпляра, ₽",App.inp("dpPrice",DP.price,"number",ex?String(num(ex.price)):"")):""}
       ${DP.cond!=="Новый"?`<div class="fld full">${App.usedForm("dpu_",DP.ua||{})}</div>`:""}
       ${App.fld("dpCode",DP.family==="iPhone"?"IMEI":"Серийный номер",App.inp("dpCode",DP.code,"text","сканируйте",'autocomplete="off" class="mono"'))}
       ${App.fld("dpPart","Артикул с коробки",App.inp("dpPart",DP.part,"text","MTUV3ZD/A — необязательно",'autocomplete="off" class="mono"'))}
@@ -280,7 +283,7 @@ ACT.dpAdd=async(_,btn)=>{
     if(!p){
       const cat=DP.cond!=="Новый"?await App.usedCategory(m.family):await App.familyCategory(m.family);
       const row=await App.api.insert("products",{name,category_id:cat,brand:"Apple",model:m.name,memory:DP.mem||null,color:DP.color||null,condition:DP.cond,
-        attrs:Object.fromEntries(Object.entries(DP.opts).filter(([k,v])=>v)),catalog_id:m.id,track_serial:true,price:DP.cond==="Новый"&&App.can("price")?num(DP.price):0});
+        attrs:Object.fromEntries(Object.entries(DP.opts).filter(([k,v])=>v)),catalog_id:m.id,track_serial:true,price:DP.cond==="Новый"&&(App.can("price")||App.can("receive"))?num(DP.price):0});
       await App.reload(["products"]);p=P(row.id);
     }else if(!p.trackSerial){if(btn)btn.disabled=false;return App.toast("Товар «"+name+"» ведётся без IMEI — включите учёт по IMEI в карточке")}
     const extra={condition:DP.cond,battery_health:DP.battery||""};if(DP.part)extra.part_no=DP.part;

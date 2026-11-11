@@ -6,7 +6,7 @@
 const {S,$,esc,ACT}=App;
 const WS={
   pos:{title:"Касса",home:"pos",need:"sale",
-    nav:["pos","repairs","sales","orders","stock","clients","tasks","print"],
+    nav:["pos","repairs","receive","sales","orders","stock","clients","tasks","print"],
     tabs:[["pos","Касса"],["repairs","Ремонт"],["__scan","Скан"],["clients","Клиенты"],["__more","Ещё"]],
     skip:["sprices","finaccounts","fincats","finops","finplans","debts","porders","payrules","unitcosts","log","staffreq","docs"]},
   service:{title:"Сервис",home:"repairs",need:"repair",
