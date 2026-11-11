@@ -45,6 +45,8 @@ VIEWS.repairs={
 ACT.repFilter=k=>{App.ui.repFilter=k;if(App.ui.view!=="repairs")location.hash="repairs";else App.render()};
 ACT.repView=k=>{App.ui.repView=k;if(k==="board")App.ui.repFilter="active";App.render()};
 
+/* строка ремонта для коротких списков (сводка, клиент) */
+App.repMini=r=>{const c=App.cust(r.customerId)||{},due=App.repDue(r);return `<button data-act="openRepair" data-id="${esc(r.id)}"><span>${esc(r.num)} · ${esc(r.device)}<small>${esc(c.name||"—")}${c.phone?" · "+esc(c.phone):""}${r.readyAt?" · готов "+App.dt(r.readyAt):""}</small></span>${due?`<b class="num">${money(due)}</b>`:'<span class="pill ok">оплачен</span>'}</button>`};
 /* ---------- приём: по шагам — клиент, устройство, неисправность, осмотр, сроки и оплата ---------- */
 const QK={
   rProblem:["Разбит экран","Не заряжается","Быстро садится батарея","Не включается","Попала вода","Не работает камера","Плохо слышно собеседника","Не работает Face ID","Нет сети"],

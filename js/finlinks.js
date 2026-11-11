@@ -57,7 +57,7 @@ App.psnStatus=function(){const cfg=App.finCfg(),y=new Date().getFullYear(),f=new
   const soon=cfg.psn.patents.filter(p=>p.to&&new Date(p.to)>=new Date(Date.now()-DAY)&&new Date(p.to)<new Date(Date.now()+30*DAY));
   return {inc,lim,pct:inc/lim,fc,soon,patents:cfg.psn.patents}};
 App.psnTile=function(){const s=App.psnStatus();const cls=s.pct>=.9?"badc":s.pct>=.75?"warnc":"";
-  return `<button class="tile" data-act="finTab" data-id="setup"><span>Доход для лимита ПСН с начала года</span><b class="${cls}">${Math.round(s.pct*100)}% · ${money(s.inc)}</b><small>лимит ${money(s.lim)} · к концу года ≈ ${money(s.fc)}${s.fc>s.lim?' · <span class="badc">превысим</span>':""}${s.soon.length?` · <span class="badc">патент заканчивается</span>`:""}</small></button>`};
+  return `<button class="tile" data-act="finTab" data-id="setup"><span>Доход для лимита ПСН с начала года</span><b class="${cls}">${money(s.inc)}</b><small>${Math.round(s.pct*100)}% лимита ${money(s.lim)} · к концу года ≈ ${money(s.fc)}${s.fc>s.lim?' · <span class="badc">превысим</span>':""}${s.soon.length?` · <span class="badc">патент заканчивается</span>`:""}</small></button>`};
 
 /* ---------- настройки учёта прибыли ---------- */
 App.finConfigCard=function(){const c=App.finCfg(),ed=App.can("settings");const dis=ed?"":"disabled";

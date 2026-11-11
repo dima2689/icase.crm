@@ -287,5 +287,5 @@ App.clientExtra=function(id){const w=S.waitlist.filter(x=>x.customerId===id&&["o
   return w.length||t.length?`<section><h3 class="sub-h">Ждёт и напоминания</h3><div class="list-mini">${w.map(x=>`<button data-act="waitOpen" data-id="${x.id}"><span>${esc(x.request)}<small>с ${App.dt(x.createdAt)}</small></span>${wPill(x.status)}</button>`).join("")}${t.map(x=>`<button data-act="taskOpen" data-id="${x.id}"><span>${esc(x.title)}<small>${x.dueDate?App.dt(x.dueDate):""}</small></span><span class="pill">задача</span></button>`).join("")}</div></section>`:""};
 ACT.taskNewFor=id=>{const c=App.cust(id)||{};ACT.taskNew({phone:c.phone,title:"Позвонить "+(c.name||"клиенту")})};
 /* автонапоминания: через 5 секунд после входа и потом раз в 10 минут */
-setTimeout(()=>App.autoTasks(),5000);setInterval(()=>App.autoTasks(),60e3);
+setTimeout(()=>App.autoTasks(),1200);setInterval(()=>App.autoTasks(),60e3);
 })();

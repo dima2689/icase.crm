@@ -63,7 +63,10 @@ const _tsC=new Map();
 App.ts = v=>{if(v==null||v==="")return NaN;if(typeof v==="number")return v;if(v instanceof Date)return +v;let t=_tsC.get(v);if(t===undefined){t=Date.parse(v);if(_tsC.size>200000)_tsC.clear();_tsC.set(v,t)}return t};
 const _fmt=(f,iso)=>{if(!iso)return "—";const t=App.ts(iso);return isNaN(t)?"—":f.format(t)};
 App.dt = iso=>_fmt(_df,iso);
-App.dtt = iso=>_fmt(_dtf,iso);
+App.dtt = iso=>_fmt(_dtf,iso).replace(", ",",\u00a0");
+/* склонение: plural(5,"чек","чека","чеков") */
+App.plural=(n,a,b,c)=>{n=Math.abs(Math.trunc(n))%100;const k=n%10;return n>10&&n<20?c:k===1?a:k>=2&&k<=4?b:c};
+App.nw=(n,a,b,c)=>n+" "+App.plural(n,a,b,c);
 App.phoneKey = p=>String(p||"").replace(/\D/g,"").slice(-10);
 App.fmtPhone = p=>{const k=App.phoneKey(p);return k.length===10?"+7 "+k.slice(0,3)+" "+k.slice(3,6)+"-"+k.slice(6,8)+"-"+k.slice(8):(p||"")};
 /* индексы по id: строятся лениво и сбрасываются, когда коллекция заменена или изменилась её длина */
@@ -132,9 +135,11 @@ App.cust = id=>App.byId("customers",id);
 App.openShift = (pointId)=>{const pid=pointId||(App.point()||{}).id;return S.shifts.find(s=>s.status==="open"&&s.pointId===pid)||null};
 App.shiftTotals = function(sh){
   const ops=S.cashops.filter(o=>o.shiftId===sh.id);
-  const t={ops,byMethod:{},sales:0,refunds:0,repairs:0,cashin:0,cashout:0,count:0};
-  Object.keys(App.PAY).forEach(m=>t.byMethod[m]=0);
+  const t={ops,byMethod:{},byPay:{},sales:0,refunds:0,repairs:0,cashin:0,cashout:0,payouts:0,count:0};
+  Object.keys(App.PAY).forEach(m=>{t.byMethod[m]=0;t.byPay[m]=0});
   ops.forEach(o=>{const a=num(o.amount);t.byMethod[o.method]=(t.byMethod[o.method]||0)+a;
+    if(["sale","refund","repair","prepay"].includes(o.type))t.byPay[o.method]=(t.byPay[o.method]||0)+a;
+    if((o.type==="cashin"||o.type==="cashout")&&o.method&&o.method!=="cash"){t.payouts+=-a;return}
     if(o.type==="sale"){t.sales+=a;t.count++}else if(o.type==="refund")t.refunds+=-a;else if(o.type==="prepay"&&/^ПЗ-/.test(o.ref))t.preorders=(t.preorders||0)+a;else if(o.type==="repair"||o.type==="prepay")t.repairs+=a;
     else if(o.type==="cashin")t.cashin+=a;else if(o.type==="cashout")t.cashout+=-a});
   t.expectedCash=num(sh.openCash)+num(t.byMethod.cash);

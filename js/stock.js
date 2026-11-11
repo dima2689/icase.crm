@@ -212,7 +212,7 @@ function productForm(id){
   const units=id&&p.trackSerial?App.sortDesc(S.units.filter(u=>u.productId===id&&(App.ui.unitAll||u.status==="in_stock")),"createdAt"):[];
   const attrs=Object.entries(p.attrs||{}).filter(([k,v])=>v);
   App.openModal(App.head(id?esc(p.name):"Новый товар",(id&&p.archived?'<span class="pill mute">архив</span>':"")+(id&&App.apprPill?App.apprPill(p):""))+(id&&App.apprPanel?App.apprPanel(p):"")+`
-  ${id?`<div class="tiles">${App.whs().map(w=>`<button type="button" class="tile click" data-act="whOpen" data-id="${esc(w.id)}" title="Открыть склад"><span>${esc(w.name)}</span><b>${App.qtyIn(p,w.id)}</b></button>`).join("")}<div class="tile"><span>Всего</span><b>${App.qtyTotal(p)}</b></div></div>`:""}
+  ${id?`<div class="pstock"><b>Остаток: ${App.qtyTotal(p)} шт</b>${App.whs().map(w=>{const q=App.qtyIn(p,w.id);return `<button type="button" class="chip ${q?"":"off"}" data-act="whOpen" data-id="${esc(w.id)}" title="Открыть склад">${esc(w.name)} <b>${q}</b></button>`}).join("")}</div>`:""}
   ${id&&p.onSite&&App.can("settings")?`<div class="row-f" style="margin:8px 0 0"><button type="button" class="btn sm" data-act="sitePreview" data-id="${esc(id)}">Как уйдёт на сайт</button></div>`:""}
   ${id&&App.can("cost")&&App.offersFor?(()=>{const of=App.offersFor(p).filter(o=>o.price>0).slice(0,5);return of.length?`<div class="offers"><span class="muted">Цены поставщиков:</span> ${of.map((o,i)=>`<button type="button" class="pill ${i?"":"ok"}" data-act="spOpen" data-id="${o.id}">${esc((App.byId("suppliers",o.supplierId)||{}).name||"")} — ${money(o.price)}</button>`).join(" ")}</div>`:""})():""}
   <div class="form">

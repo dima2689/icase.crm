@@ -21,13 +21,13 @@ VIEWS.dashboard={
     ${reqs.length?`<div class="banner info">Новые сотрудники ждут назначения роли: ${reqs.length}. <a href="#settings" data-act="settingsTab" data-id="staff">Назначить</a></div>`:""}
     ${sh&&!App.sameDay(sh.openedAt,now)?`<div class="banner warn">Смена ${esc(sh.num)} открыта ${App.dtt(sh.openedAt)} и не закрыта. <a href="#pos">Закрыть в кассе</a></div>`:""}
     <div class="tiles">
-      <div class="tile"><span>Выручка сегодня</span><b>${money(t.rev)}</b><small>${t.count} чеков · ремонтов ${t.reps.length}</small></div>
-      <div class="tile"><span>Выручка за месяц</span><b>${money(m.rev)}</b><small>${showProfit?"прибыль "+money(m.profit):"средний чек "+money(m.avg)}</small></div>
+      <div class="tile"><span>Выручка сегодня</span><b>${money(t.rev)}</b><small>все точки · ${App.nw(t.count,"чек","чека","чеков")}${t.reps.length?" · "+App.nw(t.reps.length,"ремонт","ремонта","ремонтов"):""}</small></div>
+      <div class="tile"><span>Выручка за месяц</span><b>${money(m.rev)}</b><small>${showProfit?"валовая прибыль "+money(m.profit):"средний чек "+money(m.avg)}</small></div>
       <a class="tile click" href="#pos"><span>Касса</span><b>${sh?money(App.shiftTotals(sh).expectedCash):"закрыта"}</b><small>${sh?"наличных в смене "+esc(sh.num):"откройте смену"}</small></a>
-      ${hasRep?`<a class="tile click" href="#repairs"><span>Ремонт в работе</span><b>${act.length}</b><small>${ready.length} готовы · ${waitParts.length} ждут запчасть</small></a>
-      <button class="tile click ${late.length?"alert":""}" data-act="repFilter" data-id="late"><span>Просрочено</span><b>${late.length}</b><small>${stored.length?stored.length+" на хранении дольше "+App.settings().storageDays+" дн.":"срок ремонта прошёл"}</small></button>`:""}
-      ${App.tasksDue?`<a class="tile click ${App.tasksDue()?"alert":""}" href="#tasks"><span>Задачи на сегодня</span><b>${App.tasksDue()}</b><small>${S.waitlist.filter(w=>w.status==="ready").length?S.waitlist.filter(w=>w.status==="ready").length+" клиентов ждут звонка: товар пришёл":"напоминания и звонки"}</small></a>`:""}
-      ${App.apprTile?App.apprTile():""}<button class="tile click ${low.length?"alert":""}" data-act="lowStock"><span>Заканчивается</span><b>${low.length}</b><small>товаров ниже минимума</small></button>
+      ${hasRep?`<a class="tile click" href="#repairs"><span>Ремонт в работе</span><b>${act.length}</b><small>${ready.length||waitParts.length?[ready.length?"готово к выдаче: "+ready.length:"",waitParts.length?"ждут запчасть: "+waitParts.length:""].filter(Boolean).join(" · "):"все в процессе"}</small></a>
+      <button class="tile click ${late.length?"alert":""}" data-act="repFilter" data-id="late"><span>Просрочено</span><b>${late.length}</b><small>${late.length?[late.length-stored.length>0?"не готовы в срок: "+(late.length-stored.length):"",stored.length?"не забирают дольше "+App.settings().storageDays+" дн.: "+stored.length:""].filter(Boolean).join(" · "):"всё в срок"}</small></button>`:""}
+      ${App.tasksDue?`<a class="tile click ${App.tasksDue()?"alert":""}" href="#tasks"><span>Задачи на сегодня</span><b>${App.tasksDue()}</b><small>${S.waitlist.filter(w=>w.status==="ready").length?"из них звонков о поступлении: "+S.waitlist.filter(w=>w.status==="ready").length:"напоминания и звонки"}</small></a>`:""}
+      ${App.apprTile?App.apprTile():""}<button class="tile click ${low.length?"warn":""}" data-act="lowStock"><span>Заканчивается</span><b>${low.length}</b><small>товаров ниже минимума</small></button>
     </div>
     <div class="grid g2">
       <section class="card"><div class="card-h"><h2>Выручка за 14 дней</h2><span class="pill">продажи − возвраты + ремонт</span></div>${App.barChart(days,vals)}</section>
@@ -78,7 +78,7 @@ App.posToday=pid=>{const now=new Date(),r={cash:0,non:0,n:0,ret:0,debt:0};
   r.total=r.cash+r.non;return r};
 function posToday(){const pt=App.point();if(!pt)return "";const t=App.posToday(pt.id),sh=App.openShift(),open=!!App.ui.posTodayOpen;
   const nw=t.n%10===1&&t.n%100!==11?"чек":t.n%10>=2&&t.n%10<=4&&(t.n%100<10||t.n%100>=20)?"чека":"чеков";
-  return `<div class="totbox todaybox ${open?"open":""}"><button class="fsh" data-act="posTodayT" aria-expanded="${open}"><span class="ft">Сегодня</span><span class="fsum">${money(t.total)} · нал. ${money(t.cash)} · безнал ${money(t.non)}${t.debt?" · в долг "+money(t.debt):""}</span><span class="car"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform:rotate(${open?180:0}deg);transition:transform .15s"><path d="M6 9l6 6 6-6"/></svg></span><span class="totbtn">${open?"Свернуть":"Развернуть"}</span></button>
+  return `<div class="totbox todaybox ${open?"open":""}"><button class="fsh" data-act="posTodayT" aria-expanded="${open}"><span class="ft">Сегодня</span><span class="fsum">получено ${money(t.total)} · нал. ${money(t.cash)} · безнал ${money(t.non)}${t.debt?" · в долг "+money(t.debt):""}</span><span class="car"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform:rotate(${open?180:0}deg);transition:transform .15s"><path d="M6 9l6 6 6-6"/></svg></span><span class="totbtn">${open?"Свернуть":"Развернуть"}</span></button>
     ${open?`<div class="tb-body"><div class="tb-h muted">${esc(pt.name)} · ${t.n} ${nw}${t.ret?" · возвраты "+money(t.ret):""}${t.debt?" · продано в долг "+money(t.debt):""}</div>
     <div class="tb-row"><div><span>Наличные</span><b>${money(t.cash)}</b>${sh?`<small>в ящике ${money(App.shiftTotals(sh).expectedCash)}</small>`:""}</div><div><span>Безналичные</span><b>${money(t.non)}</b><small>карта, СБП, перевод</small></div><div class="tb-tot"><span>Всего</span><b>${money(t.total)}</b></div></div></div>`:""}</div>`}
 ACT.posTodayT=()=>{App.ui.posTodayOpen=!App.ui.posTodayOpen;App.render()};
@@ -327,15 +327,26 @@ function shiftReport(sh,title){
   const t=App.shiftTotals(sh);
   return [`${title} · смена ${sh.num}`,`Открыта: ${App.dtt(sh.openedAt)} · ${App.nameOf(sh.openedBy)}`,sh.closedAt?`Закрыта: ${App.dtt(sh.closedAt)} · ${App.nameOf(sh.closedBy)}`:"","",
     `Чеков продажи: ${t.count}`,`Продажи: ${money(t.sales)}`,`Возвраты: −${money(t.refunds)}`,`Ремонт (оплаты и предоплаты): ${money(t.repairs)}`,...(t.preorders?[`Предоплаты за предзаказы: ${money(t.preorders)}`]:[]),"",
-    "По способам оплаты:",...Object.entries(App.PAY).map(([m,l])=>`  ${l}: ${money(t.byMethod[m]||0)}`),"",
+    "По способам оплаты:",...Object.entries(App.PAY).map(([m,l])=>`  ${l}: ${money(t.byPay[m]||0)}`),"",
     `Наличные на начало: ${money(sh.openCash)}`,`Внесения: ${money(t.cashin)}`,`Изъятия: −${money(t.cashout)}`,`Должно быть наличных: ${money(t.expectedCash)}`,
     sh.status==="closed"?`Пересчитано: ${money(sh.countedCash)} · расхождение: ${money(sh.diff)}`:""].filter(x=>x!=="" ).join("\n");
 }
-ACT.xReport=()=>{const sh=App.openShift();if(sh)App.textModal("X-отчёт",shiftReport(sh,"X-отчёт"),"",["printShift",sh.id])};
+/* отчёт смены таблицей — читается быстрее, чем текст */
+function shiftHtml(sh){const t=App.shiftTotals(sh),R=(l,v,cls="")=>`<div class="srow ${cls}"><span>${l}</span><b>${v}</b></div>`;
+  const pays=Object.entries(App.PAY).filter(([m])=>num(t.byPay[m])).map(([m,l])=>R(l,money(t.byPay[m])));
+  return `<div class="srep"><p class="muted">Открыта ${App.dtt(sh.openedAt)} · ${esc(App.nameOf(sh.openedBy))}${sh.closedAt?` · закрыта ${App.dtt(sh.closedAt)} · ${esc(App.nameOf(sh.closedBy))}`:""}</p>
+    <section><h3>Выручка</h3>${R("Продажи · "+App.nw(t.count,"чек","чека","чеков"),money(t.sales))}${t.refunds?R("Возвраты","−"+money(t.refunds),"badc"):""}${t.repairs?R("Ремонт: оплаты и предоплаты",money(t.repairs)):""}${t.preorders?R("Предоплаты за предзаказы",money(t.preorders)):""}</section>
+    ${pays.length?`<section><h3>Как платили клиенты</h3>${pays.join("")}</section>`:""}${t.payouts?`<section><h3>Выплаты не из кассы</h3>${R("Выкуп, комиссия и др. безналом",money(t.payouts))}</section>`:""}
+    <section><h3>Наличные в кассе</h3>${R("На начало смены",money(sh.openCash))}${t.cashin?R("Внесли",money(t.cashin)):""}${t.cashout?R("Изъяли","−"+money(t.cashout)):""}${R("Должно быть в ящике",money(t.expectedCash),"tot")}
+      ${sh.status==="closed"?R("Пересчитали",money(sh.countedCash))+R("Расхождение",(sh.diff>0?"+":"")+money(sh.diff),Math.abs(num(sh.diff))<1?"okc":"badc"):""}</section>
+    ${sh.closeNote?`<p class="muted">Комментарий: ${esc(sh.closeNote)}</p>`:""}</div>`}
+App.shiftModal=(sh,title)=>App.openModal(App.head(esc(title))+shiftHtml(sh)+`<pre id="copytext" hidden>${esc(shiftReport(sh,title)+(sh.closeNote?"\nКомментарий: "+sh.closeNote:""))}</pre>
+  <div class="acts"><button class="btn" data-act="printShift" data-id="${esc(sh.id)}">Печать A4</button><button class="btn" data-act="copy">Скопировать текстом</button><button class="btn pri" data-act="close">Готово</button></div>`);
+ACT.xReport=()=>{const sh=App.openShift();if(sh)App.shiftModal(sh,"X-отчёт · смена "+sh.num)};
 ACT.closeShift=()=>{
   const sh=App.openShift();if(!sh)return;
   const t=App.shiftTotals(sh);
-  App.openModal(App.head("Закрыть смену "+esc(sh.num))+`<pre class="receipt">${esc(shiftReport(sh,"Итоги"))}</pre>
+  App.openModal(App.head("Закрыть смену "+esc(sh.num))+`${shiftHtml(sh)}
   <div class="form">${App.fld("csCash","Пересчитанные наличные, ₽",App.inp("csCash","","number",String(Math.round(t.expectedCash))))}<div class="fld"><label>Расхождение</label><b id="csDiff" class="big-n">—</b></div>
   ${App.fld("csNote","Комментарий (обязательно при расхождении)",App.inp("csNote"),"full")}</div>
   <div class="acts"><button class="btn" data-act="close">Отмена</button><button class="btn pri" data-act="closeShiftOk">Закрыть смену</button></div>`);
@@ -352,7 +363,7 @@ ACT.closeShiftOk=async(_,btn)=>{
     App.closeModal();App.toast("Смена "+sh.num+" закрыта");App.reload(["shifts"]);
   }catch(e){btn.disabled=false;App.toast(e.message)}
 };
-ACT.openShift=id=>{const sh=App.byId("shifts",id);if(sh)App.textModal("Смена "+sh.num,shiftReport(sh,sh.status==="open"?"X-отчёт":"Z-отчёт")+(sh.closeNote?"\nКомментарий: "+sh.closeNote:""),"",["printShift",sh.id])};
+ACT.openShift=id=>{const sh=App.byId("shifts",id);if(sh)App.shiftModal(sh,(sh.status==="open"?"X-отчёт":"Z-отчёт")+" · смена "+sh.num)};
 
 /* ======================= ПРОДАЖИ ======================= */
 TITLES.sales="Продажи";
@@ -380,7 +391,7 @@ VIEWS.sales={
       const list=App.sortDesc(S.sales.filter(s=>inP(s.createdAt,s)&&(!u.salesPay||(s.payments||[]).some(p=>p.method===u.salesPay))&&(!q||[s.num,(App.cust(s.customerId)||{}).name,(App.cust(s.customerId)||{}).phone,(s.items||[]).map(i=>i.name+" "+i.serial).join(" ")].join(" ").toLowerCase().includes(q))));
       const sum=list.reduce((a,s)=>a+num(s.total),0);
       body=`<div class="tiles"><div class="tile"><span>Чеков</span><b>${list.length}</b></div><div class="tile"><span>Сумма</span><b>${money(sum)}</b></div><div class="tile"><span>Средний чек</span><b>${money(list.length?sum/list.length:0)}</b></div>${App.can("cost")?`<div class="tile"><span>Прибыль</span><b>${money(list.reduce((a,s)=>a+App.saleProfit(s),0))}</b></div>`:""}</div>
-      <section class="card"><div class="tbl-wrap"><table><thead><tr><th>№</th><th>Дата</th><th>Клиент</th><th>Товары</th><th>Оплата</th><th>Продавец</th><th class="n">Сумма</th></tr></thead><tbody>
+      <section class="card"><div class="tbl-wrap"><table class="stbl"><thead><tr><th>№</th><th>Дата</th><th>Клиент</th><th>Товары</th><th>Оплата</th><th>Продавец</th><th class="n">Сумма</th></tr></thead><tbody>
       ${list.map(s=>{const c=App.cust(s.customerId);return `<tr class="rowlink" data-act="openSale" data-id="${esc(s.id)}"><td><b>${esc(s.num)}</b>${s.status==="returned"?' <span class="pill bad">возврат</span>':s.status==="partial"?' <span class="pill warn">частичный возврат</span>':""}</td><td>${App.dtt(s.createdAt)}</td><td>${esc(c?c.name:"—")}<span class="sub">${esc(c?c.phone:"")}</span></td><td>${esc((s.items||[]).map(i=>i.name+(i.qty>1?" ×"+i.qty:"")).join(", "))}${s.tradeIn?'<span class="sub">Trade-in: '+esc(s.tradeIn.device)+"</span>":""}</td><td>${esc(App.paysText(s.payments))}</td><td>${esc(App.nameOf(s.by))}</td><td class="n"><b>${money(s.total)}</b></td></tr>`}).join("")||'<tr><td colspan="7" class="empty">Нет продаж за период</td></tr>'}
       </tbody></table></div></section>`;
     }else if(u.salesTab==="evotor"&&App.evoView){
