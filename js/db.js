@@ -105,6 +105,8 @@ const M={
   lostdemand:r=>({id:r.id,request:r.request,productId:r.product_id||"",qty:num(r.qty)||1,reason:r.reason||"",pointId:r.point_id||"",by:r.staff_id,createdAt:r.created_at}),
   tasks:r=>({id:r.id,title:r.title,note:r.note||"",dueDate:r.due_date||"",assignee:r.assignee||"",pointId:r.point_id||"",customerId:r.customer_id||"",refType:r.ref_type||"",refId:r.ref_id||"",autoKey:r.auto_key||"",status:r.status,by:r.created_by,createdAt:r.created_at,doneAt:r.done_at||"",doneBy:r.done_by||""}),
   bonusops:r=>({id:r.id,customerId:r.customer_id,saleId:r.sale_id||"",kind:r.kind,amount:num(r.amount),note:r.note||"",by:r.staff_id,at:r.created_at}),
+  preorders:r=>({id:r.id,num:r.num,pointId:r.point_id||"",customerId:r.customer_id,productId:r.product_id,unitId:r.unit_id||"",price:num(r.price),status:r.status,dueDate:r.due_date||"",note:r.note||"",
+    saleId:r.sale_id||"",by:r.created_by,createdAt:r.created_at,arrivedAt:r.arrived_at,closedAt:r.closed_at,cancelReason:r.cancel_reason||""}),
   deals:r=>({id:r.id,num:r.num,kind:r.kind,customerId:r.customer_id,pointId:r.point_id||"",productId:r.product_id||"",unitId:r.unit_id||"",device:r.device,imei:r.imei||"",amount:num(r.amount),price:r.price==null?null:num(r.price),
     termDays:r.term_days,payMethod:r.pay_method||"",person:r.person||{},status:r.status,saleId:r.sale_id||"",debtId:r.debt_id||"",note:r.note||"",by:r.created_by,createdAt:r.created_at,closedAt:r.closed_at||""}),
   evotor:r=>({id:r.id,storeId:r.store_id,pointId:r.point_id||"",deviceId:r.device_id||"",type:r.doc_type,number:r.number||"",at:r.closed_at,total:num(r.total),payments:r.payments||{},items:r.items||[],
@@ -147,6 +149,7 @@ const L={
   lostdemand:async()=>(await q(sb.from("lost_demand").select("*").order("created_at",{ascending:false}).limit(3000),"lost_demand")).map(M.lostdemand),
   tasks:async()=>(await all("tasks","*",r=>r.order("created_at",{ascending:false}))).map(M.tasks),
   bonusops:async()=>(await all("bonus_ops")).map(M.bonusops),
+  preorders:async()=>(await all("preorders","*",r=>r.order("created_at",{ascending:false}))).map(M.preorders),
   deals:async()=>(await all("buy_deals","*",r=>r.order("created_at",{ascending:false}))).map(M.deals),
   evotor:async()=>App.can("sale")||App.can("reports")?(await q(sb.from("evotor_receipts").select("id,store_id,point_id,device_id,doc_type,number,closed_at,total,payments,items,sale_id,return_id,status,note").order("closed_at",{ascending:false}).limit(5000),"evotor")).map(M.evotor):[],
   log:async()=>(await q(sb.from("audit_log").select("*").order("created_at",{ascending:false}).limit(500),"log")).map(M.log)
@@ -159,7 +162,7 @@ const T={settings:["settings"],points:["points"],warehouses:["warehouses"],categ
   fin_accounts:["finaccounts"],fin_categories:["fincats"],fin_ops:["finops"],debts:["debts"],fin_plans:["finplans"],
   repairs:["repairs"],repair_services:["repairs"],repair_parts:["repairs"],repair_history:["repairs"],
   purchase_orders:["porders"],purchase_order_lines:["porders"],pay_rules:["payrules"],
-  unit_costs:["unitcosts"],waitlist:["waitlist"],lost_demand:["lostdemand"],tasks:["tasks"],bonus_ops:["bonusops"],buy_deals:["deals"],evotor_receipts:["evotor"]};
+  unit_costs:["unitcosts"],waitlist:["waitlist"],lost_demand:["lostdemand"],tasks:["tasks"],bonus_ops:["bonusops"],buy_deals:["deals"],preorders:["preorders"],evotor_receipts:["evotor"]};
 
 App.reload = async function(cols){
   cols=[...new Set(cols)].filter(c=>L[c]&&!(App.wsSkip&&App.wsSkip(c)));

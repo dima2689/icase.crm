@@ -11,7 +11,7 @@ App.RSTAT = [
 App.RS = Object.fromEntries(App.RSTAT.map(s=>[s[0],{label:s[1],cls:s[2]}]));
 App.ACTIVE = ["new","diag","approve","work","parts","ready"];
 App.PAY = {cash:"Наличные", card:"Карта", sbp:"QR (СБП)", transfer:"Перевод"};
-App.PAYALL = Object.assign({}, App.PAY, {debt:"В долг"});
+App.PAYALL = Object.assign({}, App.PAY, {debt:"В долг", prepaid:"Предоплата"});
 App.CONDS = ["Новый","Б/у отличное","Б/у хорошее","Б/у среднее","Восстановленный","На запчасти"];
 App.SOURCES = ["Магазин","Сайт","Авито","Рекомендация","Соцсети","Другое"];
 App.DOCT = {
@@ -44,7 +44,7 @@ App.DEFAULTS = {shopName:"iCase", city:"", address:"", phone:"", inn:"", deviceW
   receiptAck:"Устройство осмотрено, проверено, претензий к внешнему виду и комплектации не имею."};
 
 /* ---------- состояние ---------- */
-App.COLS = ["settings","points","warehouses","categories","suppliers","services","products","customers","sales","returns","docs","movements","shifts","cashops","staff","staffreq","log","repairs","units","models","siteorders","sprices","finaccounts","fincats","finops","debts","finplans","porders","payrules","unitcosts","waitlist","lostdemand","tasks","bonusops","deals","evotor"];
+App.COLS = ["settings","points","warehouses","categories","suppliers","services","products","customers","sales","returns","docs","movements","shifts","cashops","staff","staffreq","log","repairs","units","models","siteorders","sprices","finaccounts","fincats","finops","debts","finplans","porders","payrules","unitcosts","waitlist","lostdemand","tasks","bonusops","deals","evotor","preorders"];
 const S = App.S = {}; App.COLS.forEach(c=>S[c]=[]);
 App.ui = {view:"dashboard"};
 App.me = {id:null, role:null, pointId:null, name:"", email:""};
@@ -135,7 +135,7 @@ App.shiftTotals = function(sh){
   const t={ops,byMethod:{},sales:0,refunds:0,repairs:0,cashin:0,cashout:0,count:0};
   Object.keys(App.PAY).forEach(m=>t.byMethod[m]=0);
   ops.forEach(o=>{const a=num(o.amount);t.byMethod[o.method]=(t.byMethod[o.method]||0)+a;
-    if(o.type==="sale"){t.sales+=a;t.count++}else if(o.type==="refund")t.refunds+=-a;else if(o.type==="repair"||o.type==="prepay")t.repairs+=a;
+    if(o.type==="sale"){t.sales+=a;t.count++}else if(o.type==="refund")t.refunds+=-a;else if(o.type==="prepay"&&/^ПЗ-/.test(o.ref))t.preorders=(t.preorders||0)+a;else if(o.type==="repair"||o.type==="prepay")t.repairs+=a;
     else if(o.type==="cashin")t.cashin+=a;else if(o.type==="cashout")t.cashout+=-a});
   t.expectedCash=num(sh.openCash)+num(t.byMethod.cash);
   return t;

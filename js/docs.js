@@ -78,7 +78,7 @@ ACT.printShift=id=>{const sh=id?App.byId("shifts",id):App.openShift();if(!sh)ret
   const z=sh.status==="closed";
   print((z?"Z-отчёт ":"X-отчёт ")+sh.num,head(z?"Z-отчёт · закрытие смены":"X-отчёт · без закрытия смены",sh.num,D(sh.openedAt),sh.pointId)
     +meta([["Точка",pt.name||""],["Открыта",App.dtt(sh.openedAt)+" · "+who(sh.openedBy)],["Закрыта",z?App.dtt(sh.closedAt)+" · "+who(sh.closedBy):"смена открыта"],["Чеков продажи",t.count]])
-    +table([["Показатель"],["Сумма","n"]],[["Продажи",rub(t.sales)],["Возвраты",rub(-t.refunds)],["Ремонт (оплаты и предоплаты)",rub(t.repairs)],...Object.entries(App.PAY).map(([m,l])=>["  в т.ч. "+l,rub(t.byMethod[m]||0)])])
+    +table([["Показатель"],["Сумма","n"]],[["Продажи",rub(t.sales)],["Возвраты",rub(-t.refunds)],["Ремонт (оплаты и предоплаты)",rub(t.repairs)],...(t.preorders?[["Предоплаты за предзаказы",rub(t.preorders)]]:[]),...Object.entries(App.PAY).map(([m,l])=>["  в т.ч. "+l,rub(t.byMethod[m]||0)])])
     +`<h3>Наличные</h3>`+table([["Показатель"],["Сумма","n"]],[["На начало смены",rub(sh.openCash)],["Внесения",rub(t.cashin)],["Изъятия",rub(-t.cashout)],["Должно быть в кассе",rub(t.expectedCash)],
       ...(z?[["Пересчитано",rub(sh.countedCash)],["Расхождение",rub(sh.diff)]]:[])])
     +(sh.closeNote?`<p class="note">Комментарий: ${esc(sh.closeNote)}</p>`:"")+signs(["Кассир: подпись / ФИО","Проверил: подпись / ФИО"]))};

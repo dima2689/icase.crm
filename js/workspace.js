@@ -6,7 +6,7 @@
 const {S,$,esc,ACT}=App;
 const WS={
   pos:{title:"Касса",home:"pos",need:"sale",
-    nav:["pos","repairs","receive","sales","orders","stock","clients","tasks","print"],
+    nav:["pos","repairs","preorders","receive","sales","orders","stock","clients","tasks","print"],
     tabs:[["pos","Касса"],["repairs","Ремонт"],["__scan","Скан"],["clients","Клиенты"],["__more","Ещё"]],
     skip:["sprices","finaccounts","fincats","finops","finplans","debts","porders","payrules","unitcosts","log","staffreq","docs"]},
   service:{title:"Сервис",home:"repairs",need:"repair",
@@ -42,11 +42,12 @@ App.wsSwitch=()=>{const l=App.wsList();if(l.length<2)return "";
 
 /* ---------- касса: приём и выдача ремонта прямо с экрана продажи ---------- */
 const pv=App.VIEWS.pos;
-if(pv){const r0=pv.render.bind(pv);pv.render=function(){const html=r0();if(!App.can("repair")||!App.point())return html;
+if(pv){const r0=pv.render.bind(pv);pv.render=function(){const html=r0();if(!App.point())return html;if(!App.can("repair"))return (App.pzStrip?`<div class="posrep"><b>Предзаказ</b>${App.pzStrip()}</div>`:"")+html;
   const pt=(App.point()||{}).id,ready=S.repairs.filter(r=>r.status==="ready"&&(!r.pointId||r.pointId===pt)).sort((a,b)=>String(a.readyAt||"").localeCompare(String(b.readyAt||"")));
+  const pzs=App.pzStrip?`<div class="posrep"><b>Предзаказ</b>${App.pzStrip()}</div>`:"";
   const strip=`<div class="posrep"><b>Ремонт</b><button class="btn sm pri" data-act="newRepair">+ Принять в ремонт</button>
     ${ready.length?`<span class="muted">Готовы к выдаче:</span>${ready.slice(0,4).map(r=>{const c=App.cust(r.customerId)||{};return `<button class="btn sm" data-act="repIssue" data-id="${esc(r.id)}" title="${esc(r.device)}">${esc(r.num)} · ${esc((c.name||"").split(" ")[0]||r.device)}</button>`}).join("")}${ready.length>4?`<a class="btn sm ghost" href="#repairs">ещё ${ready.length-4}</a>`:""}`:'<span class="muted">Готовых к выдаче нет</span>'}</div>`;
-  return (App.ws!=="crm"&&App.installCard?App.installCard():"")+strip+html}}
+  return (App.ws!=="crm"&&App.installCard?App.installCard():"")+strip+pzs+html}}
 const rv=App.VIEWS.repairs;
 if(rv){const r1=rv.render.bind(rv);rv.render=function(){return (App.ws==="service"&&App.installCard?App.installCard():"")+r1.apply(this,arguments)}}
 })();

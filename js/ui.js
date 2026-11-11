@@ -26,7 +26,7 @@ App.NAV = [
 ];
 App.navAllowed = v=>{const n=App.NAV.find(x=>x[0]===v);return n&&App.VIEWS[v]&&(!n[3]||App.can(n[3]))&&(!App.wsHas||App.wsHas(v))};
 function drawNav(){
-  const counts={tasks:App.tasksDue?App.tasksDue():0,orders:S.siteorders.filter(o=>o.status==="new").length,repairs:S.repairs.filter(r=>App.ACTIVE.includes(r.status)).length,stock:S.products.filter(App.isLow).length+(App.apprCount?App.apprCount():0)};
+  const counts={tasks:App.tasksDue?App.tasksDue():0,orders:S.siteorders.filter(o=>o.status==="new").length,repairs:S.repairs.filter(r=>App.ACTIVE.includes(r.status)).length,preorders:App.pzArrived?App.pzArrived().length:0,stock:S.products.filter(App.isLow).length+(App.apprCount?App.apprCount():0)};
   const items=App.NAV.filter(n=>App.navAllowed(n[0]));
   $("#navlist").innerHTML=items.map(([v,l,ic])=>`<a class="nav ${App.ui.view===v?"on":""}" href="#${v}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">${ic}</svg><span>${l}</span>${counts[v]?`<span class="cnt">${counts[v]}</span>`:""}</a>`).join("");
   const sh=App.openShift(),pts=App.myPoints(),cur=App.point();

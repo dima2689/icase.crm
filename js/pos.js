@@ -326,7 +326,7 @@ ACT.cashMoveOk=async(dir,btn)=>{
 function shiftReport(sh,title){
   const t=App.shiftTotals(sh);
   return [`${title} · смена ${sh.num}`,`Открыта: ${App.dtt(sh.openedAt)} · ${App.nameOf(sh.openedBy)}`,sh.closedAt?`Закрыта: ${App.dtt(sh.closedAt)} · ${App.nameOf(sh.closedBy)}`:"","",
-    `Чеков продажи: ${t.count}`,`Продажи: ${money(t.sales)}`,`Возвраты: −${money(t.refunds)}`,`Ремонт (оплаты и предоплаты): ${money(t.repairs)}`,"",
+    `Чеков продажи: ${t.count}`,`Продажи: ${money(t.sales)}`,`Возвраты: −${money(t.refunds)}`,`Ремонт (оплаты и предоплаты): ${money(t.repairs)}`,...(t.preorders?[`Предоплаты за предзаказы: ${money(t.preorders)}`]:[]),"",
     "По способам оплаты:",...Object.entries(App.PAY).map(([m,l])=>`  ${l}: ${money(t.byMethod[m]||0)}`),"",
     `Наличные на начало: ${money(sh.openCash)}`,`Внесения: ${money(t.cashin)}`,`Изъятия: −${money(t.cashout)}`,`Должно быть наличных: ${money(t.expectedCash)}`,
     sh.status==="closed"?`Пересчитано: ${money(sh.countedCash)} · расхождение: ${money(sh.diff)}`:""].filter(x=>x!=="" ).join("\n");
