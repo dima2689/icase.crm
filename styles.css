@@ -705,3 +705,44 @@ label.chip{cursor:pointer}
 .dot.ok{background:var(--ok,#2e7d32)}
 .bonusbox{margin-bottom:10px}
 .seg{flex-shrink:0}.modal>*{flex-shrink:0}
+
+/* ---------- приложение на телефоне ---------- */
+.tabbar{display:none}
+@media (max-width:760px){
+  .tabbar{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;position:fixed;left:0;right:0;bottom:0;z-index:35;background:var(--surface);border-top:1px solid var(--line);
+    padding:4px 4px calc(4px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px rgba(22,23,15,.06)}
+  .tabbar[hidden]{display:none}
+  .tb{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;min-height:52px;justify-content:center;border:0;background:none;color:var(--muted);font:500 11px var(--f-body);text-decoration:none;border-radius:12px;cursor:pointer}
+  .tb svg{width:24px;height:24px}
+  .tb.on{color:var(--ink);font-weight:700}
+  .tb.on svg{stroke-width:2.4}
+  .tb em{position:absolute;top:2px;left:calc(50% + 6px);min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--bad);color:#fff;font:700 11px/18px var(--f-body);font-style:normal}
+  .tb.scan{color:var(--ink);font-weight:700}
+  .tb.scan span{display:grid;place-items:center;width:52px;height:40px;border-radius:14px;background:var(--olive);color:var(--bg);margin-top:-14px;box-shadow:0 4px 12px rgba(59,72,40,.35)}
+  .tb.scan span svg{width:26px;height:26px}
+  .app>.main{padding-bottom:calc(84px + env(safe-area-inset-bottom))}
+  .main .top{padding-top:env(safe-area-inset-top)}
+  .toast{bottom:calc(80px + env(safe-area-inset-bottom))}
+}
+.installcard{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.installcard img{border-radius:11px;flex:none}
+.installcard>div:nth-child(2){flex:1 1 180px}.installcard p{margin:2px 0 0;font-size:13px}
+.installcard .acts{margin:0}
+ol.steps{padding-left:20px;line-height:1.6}ol.steps li{margin-bottom:6px}
+.camscrim{position:fixed;inset:0;z-index:10000;background:#000}
+.cam{position:absolute;inset:0;display:flex;flex-direction:column}
+.cam video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.camframe{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+.camframe i{width:min(78vw,420px);height:min(42vw,220px);border-radius:18px;box-shadow:0 0 0 100vmax rgba(0,0,0,.45);border:3px solid rgba(255,255,255,.9);position:relative}
+.camframe i::after{content:"";position:absolute;left:8%;right:8%;top:50%;height:2px;background:#e5484d;box-shadow:0 0 8px #e5484d;animation:camline 1.6s ease-in-out infinite alternate}
+@keyframes camline{from{transform:translateY(-70px)}to{transform:translateY(70px)}}
+.camtop{position:relative;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(12px + env(safe-area-inset-top)) 14px 12px;color:#fff;background:linear-gradient(rgba(0,0,0,.6),transparent)}
+.camtop .btn{color:#fff;border-color:rgba(255,255,255,.4);background:rgba(0,0,0,.3)}
+.camlast{position:relative;margin:0 auto;padding:8px 14px;border-radius:12px;background:rgba(47,110,52,.92);color:#fff;font:600 15px "SF Mono",Menlo,Consolas,monospace;max-width:90%;overflow-wrap:anywhere}
+.camtype{position:absolute;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));display:flex;gap:8px}
+.camtype[hidden]{display:none}
+.camtype input{flex:1;font-size:17px;padding:12px;border-radius:12px;border:0}
+.cambot{position:absolute;left:0;right:0;bottom:0;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding:14px 12px calc(14px + env(safe-area-inset-bottom));background:linear-gradient(transparent,rgba(0,0,0,.65))}
+.cambot .btn{background:rgba(255,255,255,.92);color:#16170F;border:0}
+.cambot .btn.on{background:#F5D76E}
+@media (prefers-reduced-motion:reduce){.camframe i::after{animation:none}}

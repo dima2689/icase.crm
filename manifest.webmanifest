@@ -1,0 +1,24 @@
+{
+  "name": "iCase CRM",
+  "short_name": "iCase",
+  "description": "Касса, склад, ремонт и клиенты сети iCase",
+  "lang": "ru",
+  "id": "./",
+  "start_url": "./#dashboard",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F3F0E6",
+  "theme_color": "#3B4828",
+  "icons": [
+    {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ],
+  "shortcuts": [
+    {"name": "Сканировать", "short_name": "Скан", "url": "./#scan", "icons": [{"src": "icons/icon-192.png", "sizes": "192x192"}]},
+    {"name": "Касса", "url": "./#pos", "icons": [{"src": "icons/icon-192.png", "sizes": "192x192"}]},
+    {"name": "Ремонт", "url": "./#repairs", "icons": [{"src": "icons/icon-192.png", "sizes": "192x192"}]},
+    {"name": "Задачи", "url": "./#tasks", "icons": [{"src": "icons/icon-192.png", "sizes": "192x192"}]}
+  ]
+}
