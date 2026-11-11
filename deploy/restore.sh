@@ -47,8 +47,8 @@ psql_admin -q -f - < "$ROOT/db/prelude.sql"
 docker exec -i supabase-db pg_restore -U supabase_admin -d postgres --data-only --disable-triggers < "$D/sys.dump" 2> "$W/sys.err" || true
 docker exec -i supabase-db pg_restore -U supabase_admin -d postgres < "$D/public.dump" 2> "$W/pub.err" || true
 for e in sys pub; do
-  n=$(grep -c '^pg_restore: error' "$W/$e.err" || true)
-  if [ "$n" != 0 ]; then warn "$e: ошибок $n"; grep '^pg_restore: error' "$W/$e.err" | grep -v 'schema "public" already exists' | head -20 >&2; fi
+  n=$(grep '^pg_restore: error' "$W/$e.err" | grep -vc 'schema "public" already exists' || true)
+  if [ "$n" != 0 ]; then warn "$e: ошибок $n"; { grep '^pg_restore: error' "$W/$e.err" | grep -v 'schema "public" already exists' || true; } | head -20 >&2; fi
 done
 if [ -f "$D/storage.tar.gz" ]; then
   mkdir -p "$SB_DIR/volumes/storage" 2>/dev/null || sudo -n mkdir -p "$SB_DIR/volumes/storage"
