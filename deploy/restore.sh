@@ -25,7 +25,8 @@ if [ $FRESH = 1 ]; then
   if [ $YES = 0 ]; then read -r -p "Удалить ТЕКУЩУЮ базу и файлы на этом сервере и восстановить копию? Напишите ДА: " a; [ "$a" = "ДА" ] || die "отменено"; fi
   log "сброс стека"
   dc down -v --remove-orphans || true
-  rm -rf "$SB_DIR/volumes/db/data" "$SB_DIR/volumes/storage"
+  # файлы принадлежат пользователям контейнеров: без root удаляем через sudo
+  rm -rf "$SB_DIR/volumes/db/data" "$SB_DIR/volumes/storage" 2>/dev/null || sudo -n rm -rf "$SB_DIR/volumes/db/data" "$SB_DIR/volumes/storage"
   cp "$D/supabase.env" "$SB_DIR/.env"; chmod 600 "$SB_DIR/.env"
 fi
 
@@ -49,7 +50,10 @@ for e in sys pub; do
   n=$(grep -c '^pg_restore: error' "$W/$e.err" || true)
   if [ "$n" != 0 ]; then warn "$e: ошибок $n"; grep '^pg_restore: error' "$W/$e.err" | grep -v 'schema "public" already exists' | head -20 >&2; fi
 done
-if [ -f "$D/storage.tar.gz" ]; then mkdir -p "$SB_DIR/volumes/storage"; tar -C "$SB_DIR/volumes/storage" -xzf "$D/storage.tar.gz"; fi
+if [ -f "$D/storage.tar.gz" ]; then
+  mkdir -p "$SB_DIR/volumes/storage" 2>/dev/null || sudo -n mkdir -p "$SB_DIR/volumes/storage"
+  tar -C "$SB_DIR/volumes/storage" -xzf "$D/storage.tar.gz" 2>/dev/null || sudo -n tar -C "$SB_DIR/volumes/storage" -xzf "$D/storage.tar.gz"
+fi
 
 log "миграции и расписания"
 PSQL="docker exec -i supabase-db psql -U postgres -d postgres" FUNCTIONS_URL="http://functions:9000" "$HERE/migrate.sh" "$ROOT"

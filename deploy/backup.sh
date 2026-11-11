@@ -23,7 +23,7 @@ docker exec supabase-db pg_dump -U supabase_admin -d postgres -Fc --data-only \
   -t auth.users -t auth.identities -t auth.mfa_factors -t storage.buckets -t storage.objects -t vault.secrets > "$D/sys.dump"
 docker exec supabase-db sh -c 'cat /etc/postgresql-custom/pgsodium_root.key 2>/dev/null' > "$D/pgsodium_root.key" || true
 log "файлы хранилища"
-if [ -d "$SB_DIR/volumes/storage" ]; then tar -C "$SB_DIR/volumes/storage" -czf "$D/storage.tar.gz" .; fi
+if [ -d "$SB_DIR/volumes/storage" ]; then tar -C "$SB_DIR/volumes/storage" -czf "$D/storage.tar.gz" . 2>/dev/null || sudo -n tar -C "$SB_DIR/volumes/storage" -czf "$D/storage.tar.gz" .; fi
 cp "$SB_DIR/.env" "$D/supabase.env"
 [ -f "$ICASE_ENV" ] && cp "$ICASE_ENV" "$D/icase.env"
 {
