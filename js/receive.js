@@ -99,6 +99,7 @@ function handleCode(raw){
   if(p)return addProduct(p);
   const digits=v.replace(/\s/g,"");
   if(/^\d{15}$/.test(digits))return ACT.rcvDevice(digits);           // новый IMEI → выбрать модель
+  if(App.isPartNo(digits))return App.rcvDevicePart(digits);           // артикул Apple с коробки → модель, память, цвет
   const found=App.searchProducts(v,{limit:2});
   if(found.length===1)return addProduct(found[0]);
   if(/^\d{8,14}$/.test(digits))return ACT.rcvNewItem(digits);         // новый штрихкод → новый товар
@@ -144,7 +145,7 @@ ACT.rcvPost=async(_,btn)=>{
   let doc=null;
   try{
     if(App.can("price"))for(const l of R.lines){const p=P(l.productId);if(l.price!==""&&l.price!=null&&num(l.price)!==num(p.price))await App.api.update("products",p.id,{price:num(l.price)})}
-    const clean=u=>{const o={};["imei","serial_no","condition","battery_health","price","kit"].forEach(k=>{if(u[k]!==""&&u[k]!=null)o[k]=String(u[k]).trim()});if(u.attrs&&Object.keys(u.attrs).length)o.attrs=u.attrs;return o};
+    const clean=u=>{const o={};["imei","serial_no","condition","battery_health","price","kit","part_no"].forEach(k=>{if(u[k]!==""&&u[k]!=null)o[k]=String(u[k]).trim()});if(u.attrs&&Object.keys(u.attrs).length)o.attrs=u.attrs;return o};
     const lines=R.lines.map(l=>{const p=P(l.productId);return {product_id:p.id,qty:lineQty(l),cost:num(l.cost),new_units:p.trackSerial?l.units.map(clean):[]}});
     doc=await App.api.insert("stock_docs",{type:"in",wh_to:R.wh,supplier_id:R.supplierId||null,invoice:R.invoice||null,note:R.note||"Приёмка",pay_account:R.supplierId&&R.payAcc?R.payAcc:null,po_id:R.poId||null});
     await App.api.insertMany("stock_doc_lines",lines.map(l=>Object.assign({doc_id:doc.id},l)));
@@ -202,11 +203,34 @@ ACT.rcvDevice=(code="")=>{
   if(typeof code!=="string")code="";
   if(!S.models.length)return App.toast("Каталог моделей пуст: «Настройки → Каталог Apple»");
   const prev=DP||{};
-  DP={family:prev.family||"iPhone",modelId:prev.modelId||"",mem:prev.mem||"",color:prev.color||"",opts:prev.opts||{},cond:prev.cond||"Новый",price:prev.price||"",cost:prev.cost||"",battery:"",code,count:0};
+  DP={family:prev.family||"iPhone",modelId:prev.modelId||"",mem:prev.mem||"",color:prev.color||"",opts:prev.opts||{},cond:prev.cond||"Новый",price:prev.price||"",cost:prev.cost||"",battery:"",code,count:0,part:"",info:null,auto:false};
   if(!App.byId("models",DP.modelId))DP.modelId=(App.models(DP.family)[0]||{}).id||"";
   drawDP();
+  if(code)dpIdentify(code);
 };
+App.rcvDevicePart=part=>{ACT.rcvDevice("");DP.part=App.normPart(part);drawDP();dpIdentify(DP.part)};
+/* определить устройство по IMEI / артикулу и заполнить модель, память, цвет */
+async function dpIdentify(code){
+  const info=await App.deviceLookup(code);if(!DP||!document.getElementById("dpCode"))return;
+  if(!info)return;
+  const isPart=info.kind==="part",cur=isPart?DP.part:DP.code;if(App.normPart(cur)!==App.normPart(info.code)&&String(cur).trim().toUpperCase()!==info.code)return;
+  DP.info=info;
+  const mm=info.model&&App.byId("models",info.model.id);
+  if(mm&&(!DP.count||isPart)){
+    const changed=DP.modelId!==mm.id;
+    DP.family=mm.family;DP.modelId=mm.id;if(changed){DP.mem="";DP.color="";DP.opts={}}
+    const mem=App.devSure(info,"memory"),col=App.devSure(info,"color");
+    if(mem&&mm.memories.includes(mem))DP.mem=mem;if(col&&(mm.colors.includes(col)||!mm.colors.length))DP.color=col;
+    if(info.learned&&info.learned.stats&&info.learned.stats.opts)Object.entries(info.learned.stats.opts).forEach(([k,vals])=>{const e=Object.entries(vals).sort((a,b)=>b[1]-a[1]),tot=e.reduce((a,x)=>a+x[1],0),top=e[0];
+      if(top&&(isPart||(top[1]>=3&&top[1]/tot>=.9))&&(mm.options||{})[k]&&mm.options[k].includes(top[0]))DP.opts[k]=top[0]});
+    DP.auto=true}
+  drawDP()}
 function dpModel(){return App.byId("models",DP.modelId)}
+function dpInfoHtml(){const i=DP&&DP.info;if(!i)return "";
+  if(i.ref&&!/^apple$/i.test(i.ref.brand))return App.devHint(i)+`<p class="muted">Это не Apple. <button type="button" class="btn sm" data-act="dpOther">Создать товар «${esc(i.ref.brand+" "+i.ref.model)}»</button></p>`;
+  const mm=i.model&&App.byId("models",i.model.id),cur=dpModel();
+  return App.devHint(i)+(DP.count&&mm&&cur&&mm.id!==cur.id?`<p class="pill warn">Этот IMEI похож на ${esc(mm.name)}, а выбрана ${esc(cur.name)} — проверьте</p>`:"")}
+ACT.dpOther=()=>{const i=DP&&DP.info;if(!i||!i.ref)return;const code=DP.code;App.closeModal();ACT.rcvNewItem("",i.ref.brand+" "+i.ref.model);App.toast(code?"Создайте товар, затем отсканируйте IMEI "+code+" ещё раз":"Создайте товар")};
 function dpName(){const m=dpModel();return m?App.catalogName(m,DP.mem,DP.color,DP.opts):""}
 function drawDP(){
   if(document.getElementById("dpu_body"))DP.ua=App.readUsed("dpu_").attrs;
@@ -224,7 +248,9 @@ function drawDP(){
       ${App.can("cost")?App.fld("dpCost","Закупка, ₽",App.inp("dpCost",DP.cost,"number")):""}
       ${App.can("price")?App.fld("dpPrice",DP.cond==="Новый"?"Цена продажи, ₽":"Цена этого экземпляра, ₽",App.inp("dpPrice",DP.price,"number",ex?String(num(ex.price)):"")):""}
       ${DP.cond!=="Новый"?`<div class="fld full">${App.usedForm("dpu_",DP.ua||{})}</div>`:""}
-      ${App.fld("dpCode",DP.family==="iPhone"?"IMEI":"Серийный номер",App.inp("dpCode",DP.code,"text","сканируйте",'autocomplete="off" class="mono"'),"full")}
+      ${App.fld("dpCode",DP.family==="iPhone"?"IMEI":"Серийный номер",App.inp("dpCode",DP.code,"text","сканируйте",'autocomplete="off" class="mono"'))}
+      ${App.fld("dpPart","Артикул с коробки",App.inp("dpPart",DP.part,"text","MTUV3ZD/A — необязательно",'autocomplete="off" class="mono"'))}
+      <div class="full" id="dpInfo">${dpInfoHtml()}</div>
     </div>
     <div class="dpname">${name?`<b>${esc(name)}</b> · ${esc(DP.cond)} ${ex?'<span class="pill">товар уже есть</span>':'<span class="pill info">будет создан</span>'}`:'<span class="muted">Выберите модель, память и цвет</span>'}</div>
     ${DP.count?`<p class="muted">Добавлено в приёмку: ${DP.count}. Сканируйте следующий IMEI той же модели или меняйте параметры.</p>`:""}
@@ -235,7 +261,9 @@ function drawDP(){
   bind("dpBatt","battery");bind("dpCost","cost");bind("dpPrice","price");bind("dpCode","code");
   const cs=$("#dpCond");if(cs)cs.onchange=()=>{DP.cond=cs.value;drawDP()};
   const cf=$("#dpColorFree");if(cf)cf.onchange=()=>{DP.color=cf.value.trim();drawDP()};
-  const c=$("#dpCode");if(c){c.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();DP.code=c.value;ACT.dpAdd(null,$("[data-act=dpAdd]"))}};
+  const pt=$("#dpPart");if(pt){pt.oninput=()=>{DP.part=App.normPart(pt.value);if(App.isPartNo(DP.part))dpIdentify(DP.part)};pt.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();const c2=$("#dpCode");if(c2)c2.focus()}}}
+  const c=$("#dpCode");if(c){let tm=0;c.addEventListener("input",()=>{DP.code=c.value;clearTimeout(tm);const v=c.value.trim();if(App.looksLikeDeviceCode(v))tm=setTimeout(()=>dpIdentify(v),250);else{DP.info=null;const b=$("#dpInfo");if(b)b.innerHTML=""}});
+    c.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();DP.code=c.value;ACT.dpAdd(null,$("[data-act=dpAdd]"))}};
     setTimeout(()=>{const need=m&&((m.memories.length&&!DP.mem)||(m.colors.length&&!DP.color));if(!need)c.focus()},0)}
 }
 ACT.dpFamily=f=>{DP.family=f;DP.modelId=(App.models(f)[0]||{}).id||"";DP.mem="";DP.color="";DP.opts={};drawDP()};
@@ -255,12 +283,12 @@ ACT.dpAdd=async(_,btn)=>{
         attrs:Object.fromEntries(Object.entries(DP.opts).filter(([k,v])=>v)),catalog_id:m.id,track_serial:true,price:DP.cond==="Новый"&&App.can("price")?num(DP.price):0});
       await App.reload(["products"]);p=P(row.id);
     }else if(!p.trackSerial){if(btn)btn.disabled=false;return App.toast("Товар «"+name+"» ведётся без IMEI — включите учёт по IMEI в карточке")}
-    const extra={condition:DP.cond,battery_health:DP.battery||""};
+    const extra={condition:DP.cond,battery_health:DP.battery||""};if(DP.part)extra.part_no=DP.part;
     if(DP.cond!=="Новый"&&document.getElementById("dpu_body")){const r=App.readUsed("dpu_");extra.attrs=r.attrs;if(r.kit)extra.kit=r.kit;const w=App.usedWarn(r.attrs);if(w)App.toast(w)}
     if(DP.cond!=="Новый"&&DP.price)extra.price=DP.price;
     if(!addUnit(p,code,extra)){if(btn)btn.disabled=false;return}
     const i=ensureLine(p);if(DP.cost)R.lines[i].cost=DP.cost;if(DP.cond==="Новый"&&DP.price)R.lines[i].price=DP.price;save();
-    DP.count++;DP.code="";DP.battery="";DP.ua={};if(DP.cond!=="Новый")DP.price="";
+    DP.count++;DP.code="";DP.info=null;DP.battery="";DP.ua={};if(DP.cond!=="Новый")DP.price="";
     drawDP();App.toast("Добавлено: "+code);
   }catch(e){if(btn)btn.disabled=false;App.toast(e.message)}
 };

@@ -54,7 +54,7 @@ App.makeDecoder=async()=>{
     return reader.decode(bmp).getText()}catch(e){return null}finally{reader.reset()}}}};
 
 /* куда отдать код: поле сканирования на экране, иначе — поиск по базе */
-const SCAN_SEL=".uscan,[data-rscan],[data-uscan],#posQ,#rcvQ,#poQ,#ppQ,#wQ,#lQ,#repQ,#mQ";
+const SCAN_SEL=".uscan,[data-rscan],[data-uscan],#dpCode,#dpPart,#rImei,#dlCode,#posTiI,#uImei,#posQ,#rcvQ,#poQ,#ppQ,#wQ,#lQ,#repQ,#mQ";
 let lastFocus=null;
 document.addEventListener("focusin",e=>{const t=e.target;if(t.matches&&t.matches("input")&&t.matches(SCAN_SEL))lastFocus=desc(t)});
 function desc(el){return el.id?"#"+el.id:el.dataset.rscan!=null?`[data-rscan="${el.dataset.rscan}"]`:el.dataset.uscan!=null?`[data-uscan="${el.dataset.uscan}"]`:null}
@@ -127,7 +127,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&cam){e.stopImmediat
 
 /* универсальная кнопка «Скан»: в поле на экране, а если поля нет — поиск по базе */
 ACT.camScan=()=>{const el=target();
-  if(el){const multi=el.matches(".uscan,[data-rscan],[data-uscan],#rcvQ");const key=desc(el);
+  if(el){const multi=el.matches(".uscan,[data-rscan],[data-uscan],#rcvQ,#dpCode");const key=desc(el);
     return App.scan({title:multi?"Сканируйте подряд — каждый код добавится":"Наведите на штрихкод или IMEI",onCode:code=>{
       const cur=(key&&(($("#scrim").hidden?$("#view"):$("#modal")).querySelector(key)))||target();if(!cur){App.lookupCode(code);return false}
       feed(cur,code);return multi}})}

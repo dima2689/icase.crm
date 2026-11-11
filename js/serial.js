@@ -46,7 +46,7 @@ ACT.openUnit=id=>{
       ${App.fld("uNote","Заметка",`<textarea id="uNote" ${ed?"":"disabled"}>${esc(u.note)}</textarea>`,"full")}
     </div>
     ${App.isUsedUnit(u,p)?App.usedForm("uu_",u.attrs,{ro:!ed}):`<details class="more"><summary>Параметры б/у</summary>${App.usedForm("uu_",u.attrs,{ro:!ed})}</details>`}
-    <dl class="kv"><dt>Последний документ</dt><dd>${esc(u.lastRef||"—")}</dd>${sale?`<dt>Продажа</dt><dd><button class="btn sm" data-act="openSale" data-id="${esc(sale.id)}">${esc(sale.num)}</button> ${App.dtt(sale.createdAt)}</dd>`:""}<dt>Принят</dt><dd>${App.dtt(u.createdAt)}</dd></dl>
+    <dl class="kv"><dt>Последний документ</dt><dd>${esc(u.lastRef||"—")}</dd>${u.partNo?`<dt>Артикул коробки</dt><dd class="mono">${esc(u.partNo)}</dd>`:""}${sale?`<dt>Продажа</dt><dd><button class="btn sm" data-act="openSale" data-id="${esc(sale.id)}">${esc(sale.num)}</button> ${App.dtt(sale.createdAt)}</dd>`:""}<dt>Принят</dt><dd>${App.dtt(u.createdAt)}</dd></dl>
     <div class="acts"><button class="btn" data-act="openProduct" data-id="${esc(u.productId)}">Карточка товара</button>${ed?`<button class="btn pri" data-act="saveUnit" data-id="${esc(id)}">Сохранить</button>`:""}</div>`);
 };
 ACT.saveUnit=async(id,btn)=>{
