@@ -50,7 +50,7 @@ App.finPnl=function(from,to){
 };
 
 /* ---------- экран ---------- */
-const TABS=[["sum","Сводка"],["ops","Операции"],["debts","Долги"],["plans","Платежи"],["report","Прибыль"],["setup","Счета и статьи"]];
+const TABS=[["sum","Сводка"],["ops","Операции"],["debts","Долги"],["plans","Платежи"],["report","Прибыль"],["pay","Зарплата"],["setup","Счета и статьи"]];
 VIEWS.finance={
   ownSearch:true,
   actions:()=>`<button class="btn" data-act="finOp" data-id="in">+ Приход</button><button class="btn" data-act="finOp" data-id="out">− Расход</button><button class="btn pri" data-act="finOp" data-id="transfer">⇄ Перевод</button>`,
@@ -59,7 +59,7 @@ VIEWS.finance={
       <p class="muted">Появятся касса для каждой точки, расчётный счёт (сюда идёт безнал с касс), сейф и обычные статьи расходов. Всё можно поменять.</p></div></section>`;
     const t=App.ui.finTab;
     return `<div class="tabs">${TABS.map(([k,l])=>`<button class="tab ${t===k?"on":""}" data-act="finTab" data-id="${k}">${l}${k==="debts"&&S.debts.some(overdue)?' <span class="dot bad"></span>':""}${k==="plans"&&duePlans().length?' <span class="dot warn"></span>':""}</button>`).join("")}</div>
-      <div class="fin" data-nodirty>${({sum,ops,debts,plans,report,setup})[t]()}</div>`;
+      <div class="fin" data-nodirty>${({sum,ops,debts,plans,report,setup,pay:()=>App.payrollView?App.payrollView():""})[t]()}</div>`;
   },
   after(){if(!S.finaccounts.length||S.points.some(p=>!S.finaccounts.some(a=>a.kind==="drawer"&&a.pointId===p.id)))autoSetup()}
 };
@@ -139,17 +139,17 @@ ACT.finOp=(kind,_,pre)=>{
     ${d||pre.plan?"":`<div class="seg wide3">${[["in","+ Приход"],["out","− Расход"],["transfer","⇄ Перевод"]].map(([v,l])=>`<button class="${v===k?"on":""}" data-act="finOp" data-id="${v}">${l}</button>`).join("")}</div>`}
     ${d?`<div class="fbox"><b>${esc(d.counterparty)}</b> · ${esc(d.num)}<br><small>Остаток долга ${money(App.debtLeft(d))} из ${money(d.amount)}${d.note?" · "+esc(d.note):""}</small></div>`:""}
     <div class="form">
-      ${App.fld("foAmt","Сумма, ₽",App.inp("foAmt",d?App.debtLeft(d):pre.plan?pre.plan.amount:"","number","0",'min="0" autofocus'))}
+      ${App.fld("foAmt","Сумма, ₽",App.inp("foAmt",d?App.debtLeft(d):pre.plan?pre.plan.amount:pre.amount||"","number","0",'min="0" autofocus'))}
       ${App.fld("foDate","Дата",App.inp("foDate",today(),"date"))}
       ${App.fld("foAcc",k==="in"?"Куда пришли деньги":k==="out"?"Откуда платим":"Откуда",App.sel("foAcc",list.map(a=>[a.id,a.name+" · "+money(App.finBalance(a))]),def.id),k==="transfer"?"":"full")}
       ${k==="transfer"?App.fld("foTo","Куда",App.sel("foTo",list.map(a=>[a.id,a.name]),toDef.id)):""}
       ${k!=="transfer"?App.fld("foCat","Статья",App.sel("foCat",[["","— без статьи —"],...cats.map(c=>[c.id,c.name])],pre.cat||(d?(cats.find(c=>c.name===(d.direction==="in"?"Оплата долга клиентом":d.kind==="supplier"?"Закупка товара":d.kind==="loan"?"Возврат займа":""))||{}).id:"")||""))
-        +App.fld("foCp",k==="in"?"От кого":"Кому",App.inp("foCp",d?d.counterparty:pre.plan?pre.plan.counterparty||"":"","text",k==="in"?"Клиент, банк, владелец…":"Арендодатель, поставщик…")):""}
+        +App.fld("foCp",k==="in"?"От кого":"Кому",App.inp("foCp",d?d.counterparty:pre.plan?pre.plan.counterparty||"":pre.cp||"","text",k==="in"?"Клиент, банк, владелец…":"Арендодатель, поставщик…")):""}
       ${App.fld("foNote","Комментарий",App.inp("foNote","","text","Необязательно"),"full")}
     </div>
     <p class="muted" id="foHint">${hintFor(def,k)}</p>
     <div class="acts"><button class="btn pri" data-act="finOpSave">${k==="in"?"Записать приход":k==="out"?"Записать расход":"Перевести"}</button></div>`);
-  App.ui.finOpCtx={kind:k,debtId:d?d.id:null,planId:pre.plan?pre.plan.id:null};
+  App.ui.finOpCtx={kind:k,debtId:d?d.id:null,planId:pre.plan?pre.plan.id:null,payee:pre.payee||null};
   const a=$("#foAcc");if(a)a.addEventListener("change",()=>{$("#foHint").textContent=hintFor(acc(a.value),k)});
 };
 const hintFor=(a,k)=>a&&a.kind==="drawer"?(S.shifts.some(s=>s.pointId===a.pointId&&s.status==="open")?(k==="in"?"Наличные попадут в кассу точки — будут видны в X-отчёте смены.":"Наличные будут изъяты из кассы точки — будут видны в X-отчёте смены."):"Смена на этой точке закрыта: чтобы двигать наличные в кассе, откройте смену."):"";
@@ -157,7 +157,8 @@ ACT.finOpSave=(_,btn)=>run(btn,async()=>{
   const c=App.ui.finOpCtx||{},V=App.val;const amt=num(V("foAmt"));if(!(amt>0))throw new Error("Укажите сумму");
   const p={kind:c.kind,account_id:V("foAcc"),amount:amt,op_date:V("foDate")||today(),note:V("foNote")||null,debt_id:c.debtId,plan_id:c.planId};
   if(c.kind==="transfer")p.to_account_id=V("foTo");else{p.category_id=V("foCat")||null;p.counterparty=V("foCp")||null}
-  await App.api.rpc("fin_op_create",{p},["fin_ops","debts","fin_plans","cash_ops"]);
+  if(c.payee&&c.kind==="out"){p.payee_staff=c.payee;await App.api.rpc("fin_op_create_payee",{p},["fin_ops","debts","fin_plans","cash_ops"])}
+  else await App.api.rpc("fin_op_create",{p},["fin_ops","debts","fin_plans","cash_ops"]);
   await App.reload(RELOAD);App.closeModal();App.render();App.toast(c.kind==="in"?"Приход записан":c.kind==="out"?"Расход записан":"Перевод выполнен");
 });
 ACT.finOpOpen=id=>{

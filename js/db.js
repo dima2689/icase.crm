@@ -52,7 +52,7 @@ const M={
   returns:r=>({id:r.id,num:r.num,saleId:r.sale_id,customerId:r.customer_id,amount:num(r.amount),method:r.method,reason:r.reason,note:r.note||"",whId:r.warehouse_id,defect:r.is_defect,
     shiftId:r.shift_id,by:r.staff_id,createdAt:r.created_at,
     items:(r.return_items||[]).map(i=>({line:i.sale_item_id,qty:i.qty,productId:i.sale_items&&i.sale_items.product_id,name:i.sale_items&&i.sale_items.name,price:num(i.sale_items&&i.sale_items.price),cost:num(i.sale_items&&i.sale_items.cost)}))}),
-  docs:r=>({id:r.id,num:r.num,type:r.type,status:r.status,whFrom:r.wh_from||"",whTo:r.wh_to||"",supplierId:r.supplier_id||"",invoice:r.invoice||"",reason:r.reason||"",catId:r.category_id||"",note:r.note||"",
+  docs:r=>({id:r.id,num:r.num,type:r.type,poId:r.po_id||"",status:r.status,whFrom:r.wh_from||"",whTo:r.wh_to||"",supplierId:r.supplier_id||"",invoice:r.invoice||"",reason:r.reason||"",catId:r.category_id||"",note:r.note||"",
     by:r.created_by,createdAt:r.created_at,postedAt:r.posted_at,cancelledAt:r.cancelled_at,
     lines:(r.stock_doc_lines||[]).sort((a,b)=>a.id-b.id).map(l=>({productId:l.product_id,name:(App.byId("products",l.product_id)||{}).name||"Товар",qty:l.qty,expected:l.expected,counted:l.counted==null?"":l.counted,cost:num(l.cost),newUnits:l.new_units||[],unitIds:l.unit_ids||[],foundCodes:l.found_codes||[],unitLog:l.unit_log||[]}))}),
   units:r=>({id:r.id,productId:r.product_id,imei:r.imei||"",imei2:r.imei2||"",serialNo:r.serial_no||"",whId:r.warehouse_id||"",status:r.status,condition:r.condition||"",batteryHealth:r.battery_health,
@@ -69,10 +69,20 @@ const M={
   finaccounts:r=>({id:r.id,name:r.name,kind:r.kind,pointId:r.point_id||"",opening:num(r.opening),noncash:!!r.noncash,active:r.is_active!==false,sort:r.sort||0,createdAt:r.created_at}),
   fincats:r=>({id:r.id,name:r.name,kind:r.kind,inPnl:r.in_pnl!==false,active:r.is_active!==false,sort:r.sort||0}),
   finops:r=>({id:r.id,num:r.num,date:r.op_date,kind:r.kind,accountId:r.account_id,toAccountId:r.to_account_id||"",amount:num(r.amount),catId:r.category_id||"",debtId:r.debt_id||"",planId:r.plan_id||"",
-    counterparty:r.counterparty||"",note:r.note||"",cashOpIds:r.cash_op_ids||[],by:r.staff_id,createdAt:r.created_at,cancelledAt:r.cancelled_at||""}),
+    counterparty:r.counterparty||"",note:r.note||"",cashOpIds:r.cash_op_ids||[],by:r.staff_id,createdAt:r.created_at,cancelledAt:r.cancelled_at||"",payee:r.payee_staff||""}),
   debts:r=>({id:r.id,num:r.num,direction:r.direction,kind:r.kind,counterparty:r.counterparty||"",supplierId:r.supplier_id||"",customerId:r.customer_id||"",saleId:r.sale_id||"",docId:r.doc_id||"",
     amount:num(r.amount),dueDate:r.due_date||"",note:r.note||"",status:r.status,createdAt:r.created_at,closedAt:r.closed_at||""}),
   finplans:r=>({id:r.id,name:r.name,kind:r.kind,amount:num(r.amount),catId:r.category_id||"",accountId:r.account_id||"",counterparty:r.counterparty||"",period:r.period,nextDate:r.next_date,note:r.note||"",active:r.is_active!==false}),
+  repairs:r=>({id:r.id,num:r.num,pointId:r.point_id||"",customerId:r.customer_id,device:r.device,imei:r.imei||"",problem:r.problem||"",kit:r.kit||"",appearance:r.appearance||"",devicePass:r.device_pass||"",
+    status:r.status,master:r.master||"",masterId:r.master_id||"",diagnosis:r.diagnosis||"",estimate:num(r.estimate),approved:r.approved,approvedSum:r.approved_sum==null?null:num(r.approved_sum),finalPrice:num(r.final_price),
+    dueDate:r.due_date||"",readyAt:r.ready_at||"",closedAt:r.closed_at||"",warrantyDays:num(r.warranty_days),warrantyOf:r.warranty_of||"",cancelReason:r.cancel_reason||"",source:r.source||"",diagFee:num(r.diag_fee),
+    by:r.created_by,createdAt:r.created_at,
+    services:(r.repair_services||[]).map(x=>({id:x.id,serviceId:x.service_id||"",name:x.name,price:num(x.price),qty:num(x.qty)||1})).sort((a,b)=>a.id-b.id),
+    parts:(r.repair_parts||[]).map(x=>({id:x.id,productId:x.product_id,whId:x.warehouse_id,name:x.name,qty:num(x.qty),price:num(x.price),cost:num(x.cost),returned:!!x.returned})).sort((a,b)=>a.id-b.id),
+    history:(r.repair_history||[]).map(h=>({id:h.id,status:h.status,note:h.note||"",by:h.staff_id,at:h.created_at})).sort((a,b)=>String(a.at).localeCompare(b.at))}),
+  porders:r=>({id:r.id,num:r.num,supplierId:r.supplier_id||"",whId:r.wh_id||"",status:r.status,expectedDate:r.expected_date||"",note:r.note||"",by:r.created_by,createdAt:r.created_at,
+    lines:(r.purchase_order_lines||[]).sort((a,b)=>a.id-b.id).map(l=>({id:l.id,productId:l.product_id,qty:num(l.qty),cost:num(l.cost),received:num(l.received)}))}),
+  payrules:r=>({id:r.staff_id,staffId:r.staff_id,base:num(r.base_month),perShift:num(r.per_shift),pctSales:num(r.pct_sales),pctProfit:num(r.pct_profit),pctWorks:num(r.pct_works),note:r.note||""}),
   log:r=>({id:r.id,at:r.created_at,by:r.staff_id,action:r.action,ref:r.ref||"",details:r.details||""})
 };
 /* что загружать для каждого раздела */
@@ -103,6 +113,9 @@ const L={
   finops:async()=>App.can("finance")?(await all("fin_ops")).map(M.finops):[],
   debts:async()=>App.can("finance")?(await all("debts")).map(M.debts):[],
   finplans:async()=>App.can("finance")?(await all("fin_plans")).map(M.finplans):[],
+  repairs:async()=>(await all("repairs","*,repair_services(*),repair_parts(*),repair_history(*)",r=>r.order("created_at",{ascending:false}))).map(M.repairs),
+  porders:async()=>App.can("stock")?(await all("purchase_orders","*,purchase_order_lines(*)",r=>r.order("created_at",{ascending:false}))).map(M.porders):[],
+  payrules:async()=>(await all("pay_rules")).map(M.payrules),
   log:async()=>(await q(sb.from("audit_log").select("*").order("created_at",{ascending:false}).limit(500),"log")).map(M.log)
 };
 /* таблица базы → разделы, которые нужно перечитать */
@@ -110,7 +123,9 @@ const T={settings:["settings"],points:["points"],warehouses:["warehouses"],categ
   customers:["customers"],products:["products"],stock:["products"],stock_movements:["movements"],stock_docs:["docs"],stock_doc_lines:["docs"],
   sales:["sales"],sale_items:["sales"],sale_payments:["sales"],returns:["returns"],return_items:["returns"],shifts:["shifts"],cash_ops:["cashops"],
   staff:["staff"],staff_requests:["staffreq"],audit_log:["log"],units:["units"],apple_models:["models"],site_orders:["siteorders"],supplier_prices:["sprices"],
-  fin_accounts:["finaccounts"],fin_categories:["fincats"],fin_ops:["finops"],debts:["debts"],fin_plans:["finplans"]};
+  fin_accounts:["finaccounts"],fin_categories:["fincats"],fin_ops:["finops"],debts:["debts"],fin_plans:["finplans"],
+  repairs:["repairs"],repair_services:["repairs"],repair_parts:["repairs"],repair_history:["repairs"],
+  purchase_orders:["porders"],purchase_order_lines:["porders"],pay_rules:["payrules"]};
 
 App.reload = async function(cols){
   cols=[...new Set(cols)].filter(c=>L[c]);
@@ -171,6 +186,7 @@ App.requestAccess = async name=>{await q(sb.from("staff_requests").upsert({id:Ap
 /* ---------- запись ---------- */
 const snake=o=>Object.fromEntries(Object.entries(o).filter(([,v])=>v!==undefined));
 App.api = {
+  upsertRule:async row=>{await q(sb.from("pay_rules").upsert(row,{onConflict:"staff_id"}).select(),"pay_rules");App.refresh("pay_rules")},
   insert:async(table,row)=>{const d=await q(sb.from(table).insert(snake(row)).select().single(),table);App.refresh(table);return d},
   insertMany:async(table,rows)=>{if(!rows.length)return[];const d=await q(sb.from(table).insert(rows.map(snake)).select(),table);App.refresh(table);return d},
   update:async(table,id,patch,key="id")=>{const d=await q(sb.from(table).update(snake(patch)).eq(key,id).select(),table);if(!d.length)throw new Error("Нет прав на изменение или запись не найдена");App.refresh(table);return d[0]},

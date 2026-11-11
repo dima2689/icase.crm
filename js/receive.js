@@ -4,10 +4,14 @@
 const {S,$,esc,num,money,ACT,VIEWS,TITLES}=App;
 TITLES.receive="Приёмка";
 const LS=(k,v)=>{try{if(v===undefined)return JSON.parse(localStorage.getItem(k)||"null");localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}};
-const blank=()=>({wh:"",supplierId:"",invoice:"",note:"",payAcc:"",lines:[]});
+const blank=()=>({wh:"",supplierId:"",invoice:"",note:"",payAcc:"",poId:"",lines:[]});
 let R=LS("icase_recv")||blank();
 let last=null; // последняя проведённая приёмка
 const save=()=>LS("icase_recv",R);
+/* заполнить приёмку остатком заказа поставщику */
+App.rcvLoad=function(o){R=Object.assign(blank(),{wh:o.wh||R.wh,supplierId:o.supplierId||"",invoice:o.invoice||"",note:o.note||"",poId:o.poId||"",
+  lines:o.lines.map(l=>({productId:l.productId,qty:l.qty,cost:l.cost,price:"",units:[],poQty:l.qty}))});save()};
+ACT.rcvPoOff=()=>{R.poId="";save();App.render()};
 const P=id=>App.byId("products",id);
 const isSer=l=>{const p=P(l.productId);return !!(p&&p.trackSerial)};
 const lineQty=l=>isSer(l)?(l.units||[]).length:num(l.qty);
@@ -22,7 +26,9 @@ VIEWS.receive={
     R.lines=R.lines.filter(l=>P(l.productId));
     const cost=App.can("cost"),price=App.can("price");
     const tq=R.lines.reduce((a,l)=>a+lineQty(l),0),tc=R.lines.reduce((a,l)=>a+lineQty(l)*num(l.cost),0);
+    const po=R.poId?App.byId("porders",R.poId):null;if(R.poId&&!po&&S.porders.length)R.poId="";
     return `<div class="recv" data-nodirty>
+    ${po?`<div class="fbox pobar">Приёмка по заказу <b>${esc(po.num)}</b> · ${esc((App.byId("suppliers",po.supplierId)||{}).name||"")} — после проведения в заказе отметится, что пришло. <button class="btn sm ghost" data-act="rcvPoOff">Не по заказу</button></div>`:""}
     <section class="card">
       <div class="form">
         ${App.fld("rcvWh","На склад",App.sel("rcvWh",App.whOpts(),R.wh,'data-rh="wh"'))}
@@ -140,12 +146,12 @@ ACT.rcvPost=async(_,btn)=>{
     if(App.can("price"))for(const l of R.lines){const p=P(l.productId);if(l.price!==""&&l.price!=null&&num(l.price)!==num(p.price))await App.api.update("products",p.id,{price:num(l.price)})}
     const clean=u=>{const o={};["imei","serial_no","condition","battery_health","price","kit"].forEach(k=>{if(u[k]!==""&&u[k]!=null)o[k]=String(u[k]).trim()});if(u.attrs&&Object.keys(u.attrs).length)o.attrs=u.attrs;return o};
     const lines=R.lines.map(l=>{const p=P(l.productId);return {product_id:p.id,qty:lineQty(l),cost:num(l.cost),new_units:p.trackSerial?l.units.map(clean):[]}});
-    doc=await App.api.insert("stock_docs",{type:"in",wh_to:R.wh,supplier_id:R.supplierId||null,invoice:R.invoice||null,note:R.note||"Приёмка",pay_account:R.supplierId&&R.payAcc?R.payAcc:null});
+    doc=await App.api.insert("stock_docs",{type:"in",wh_to:R.wh,supplier_id:R.supplierId||null,invoice:R.invoice||null,note:R.note||"Приёмка",pay_account:R.supplierId&&R.payAcc?R.payAcc:null,po_id:R.poId||null});
     await App.api.insertMany("stock_doc_lines",lines.map(l=>Object.assign({doc_id:doc.id},l)));
     await App.api.rpc("post_doc",{p_doc:doc.id},["stock_docs","stock","stock_movements","products","audit_log","units"]);
     last={id:doc.id,num:doc.num,wh:R.wh,qty:lines.reduce((a,l)=>a+l.qty,0),productIds:R.lines.map(l=>l.productId)};
     R=Object.assign(blank(),{wh:R.wh});save();
-    await App.reload(["products","units","docs"]);App.toast("Приёмка "+doc.num+" проведена");App.render();
+    await App.reload(["products","units","docs","porders"]);App.toast("Приёмка "+doc.num+" проведена");App.render();
   }catch(e){
     if(doc)try{await App.api.remove("stock_docs",doc.id)}catch(x){}
     btn.disabled=false;btn.textContent="Провести приёмку";App.toast(e.message||"Ошибка приёмки");

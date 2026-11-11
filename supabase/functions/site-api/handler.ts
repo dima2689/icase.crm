@@ -4,6 +4,7 @@
 //   GET  /site-api/categories   — дерево категорий с количеством товаров в наличии
 //   POST /site-api/order        — заказ с сайта (простой формат или формат WooCommerce), товар резервируется в CRM
 //   GET  /site-api/order-status — статус заказа для покупателя: ?num=С-…&phone=последние 4 цифры
+//   GET  /site-api/repair-status — статус ремонта: ?num=Р-…&phone=последние 4 цифры
 //   POST /site-api/woo-order    — веб-хук WooCommerce (подпись X-WC-Webhook-Signature)
 //   GET  /site-api/feed         — весь каталог одним списком (совместимость)
 import { fieldsOf, shape, slugOf } from "./shape.ts";
@@ -97,6 +98,15 @@ export async function handle(req: Request, rpc: Rpc): Promise<Response> {
     return r ? json(r) : json({ error: "Заказ не найден" }, 404);
   }
 
+  // ---------- статус ремонта ----------
+  if (req.method === "GET" && route === "repair-status") {
+    if (!authed) return json({ error: "Неверный ключ" }, 401);
+    const r = await rpc("repair_public", { p_num: P.get("num") || "", p_phone4: P.get("phone") || "" });
+    if (!r) return json({ error: "Ремонт не найден — проверьте номер квитанции и последние 4 цифры телефона" }, 404);
+    const L: Record<string, string> = { new: "Принят", diag: "Диагностика", approve: "Ждём вашего согласия", work: "В работе", parts: "Ждём запчасть", ready: "Готов — можно забирать", done: "Выдан", cancel: "Отказ от ремонта" };
+    return json({ ...r, status_label: L[r.status] || r.status, history: (r.history || []).map((h: any) => ({ ...h, label: L[h.status] || h.status })) });
+  }
+
   // ---------- заказы ----------
   if ((route === "woo-order" || route === "order") && req.method === "POST") {
     const raw = await req.text();
@@ -118,5 +128,5 @@ export async function handle(req: Request, rpc: Rpc): Promise<Response> {
     const st = id ? await rpc("site_order_public", { p_num: "С-" + order.number, p_phone4: String(order.billing?.phone || "") }) : null;
     return json({ ok: true, crm_order: id, num: st ? st.num : null, status: st ? st.status : null });
   }
-  return json({ error: "Неизвестный адрес. Доступно: GET catalog, product, categories, order-status, feed; POST order, woo-order" }, 404);
+  return json({ error: "Неизвестный адрес. Доступно: GET catalog, product, categories, order-status, repair-status, feed; POST order, woo-order" }, 404);
 }

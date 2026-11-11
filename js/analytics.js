@@ -468,6 +468,7 @@ ACT.anBuy=()=>{const rows=prodStats(90).filter(r=>r.rate>0&&r.cover<14).sort((a,
   App.openModal(App.head("Что заказать")+`<div class="tbl-wrap"><table><thead><tr><th>Товар</th><th class="n">Остаток</th><th class="n">В неделю</th><th class="n">Заказать</th><th>Лучшая цена поставщика</th></tr></thead><tbody>
     ${rows.map(r=>{const o=(App.offersFor?App.offersFor(r.p):[]).filter(x=>x.price>0)[0];return `<tr><td>${esc(r.p.name)}</td><td class="n">${r.stock}</td><td class="n">${(r.rate*7).toFixed(1).replace(".",",")}</td><td class="n"><b>${r.need}</b></td><td>${o?money(o.price)+" · "+esc((App.byId("suppliers",o.supplierId)||{}).name||""):"—"}</td></tr>`}).join("")}</tbody></table></div>
     <p class="muted">Количество — чтобы хватило на 30 дней плюс неделя на поставку.</p>
-    <div class="acts"><button class="btn" data-act="anBuyCsv">Скачать</button></div>`,{wide:true})};
+    <div class="acts"><button class="btn" data-act="anBuyCsv">Скачать</button>${App.poFromNeeds&&App.can("stock")&&rows.length?'<button class="btn pri" data-act="anBuyPo">Создать заказы поставщикам</button>':""}</div>`,{wide:true})};
+ACT.anBuyPo=(_,btn)=>{btn.disabled=true;App.poFromNeeds(prodStats(90).filter(r=>r.rate>0&&r.cover<14)).catch(e=>{btn.disabled=false;App.toast(e.message)})};
 ACT.anBuyCsv=()=>{const rows=prodStats(90).filter(r=>r.rate>0&&r.cover<14);App.download("icase-zakaz.csv",App.toCSV([["Товар","Артикул","Остаток","Продаётся в неделю","Заказать"],...rows.map(r=>[r.p.name,r.p.sku,r.stock,(r.rate*7).toFixed(1),r.need])]))};
 })();

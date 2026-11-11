@@ -44,7 +44,7 @@ App.DEFAULTS = {shopName:"iCase", city:"", address:"", phone:"", inn:"", deviceW
   receiptAck:"Устройство осмотрено, проверено, претензий к внешнему виду и комплектации не имею."};
 
 /* ---------- состояние ---------- */
-App.COLS = ["settings","points","warehouses","categories","suppliers","services","products","customers","sales","returns","docs","movements","shifts","cashops","staff","staffreq","log","repairs","units","models","siteorders","sprices","finaccounts","fincats","finops","debts","finplans"];
+App.COLS = ["settings","points","warehouses","categories","suppliers","services","products","customers","sales","returns","docs","movements","shifts","cashops","staff","staffreq","log","repairs","units","models","siteorders","sprices","finaccounts","fincats","finops","debts","finplans","porders","payrules"];
 const S = App.S = {}; App.COLS.forEach(c=>S[c]=[]);
 App.ui = {view:"dashboard"};
 App.me = {id:null, role:null, pointId:null, name:"", email:""};
@@ -131,8 +131,8 @@ App.returnedQty = (saleId,productId,line)=>S.returns.filter(r=>r.saleId===saleId
 App.repairPartsCost = r=>(r.parts||[]).filter(p=>!p.returned).reduce((a,p)=>a+num(p.cost)*num(p.qty),0);
 App.repairPartsSum = r=>(r.parts||[]).filter(p=>!p.returned).reduce((a,p)=>a+num(p.price)*num(p.qty),0);
 App.repairWorksSum = r=>(r.services||[]).reduce((a,s)=>a+num(s.price)*num(s.qty||1),0);
-App.repairTotal = r=>r.status==="done"||r.status==="cancel"?num(r.finalPrice):(App.repairWorksSum(r)+App.repairPartsSum(r))||num(r.estimate);
-App.repairPaid = r=>S.cashops.filter(o=>o.ref===r.num&&(o.type==="prepay"||o.type==="repair")).reduce((a,o)=>a+num(o.amount),0);
+App.repairTotal = r=>r.status==="done"||r.status==="cancel"?num(r.finalPrice):(App.repairWorksSum(r)+App.repairPartsSum(r))||num(r.approvedSum)||num(r.estimate);
+App.repairPaid = r=>S.cashops.filter(o=>o.ref===r.num&&(o.type==="prepay"||o.type==="repair"||o.type==="refund")).reduce((a,o)=>a+num(o.amount),0);
 App.isLate = r=>App.ACTIVE.includes(r.status)&&r.status!=="ready"&&r.dueDate&&new Date(r.dueDate)<new Date(new Date().toDateString());
 App.isStored = r=>r.status==="ready"&&r.readyAt&&App.days(r.readyAt)>App.settings().storageDays;
 
