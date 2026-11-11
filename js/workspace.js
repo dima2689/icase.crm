@@ -42,12 +42,17 @@ App.wsSwitch=()=>{const l=App.wsList();if(l.length<2)return "";
 
 /* ---------- касса: приём и выдача ремонта прямо с экрана продажи ---------- */
 const pv=App.VIEWS.pos;
-if(pv){const r0=pv.render.bind(pv);pv.render=function(){const html=r0();if(!App.point())return html;if(!App.can("repair"))return (App.pzStrip?`<div class="posrep"><b>Предзаказ</b>${App.pzStrip()}</div>`:"")+html;
-  const pt=(App.point()||{}).id,ready=S.repairs.filter(r=>r.status==="ready"&&(!r.pointId||r.pointId===pt)).sort((a,b)=>String(a.readyAt||"").localeCompare(String(b.readyAt||"")));
-  const pzs=App.pzStrip?`<div class="posrep"><b>Предзаказ</b>${App.pzStrip()}</div>`:"";
-  const strip=`<div class="posrep"><b>Ремонт</b><button class="btn sm pri" data-act="newRepair">+ Принять в ремонт</button>
-    ${ready.length?`<span class="muted">Готовы к выдаче:</span>${ready.slice(0,4).map(r=>{const c=App.cust(r.customerId)||{};return `<button class="btn sm" data-act="repIssue" data-id="${esc(r.id)}" title="${esc(r.device)}">${esc(r.num)} · ${esc((c.name||"").split(" ")[0]||r.device)}</button>`}).join("")}${ready.length>4?`<a class="btn sm ghost" href="#repairs">ещё ${ready.length-4}</a>`:""}`:'<span class="muted">Готовых к выдаче нет</span>'}</div>`;
-  return (App.ws!=="crm"&&App.installCard?App.installCard():"")+strip+pzs+html}}
+/* касса: одна строка быстрых действий — принять ремонт или предзаказ и выдать то, что ждёт клиента */
+if(pv){const r0=pv.render.bind(pv);pv.render=function(){const html=r0();if(!App.point())return html;
+  const pt=(App.point()||{}).id,canR=App.can("repair"),canS=App.can("sale");
+  const ready=canR?S.repairs.filter(r=>r.status==="ready"&&(!r.pointId||r.pointId===pt)).sort((a,b)=>String(a.readyAt||"").localeCompare(String(b.readyAt||""))):[];
+  const pz=canS&&App.pzArrived?App.pzArrived(pt):[];
+  const first=x=>esc((x||"").split(" ")[0]||"");
+  const wait=[...ready.map(r=>`<button class="wchip" data-act="repIssue" data-id="${esc(r.id)}" title="${esc(r.device)}"><i>ремонт</i>${esc(r.num)} · ${first((App.cust(r.customerId)||{}).name)||esc(r.device)}</button>`),
+    ...pz.map(o=>`<button class="wchip pz" data-act="pzOpen" data-id="${esc(o.id)}"><i>предзаказ</i>${esc(o.num)} · ${first((App.cust(o.customerId)||{}).name)}</button>`)];
+  const bar=canR||canS?`<div class="posquick"><div class="pq-b">${canR?'<button class="btn sm" data-act="newRepair">+ Ремонт</button>':""}${canS&&App.pzStrip?'<button class="btn sm" data-act="pzNew">+ Предзаказ</button>':""}</div>
+    ${wait.length?`<div class="pq-w"><span class="muted">Ждут выдачи:</span>${wait.slice(0,6).join("")}${wait.length>6?`<a class="btn sm ghost" href="#repairs">ещё ${wait.length-6}</a>`:""}</div>`:'<span class="muted pq-none">Выдавать сейчас нечего</span>'}</div>`:"";
+  return (App.ws!=="crm"&&App.installCard?App.installCard():"")+bar+html}}
 const rv=App.VIEWS.repairs;
 if(rv){const r1=rv.render.bind(rv);rv.render=function(){return (App.ws==="service"&&App.installCard?App.installCard():"")+r1.apply(this,arguments)}}
 })();

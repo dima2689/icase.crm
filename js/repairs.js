@@ -35,7 +35,7 @@ VIEWS.repairs={
     const board=u.repView==="board"&&u.repFilter==="active";
     const cols=App.RSTAT.filter(s=>App.ACTIVE.includes(s[0]));
     return `<div class="cfilt rep3"><input id="repQ" type="search" placeholder="№ квитанции, устройство, IMEI, клиент, телефон" value="${esc(u.repQ)}" data-filter="repQ" aria-label="Поиск ремонта">
-        ${App.sel("repMaster",[["","Все мастера"],...masters().map(m=>[m.id,m.fullName])],u.repMaster,'data-filter-sel="repMaster" aria-label="Мастер"')}
+        ${App.me.role==="seller"?"":App.sel("repMaster",[["","Все мастера"],...masters().map(m=>[m.id,m.fullName])],u.repMaster,'data-filter-sel="repMaster" aria-label="Мастер"')}
         <div class="seg"><button class="${u.repView==="board"?"on":""}" data-act="repView" data-id="board">Доска</button><button class="${u.repView==="list"?"on":""}" data-act="repView" data-id="list">Список</button></div></div>
       <div class="chips rchips">${FILTERS.map(([k,l])=>{const n=base.filter(r=>flt(k,r)).length;return `<button class="chip ${u.repFilter===k?"on":""} ${k==="late"&&n?"bad":""}" data-act="repFilter" data-id="${k}">${l} <b>${n}</b></button>`}).join("")}</div>
       ${board?`<div class="rboard">${cols.map(([s,l])=>{const rs=list.filter(r=>r.status===s);return `<div class="rcol"><div class="rcol-h">${esc(l)} <b>${rs.length}</b></div>${rs.map(card).join("")||'<div class="rcol-e">—</div>'}</div>`}).join("")}</div>`

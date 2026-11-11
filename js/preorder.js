@@ -26,7 +26,7 @@ VIEWS.preorders={
       .sort((a,b)=>(a.status==="arrived"?0:1)-(b.status==="arrived"?0:1)||String(a.createdAt).localeCompare(String(b.createdAt)));
     return `<div class="tabs">${tabs.map(([k,l])=>`<button class="tab ${u.pzTab===k?"on":""}" data-act="pzTab" data-id="${k}">${l}${cnt(k)?` <b>${cnt(k)}</b>`:""}</button>`).join("")}</div>
     <section class="card"><div class="card-h"><input type="search" id="pzQ" placeholder="№, клиент, телефон, устройство" value="${esc(u.pzQ)}" data-filter="pzQ" aria-label="Поиск предзаказов"></div>
-    <div class="tbl-wrap"><table><thead><tr><th>№</th><th>Клиент</th><th>Устройство</th><th class="n">Цена</th><th class="n">Внесено</th><th>Статус</th><th>Срок</th></tr></thead><tbody>
+    <div class="tbl-wrap"><table class="pztbl"><thead><tr><th>№</th><th>Клиент</th><th>Устройство</th><th class="n">Цена</th><th class="n">Внесено</th><th>Статус</th><th>Срок</th></tr></thead><tbody>
     ${list.map(o=>{const c=App.cust(o.customerId)||{},p=App.byId("products",o.productId)||{},paid=App.pzPaid(o),un=unitOf(o);
       return `<tr class="rowlink" data-act="pzOpen" data-id="${esc(o.id)}"><td><b>${esc(o.num)}</b><span class="sub">${App.dt(o.createdAt)}</span></td><td>${esc(c.name||"")}<span class="sub">${esc(App.fmtPhone(c.phone))}</span></td>
         <td>${esc(p.name||"")}${un?`<span class="sub">${esc(App.unitCode(un))} · ${esc(App.whName(un.whId))}</span>`:""}</td><td class="n">${money(o.price)}</td><td class="n">${money(paid)}</td><td>${pill(o)}</td>

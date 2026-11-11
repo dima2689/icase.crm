@@ -120,21 +120,21 @@ VIEWS.pos={
       </section>
       <section class="card cartcard">
         <div class="card-h"><h2>Чек</h2>${P.cart.length?'<button class="btn sm ghost danger" data-act="posClear">Очистить</button>':""}</div>
-        <div class="form">
-          ${App.fld("posPhone","Телефон клиента",App.inp("posPhone",P.phone,"tel","необязательно",'data-pos="phone" autocomplete="off"'))}
-          ${App.fld("posName","Имя",App.inp("posName",P.name,"text","",'data-pos="name"'))}
-        </div>
-        ${c?`<div class="hint ${c.blacklisted?"bad":"ok"}" style="margin-top:6px">${c.blacklisted?'<span class="pill bad">Чёрный список</span> '+esc(c.blackReason||"")+" · ":""}${esc(c.name)} · покупок ${S.sales.filter(s=>s.customerId===c.id).length}${num(c.discount)?" · скидка "+num(c.discount)+"%":""}${(c.tags||[]).length?" · "+esc(c.tags.join(", ")):""}${App.bonusOn&&App.bonusOn()?" · бонусов "+App.bonusBal(c.id):""}</div>`:App.phoneKey(P.phone).length===10?'<div class="hint" style="margin-top:6px">Новый клиент, добавится при продаже</div>':""}
         <div class="clist">
         ${P.cart.length?P.cart.map((i,k)=>{const p=App.byId("products",i.productId);const below=p&&num(i.price)-num(i.disc)/Math.max(1,num(i.qty))<num(i.unitId?i.cost:p.cost);
           return `<div class="cline"><div class="cl-top"><div class="cl-name"><b>${esc(i.name)}${i.productId?"":` <span class="pill ${i.kind==="goods"?"":"info"}">${i.kind==="goods"?"вне каталога":"услуга"}</span>`}</b>${i.serial?'<span class="sub">'+App.codeLbl(i.productId)+" "+esc(i.serial)+(i.battery!=null&&i.battery!==""?" · АКБ "+i.battery+"%":"")+"</span>":""}${below?'<span class="sub bad">ниже закупки</span>':""}</div>
             <button class="btn sm ghost danger" data-act="posDel" data-id="${k}" aria-label="Убрать">✕</button></div>
-            <div class="cl-row"><label>Кол-во<input type="number" min="1" value="${num(i.qty)}" data-cart="${k}" data-f="qty" id="cq${k}" ${i.serial?"disabled":""}></label>
-            <label>Цена<input type="number" min="0" value="${num(i.price)}" data-cart="${k}" data-f="price" id="cp${k}" ${App.can("price")?"":"disabled"}></label>
+            <div class="cl-row"><div class="cl-q">${i.serial?'<span class="muted">1 шт</span>':`<button type="button" class="btn sm" data-act="posQty" data-id="${k}|-1" aria-label="Меньше">−</button><input type="number" min="1" value="${num(i.qty)}" data-cart="${k}" data-f="qty" id="cq${k}" aria-label="Количество"><button type="button" class="btn sm" data-act="posQty" data-id="${k}|1" aria-label="Больше">+</button>`}</div>
+            ${App.can("price")?`<label>Цена<input type="number" min="0" value="${num(i.price)}" data-cart="${k}" data-f="price" id="cp${k}"></label>`:`<div class="cl-pr"><span>Цена</span><b>${money(i.price)}</b></div>`}
             <label>Скидка<input type="number" min="0" value="${num(i.disc)||""}" data-cart="${k}" data-f="disc" id="cd${k}" placeholder="0"></label>
             <div class="cl-sum"><span>Сумма</span><b>${money(num(i.qty)*num(i.price)-num(i.disc))}</b></div></div></div>`}).join(""):'<div class="empty">Добавьте товар поиском, сканером или выберите из списка</div>'}
         </div>
-        <details class="more" ${P.discPct||P.discSum||P.tiDev?"open":""}><summary>Скидка на чек и trade-in</summary>
+        <div class="posclient"><div class="form">
+          ${App.fld("posPhone","Телефон клиента <small class=\"muted\">необязательно</small>",App.inp("posPhone",P.phone,"tel","+7 900 000-00-00",'data-pos="phone" autocomplete="off"'))}
+          ${App.fld("posName","Имя",App.inp("posName",P.name,"text","Как обращаться",'data-pos="name"'))}
+        </div>
+        ${c?`<div class="hint ${c.blacklisted?"bad":"ok"}" style="margin-top:6px">${c.blacklisted?'<span class="pill bad">Чёрный список</span> '+esc(c.blackReason||"")+" · ":""}${esc(c.name)} · покупок ${S.sales.filter(s=>s.customerId===c.id).length}${num(c.discount)?" · скидка "+num(c.discount)+"%":""}${(c.tags||[]).length?" · "+esc(c.tags.join(", ")):""}${App.bonusOn&&App.bonusOn()?" · бонусов "+App.bonusBal(c.id):""}</div>`:App.phoneKey(P.phone).length===10?'<div class="hint" style="margin-top:6px">Новый клиент, добавится при продаже</div>':""}</div>
+                <details class="more" ${P.discPct||P.discSum||P.tiDev?"open":""}><summary>Скидка на чек и trade-in</summary>
           <div class="form">
             ${App.fld("posPct","Скидка, %",App.inp("posPct",P.discPct||"","number","0",'data-pos="discPct"'))}
             ${App.fld("posDsum","Скидка, ₽",App.inp("posDsum",P.discSum||"","number","0",'data-pos="discSum"'))}
@@ -221,6 +221,8 @@ ACT.pcAdd=()=>{
   App.closeModal();App.schedule();
 };
 ACT.posDel=k=>{P.cart.splice(+k,1);App.schedule()};
+ACT.posQty=v=>{const [k,d]=v.split("|"),i=P.cart[+k];if(!i)return;let q=num(i.qty)+ +d;if(q<1)return ACT.posDel(k);
+  if(i.productId){const max=App.qtyIn(App.byId("products",i.productId),posWh());if(q>max){App.toast("На складе только "+max);q=max}}i.qty=q;App.schedule()};
 ACT.posClear=()=>{Object.assign(P,{cart:[],phone:"",name:"",discPct:0,discSum:0,tiDev:"",tiAmt:0,tiImei:"",manualPct:false});App.schedule()};
 ACT.posCat=id=>{App.ui.posCat=id;App.render()};
 ACT.saleFor=id=>{const c=App.cust(id);ACT.posClear();P.phone=c.phone;P.name=c.name;P.discPct=num(c.discount);location.hash="pos";App.render()};
@@ -237,19 +239,28 @@ ACT.posPay=()=>{
   App.openModal(App.head("Оплата · "+money(t.total))+`
     ${bmax>0?`<div class="fbox bonusbox"><div class="fld"><label for="pay_bonus">Списать бонусы <small class="muted">есть ${bal}, можно до ${bmax}</small></label><div class="row-f">${App.inp("pay_bonus","","number","0",'min="0" max="'+bmax+'"')}<button class="btn sm" data-act="payBonusMax">Максимум</button></div></div></div>`:""}
     ${c&&c.blacklisted?`<div class="banner err">Клиент в чёрном списке: ${esc(c.blackReason||"без причины")}</div>`:""}
+    <div class="paym">${Object.entries(App.PAY).map(([m,l])=>`<button type="button" class="paybtn" data-act="payOne" data-id="${m}">${l}</button>`).join("")}</div>
+    <div class="paycash" id="payCash" hidden><div class="fld"><label for="payGot">Сколько дал клиент</label>${App.inp("payGot","","number","например 3000",'inputmode="numeric"')}
+      <div class="qk" id="payNotes"></div></div><div class="fld"><label>Сдача</label><b id="payChange" class="big-n">—</b></div></div>
+    <details class="paysplit" id="paySplit"><summary>Разделить оплату${App.phoneKey(P.phone).length===10?" или продать в долг":""}</summary>
     <div class="paygrid">${Object.entries(App.PAY).map(([m,l])=>`<div class="fld"><label for="pay_${m}">${l}</label><div class="row-f">${App.inp("pay_"+m,"","number","0")}<button class="btn sm" data-act="payAll" data-id="${m}">Всё</button></div></div>`).join("")}</div>
     ${App.phoneKey(P.phone).length===10?`<div class="paydebt"><div class="fld"><label for="pay_debt">В долг</label><div class="row-f">${App.inp("pay_debt","","number","0")}<button class="btn sm" data-act="payAll" data-id="debt">Всё</button></div></div>
-      ${App.fld("payDue","Вернуть до",App.inp("payDue","","date"))}</div>`:`<p class="muted paydebt-hint">Чтобы продать в долг, укажите телефон покупателя.</p>`}
-    <div class="form" style="margin-top:10px">${App.fld("payGot","Получено наличными (для сдачи)",App.inp("payGot","","number"))}<div class="fld"><label>Сдача</label><b id="payChange" class="big-n">—</b></div></div>
-    <div class="total"><span>Осталось распределить</span><b id="payLeft">${money(t.total)}</b></div>
-    ${App.fld("payWarr","Гарантия на устройства, мес.",App.inp("payWarr",App.settings().deviceWarrantyMonths,"number"))}
+      ${App.fld("payDue","Вернуть до",App.inp("payDue","","date"))}</div>`:`<p class="muted paydebt-hint">Продать в долг можно, если в чеке указан телефон покупателя.</p>`}</details>
+    <div class="total"><span id="payLeftL">Выберите способ оплаты</span><b id="payLeft">${money(t.total)}</b></div>
     <div class="acts"><button class="btn" data-act="close">Назад</button><button class="btn pri" data-act="posConfirm" id="payOk">Провести продажу</button></div>`);
   const bon=()=>Math.max(0,Math.min(bmax,Math.round(num(App.val("pay_bonus")))));
-  const upd=()=>{const paid=PAYK().reduce((a,m)=>a+num(App.val("pay_"+m)),0);const left=t.total-bon()-paid;
-    $("#payLeft").textContent=money(left);$("#payLeft").className=Math.abs(left)<0.5?"ok":"bad";
-    const got=num(App.val("payGot")),cash=num(App.val("pay_cash"));$("#payChange").textContent=got?money(got-cash):"—"};
+  const upd=()=>{const paid=PAYK().reduce((a,m)=>a+num(App.val("pay_"+m)),0);const left=t.total-bon()-paid;const done=Math.abs(left)<0.5;
+    $("#payLeft").textContent=done?"":money(left);$("#payLeft").className=done?"ok":"bad";$("#payLeftL").textContent=done?"Оплата распределена ✓":paid?"Осталось распределить":"Выберите способ оплаты";
+    document.querySelectorAll("#modal .paybtn").forEach(b=>{const v=num(App.val("pay_"+b.dataset.id));b.classList.toggle("on",v>0);b.querySelector("small")&&b.querySelector("small").remove();if(v>0&&v<t.total-bon()-0.5)b.insertAdjacentHTML("beforeend",`<small>${money(v)}</small>`)});
+    const cash=num(App.val("pay_cash"));$("#payCash").hidden=!cash;
+    if(cash){const notes=[...new Set([cash,Math.ceil(cash/500)*500,Math.ceil(cash/1000)*1000,Math.ceil(cash/5000)*5000])].filter(v=>v>=cash).slice(0,4);
+      const nb=$("#payNotes");if(nb&&nb.dataset.k!==String(cash)){nb.dataset.k=cash;nb.innerHTML=notes.map(v=>`<button type="button" class="chip" data-act="payGotQ" data-id="${v}">${v===cash?"без сдачи":money(v)}</button>`).join("")}}
+    const got=num(App.val("payGot"));$("#payChange").textContent=got?(got<cash?"не хватает "+money(cash-got):money(got-cash)):"—";$("#payChange").className="big-n "+(got&&got<cash?"badc":"");
+    const ok=$("#payOk");if(ok){ok.textContent=done?"Провести продажу · "+money(t.total):"Провести продажу";ok.classList.toggle("dim",!done)}};
   document.querySelectorAll("#modal input").forEach(el=>el.addEventListener("input",upd));
   ACT.payAll=m=>{PAYK().forEach(k=>{document.getElementById("pay_"+k).value=k===m?t.total-bon():""});upd()};
+  ACT.payOne=m=>{ACT.payAll(m);if(m==="cash"){const g=$("#payGot");if(g){g.value="";setTimeout(()=>g.focus(),30)}}upd()};
+  ACT.payGotQ=v=>{const g=$("#payGot");if(g){g.value=v;upd()}};
   ACT.payBonusMax=()=>{$("#pay_bonus").value=bmax;const filled=PAYK().filter(k=>num(App.val("pay_"+k)));if(filled.length===1)ACT.payAll(filled[0]);else upd()};
   if(t.total===0){upd()}
 };
@@ -261,6 +272,7 @@ ACT.posConfirm=async(_,btn)=>{
   const bonus=Math.max(0,Math.round(num(App.val("pay_bonus"))));
   if(payments.some(p=>p.amount<0))return App.toast("Суммы оплат не могут быть отрицательными");
   if(debt&&App.phoneKey(P.phone).length!==10)return App.toast("Для продажи в долг укажите телефон покупателя");
+  if(!paid&&!bonus&&t.total>0)return App.toast("Выберите, как платит клиент: наличные, карта, QR или перевод");
   if(Math.abs(paid+bonus-t.total)>=0.5)return App.toast("Сумма оплат ("+money(paid+bonus)+") не равна сумме чека ("+money(t.total)+")");
   const sh=App.openShift();
   if(!sh&&(App.settings().requireShift||payments.some(p=>p.method==="cash")))return App.toast("Для этой оплаты нужна открытая смена");
@@ -426,7 +438,7 @@ ACT.openSale=id=>{
     <dl class="kv"><dt>Дата</dt><dd>${App.dtt(s.createdAt)}</dd><dt>Клиент</dt><dd>${c?`<button class="btn sm" data-act="openClient" data-id="${esc(c.id)}">${esc(c.name)}</button> ${esc(c.phone)}`:"—"}</dd>
     <dt>Склад</dt><dd>${esc(App.whName(s.whId))}</dd><dt>Продавец</dt><dd>${esc(App.nameOf(s.by))}</dd>${App.evoBadge?App.evoBadge(s):""}<dt>Оплата</dt><dd>${esc(App.paysText(s.payments))}</dd>
     ${s.tradeIn?`<dt>Trade-in</dt><dd>${esc(s.tradeIn.device)} · ${money(s.tradeIn.amount)}</dd>`:""}</dl>
-    <div class="tbl-wrap"><table><thead><tr><th>Товар</th><th class="n">Кол-во</th><th class="n">Цена</th><th class="n">Скидка</th><th class="n">Сумма</th><th class="n">Возвращено</th></tr></thead><tbody>
+    <div class="tbl-wrap"><table class="sitbl"><thead><tr><th>Товар</th><th class="n">Кол-во</th><th class="n">Цена</th><th class="n">Скидка</th><th class="n">Сумма</th><th class="n">Возвращено</th></tr></thead><tbody>
     ${(s.items||[]).map(i=>`<tr><td>${esc(i.name)}${i.serial?'<span class="sub">'+App.codeLbl(i.productId)+" "+esc(i.serial)+"</span>":""}</td><td class="n">${i.qty}</td><td class="n">${money(i.price)}</td><td class="n">${num(i.disc)?money(i.disc):"—"}</td><td class="n">${money(i.qty*i.price-num(i.disc))}</td><td class="n">${App.returnedQty(id,i.productId,i.line)||"—"}</td></tr>`).join("")}
     </tbody></table></div>
     <div class="sumlines"><span>Скидка на чек</span><span>${money(s.discount)}</span><span><b>Итого</b></span><span><b>${money(s.total)}</b></span>${App.can("cost")?`<span>Прибыль</span><span>${money(App.saleProfit(s))}</span>`:""}</div>

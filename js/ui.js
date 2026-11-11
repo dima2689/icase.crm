@@ -135,7 +135,7 @@ App.productPicker = function(inputId,boxId,{wh=null,inStock=false,onPick,showCos
     const whv=typeof wh==="function"?wh():wh;
     const list=App.searchProducts(s,{wh:whv,inStock,limit:10});
     box.innerHTML=list.length?list.map(p=>{const here=whv?App.qtyIn(p,whv):App.qtyTotal(p);const other=whv&&here<=0?App.whereElse(p,whv):"";
-      return `<button type="button" data-pick="${esc(p.id)}"><span>${esc(p.name)}<small> · ${esc(App.catName(p))}${p.serial?" · "+esc(p.serial):""} · ${whv?"здесь ":"всего "}${here}${other?" · есть: "+esc(other):""}</small></span><b>${money(showCost?p.cost:p.price)}</b></button>`}).join(""):'<div class="empty">Не найдено'+(inStock?" в наличии":"")+'</div>';
+      return `<button type="button" data-pick="${esc(p.id)}"><span>${esc(p.name)}<small> · ${esc(App.catName(p))}${p.serial?" · "+esc(p.serial):""} · ${whv?"в наличии: ":"всего: "}${here} шт${other?" · есть: "+esc(other):""}</small></span><b>${money(showCost?p.cost:p.price)}</b></button>`}).join(""):'<div class="empty">Не найдено'+(inStock?" в наличии":"")+'</div>';
     box.hidden=false};
   q.addEventListener("input",draw);
   q.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();const u=App.findUnit?App.findUnit(q.value):null;const p=App.findByCode(q.value)||(App.searchProducts(q.value,{wh:typeof wh==="function"?wh():wh,inStock,limit:2}).length===1?App.searchProducts(q.value,{wh:typeof wh==="function"?wh():wh,inStock,limit:1})[0]:null);

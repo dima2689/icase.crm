@@ -203,11 +203,25 @@ ACT.moreStock=()=>{App.ui.stockLimit=(App.ui.stockLimit||300)+300;App.render()};
 /* ---------- карточка товара ---------- */
 ACT.newProduct=()=>productForm(null);
 ACT.openProduct=id=>productForm(id);
+/* карточка товара для продавца: без полей редактирования — цена, где лежит, характеристики, действия */
+function productView(p){const pt=App.point(),mine=new Set(App.whs().filter(w=>pt&&w.pointId===pt.id).map(w=>w.id));
+  const here=App.whs().filter(w=>mine.has(w.id)).reduce((a,w)=>a+App.qtyIn(p,w.id),0),tot=App.qtyTotal(p);
+  const attrs=[["Модель",p.model],["Память",p.memory],["Цвет",p.color],["Состояние",p.condition],["Бренд",p.brand],...Object.entries(p.attrs||{}),["Гарантия",num(p.warrantyMonths)?p.warrantyMonths+" мес.":""],["Артикул",p.sku],["Штрихкод",p.barcode]].filter(([,v])=>v);
+  const units=p.trackSerial?S.units.filter(u=>u.productId===p.id&&u.status==="in_stock"):[];
+  App.openModal(App.head(esc(p.name),App.apprPill?App.apprPill(p):"")+`
+    <div class="pview"><div class="pv-price"><b>${money(p.price)}</b><span class="pill ${here?"ok":"bad"}">${here?"здесь "+here+" шт":"здесь нет"}</span>${tot>here?`<span class="muted">всего ${tot} шт</span>`:""}</div>
+    <div class="pstock">${App.whs().filter(w=>App.qtyIn(p,w.id)).map(w=>`<span class="chip ${mine.has(w.id)?"on":""}">${esc(w.name)} <b>${App.qtyIn(p,w.id)}</b></span>`).join("")||'<span class="muted">Нет ни на одном складе</span>'}</div>
+    ${attrs.length?`<dl class="rdl">${attrs.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>`:""}
+    ${units.length?`<h3 class="sub-h">Экземпляры в наличии</h3><div class="list-mini">${units.slice(0,20).map(u=>`<button data-act="openUnit" data-id="${esc(u.id)}"><span>${esc(App.unitCode(u))}<small>${esc(App.whName(u.whId))}${u.batteryHealth!=null&&u.batteryHealth!==""?" · АКБ "+u.batteryHealth+"%":""}${u.condition?" · "+esc(u.condition):""}</small></span><b class="num">${money(App.unitPrice?App.unitPrice(u,p):p.price)}</b></button>`).join("")}</div>`:""}
+    ${p.description?`<p class="muted">${esc(p.description)}</p>`:""}</div>
+    <div class="acts"><button class="btn" data-act="tagOne" data-id="${esc(p.id)}">Ценник</button>${App.can("sale")&&here&&p.approval!=="pending_create"?`<button class="btn pri" data-act="pvSell" data-id="${esc(p.id)}">Добавить в чек</button>`:""}</div>`)}
+ACT.pvSell=id=>{App.closeModal();location.hash="pos";setTimeout(()=>ACT.posAdd(id),150)};
 ACT.unitAll=()=>{App.ui.unitAll=!App.ui.unitAll;if(App.ui.prodOpen)productForm(App.ui.prodOpen)};
 function productForm(id){
   const p=id?App.byId("products",id):{condition:"Новый",onSite:true,onAvito:false,minQty:0,categoryId:(App.catChildren("")[0]||{}).id||""};
   if(!p)return;App.ui.prodOpen=id||"";
   const edit=App.can("stock"),price=App.can("price"),cost=App.can("cost"),st=App.settings();
+  if(id&&!edit)return productView(p);
   const moves=id?App.sortDesc(S.movements.filter(m=>m.productId===id),"at").slice(0,15):[];
   const units=id&&p.trackSerial?App.sortDesc(S.units.filter(u=>u.productId===id&&(App.ui.unitAll||u.status==="in_stock")),"createdAt"):[];
   const attrs=Object.entries(p.attrs||{}).filter(([k,v])=>v);

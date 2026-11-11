@@ -19,7 +19,7 @@ VIEWS.clients={
     let rows=S.customers.filter(c=>!c.mergedInto&&(!q||String(c.name).toLowerCase().includes(q)||(qk.length>=3&&App.phoneKey(c.phone).includes(qk))||String(c.email||"").toLowerCase().includes(q))&&(!u.clientTag||(u.clientTag==="__black"?c.blacklisted:(c.tags||[]).includes(u.clientTag))))
       .map(c=>Object.assign({c},stat(c)));
     rows.sort((a,b)=>u.clientSort==="spent"?b.spent-a.spent:u.clientSort==="name"?String(a.c.name).localeCompare(b.c.name):String(b.last).localeCompare(String(a.last)));
-    const dup=dupGroups().length;
+    const dup=["owner","manager"].includes(App.me.role)?dupGroups().length:0;
     return `<div class="cfilt"><input id="clientQ" type="search" placeholder="Имя, телефон, email" value="${esc(u.clientQ)}" data-filter="clientQ" aria-label="Поиск клиента">
       ${App.sel("clientTag",[["","Все клиенты"],["__black","Чёрный список"],...tags.map(t=>[t,"Метка: "+t])],u.clientTag,'data-filter-sel="clientTag" aria-label="Фильтр"')}
       ${App.sel("clientSort",[["last","Сначала недавние"],["spent","По сумме покупок"],["name","По имени"]],u.clientSort,'data-filter-sel="clientSort" aria-label="Сортировка"')}</div>
