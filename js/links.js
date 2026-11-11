@@ -11,7 +11,7 @@ const ymd=d=>{const x=new Date(d);return new Date(x-x.getTimezoneOffset()*6e4).t
 const pct=v=>(Math.round(v*1000)/10).toString().replace(".",",")+"%";
 const inR=(t,[a,b])=>{if(!t)return false;const d=new Date(t);return d>=a&&d<b};
 const docByNum=n=>S.docs.find(d=>d.num===n);
-const saleByNum=n=>S.sales.find(s=>s.num===n);
+const saleByNum=n=>App.idx(S.sales,"num").get(n);
 
 /* =================== ЭКЗЕМПЛЯР: ПОЛНАЯ ИСТОРИЯ ПО IMEI =================== */
 App.unitSaleItem=u=>{for(const s of S.sales)for(const i of (s.items||[]))if((i.unitId&&i.unitId===u.id)||(u.saleItemId&&i.line===u.saleItemId))return {s,i};return null};

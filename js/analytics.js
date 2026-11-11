@@ -56,19 +56,20 @@ function allLines(){
       L.push({t,day:dk(t),sale:r.saleId,pid:i.productId||"",name:i.name||"",top:c.top,sub:c.sub,brand:(p&&p.brand)||"—",cond:/б\/у/i.test((p&&p.condition)||"")?"Б/у":p?"Новый":"—",
         kind:i.productId?"goods":"service",qty:-num(i.qty),rev:-num(i.qty)*num(i.price)*f*k,cost:-num(i.qty)*num(i.cost),by:s.by,point:s.pointId,cust:s.customerId||"",channel:s.channel||"store",price:num(i.price),ret:true})}
     if(!its.length&&num(r.amount)>0)L.push({t,day:dk(t),sale:r.saleId,pid:"",name:"Возврат",top:"Услуги и прочее",sub:"Услуги и прочее",brand:"—",cond:"—",kind:"service",qty:0,rev:-num(r.amount),cost:0,by:s.by,point:s.pointId,cust:s.customerId||"",channel:s.channel||"store",price:0,ret:true})}
+  for(const l of L)l.tm=+l.t;
   cache={key,lines:L};return L;
 }
-const linesIn=(from,to,pt)=>allLines().filter(l=>l.t>=from&&l.t<to&&(!pt||l.point===pt));
+const linesIn=(from,to,pt)=>{const f=+from,t=+to;return allLines().filter(l=>l.tm>=f&&l.tm<t&&(!pt||l.point===pt))};
 function agg(lines,keyFn){const m=new Map();
   for(const l of lines){const k=keyFn(l);if(k==null)continue;let a=m.get(k);if(!a){a={key:k,qty:0,rev:0,cost:0,ret:0,retRev:0,sales:new Set()};m.set(k,a)}
     a.qty+=l.qty;a.rev+=l.rev;a.cost+=l.cost;if(l.ret){a.ret+=-l.qty;a.retRev+=-l.rev}else a.sales.add(l.sale)}
   return [...m.values()].map(a=>Object.assign(a,{profit:a.rev-a.cost,margin:a.rev>0?(a.rev-a.cost)/a.rev:0,checks:a.sales.size}))}
 function kpi(from,to,pt){
-  const L=linesIn(from,to,pt),sales=S.sales.filter(s=>{const t=new Date(s.createdAt);return t>=from&&t<to&&(!pt||s.pointId===pt)});
+  const L=linesIn(from,to,pt),f0=+from,t0=+to,sales=S.sales.filter(s=>{if(pt&&s.pointId!==pt)return false;const t=App.ts(s.createdAt);return t>=f0&&t<t0});
   const rev=L.reduce((a,l)=>a+l.rev,0),cost=L.reduce((a,l)=>a+l.cost,0),gross=L.filter(l=>!l.ret).reduce((a,l)=>a+l.rev,0),retRev=-L.filter(l=>l.ret).reduce((a,l)=>a+l.rev,0);
   const items=L.filter(l=>!l.ret).reduce((a,l)=>a+l.qty,0),custs=new Set(sales.map(s=>s.customerId).filter(Boolean));
   const first=firstBuy();let newC=0;custs.forEach(c=>{const f=first[c];if(f&&f>=from&&f<to)newC++});
-  const reps=S.repairs.filter(r=>r.status==="done"&&r.closedAt&&new Date(r.closedAt)>=from&&new Date(r.closedAt)<to&&(!pt||r.pointId===pt));
+  const reps=S.repairs.filter(r=>r.status==="done"&&r.closedAt&&App.ts(r.closedAt)>=from&&App.ts(r.closedAt)<to&&(!pt||r.pointId===pt));
   const repRev=reps.reduce((a,r)=>a+num(r.finalPrice),0),repProfit=reps.reduce((a,r)=>a+num(r.finalPrice)-App.repairPartsCost(r),0);
   const n=sales.length;
   return{rev,cost,profit:rev-cost,margin:rev>0?(rev-cost)/rev:0,checks:n,avg:n?gross/n:0,ipc:n?items/n:0,custs:custs.size,newC,retC:custs.size-newC,
@@ -212,7 +213,7 @@ function insights(c,p,f,t){
   const w=Array(7).fill(0),wc=Array(7).fill(0);for(let d=new Date(f);d<t;d=new Date(+d+DAY))wc[wd(d)]++;c.L.forEach(l=>w[wd(l.t)]+=l.rev);
   const avgW=w.map((v,i)=>wc[i]?v/wc[i]:0),best=avgW.indexOf(Math.max(...avgW)),worst=avgW.indexOf(Math.min(...avgW.map((v,i)=>wc[i]?v:Infinity)));
   if(c.checks>=10&&avgW[worst]>0)out.push(["info",`Лучший день — <b>${WD[best].toLowerCase()}</b> (в среднем ${money(avgW[best])}), слабее всего — ${WD[worst].toLowerCase()} (${money(avgW[worst])}).`]);
-  const pr=prodStats(90,App.ui.anPoint);const soon=pr.filter(r=>r.rate>0&&r.cover<10&&r.stock>=0&&!r.p.archived).length,dead=pr.filter(r=>r.stock>0&&r.idle>=num(App.settings().deadDays||60));
+  const pr=prodStats(90,App.ui.anPoint);const soon=pr.filter(r=>r.rate>0&&r.cover<10&&r.stock>=0&&!r.p.archived).length,ddays=num(App.settings().deadDays||60),dead=pr.filter(r=>r.stock>0&&r.idle>=ddays);
   if(soon)out.push(["warn",`<b>${soon}</b> ${plural(soon,"товар закончится","товара закончатся","товаров закончатся")} в ближайшие 10 дней при текущих продажах — см. «Товары», колонка «Хватит на».`]);
   if(dead.length&&cost)out.push(["warn",`В товарах без продаж ${App.settings().deadDays||60}+ дней заморожено <b>${money(dead.reduce((a,r)=>a+r.stock*r.costU,0))}</b> (${dead.length} поз.).`]);
   const fb=firstBuy(),rep=c.sales.filter(s=>s.customerId&&fb[s.customerId]<f),repRev=rep.reduce((a,s)=>a+saleVal(s),0),tot=c.sales.reduce((a,s)=>a+saleVal(s),0);
@@ -308,7 +309,7 @@ function prodStats(days,pt){
       xyz:qty<=0?"—":wk<4?"—":cv<.5?"X":cv<1?"Y":"Z",idle,last:last[p.id]||null,costU:num(p.cost),cat:catOf(p)}});
   const abc=(key,field)=>{const s=rows.filter(r=>r[field]>0).sort((a,b)=>b[field]-a[field]),tot=s.reduce((a,r)=>a+r[field],0);let c=0;s.forEach(r=>{c+=r[field];r[key]=c/tot<=.8||c===r[field]?"A":c/tot<=.95?"B":"C"});rows.forEach(r=>{if(!r[key])r[key]="—"})};
   abc("abc","rev");abc("abcP","profit");
-  rows.forEach(r=>{const dd=num(App.settings().deadDays||60);
+  const dd=num(App.settings().deadDays||60);rows.forEach(r=>{
     r.tip=r.rate>0&&r.cover<14?["bad",r.stock<=0?"Нет в наличии — заказать "+r.need+" шт":`Закончится через ${Math.max(0,Math.round(r.cover))} дн. — заказать ${r.need} шт`]
       :r.stock>0&&r.idle>=dd?["warn",`Не продаётся ${r.idle} дн. — снизить цену или распродать`]
       :r.rate>0&&r.cover>120?["warn","Запас больше чем на 4 месяца — не заказывать"]
@@ -348,7 +349,7 @@ ACT.anExport=()=>{const [f,t]=range(App.ui.anPer),days=Math.max(7,Math.round((t-
 function cat(){
   const u=App.ui,[f,t]=range(u.anPer),[pf,ptt]=prevRange(f,t),L=linesIn(f,t,u.anPoint),P=linesIn(pf,ptt,u.anPoint),cost=App.can("cost");
   const tot=L.reduce((a,l)=>a+l.rev,0);if(!L.length)return emptyPer();
-  const ti=S.sales.filter(s=>s.tradeIn&&new Date(s.createdAt)>=f&&new Date(s.createdAt)<t&&(!u.anPoint||s.pointId===u.anPoint)).reduce((a,s)=>({n:a.n+1,sum:a.sum+num(s.tradeIn.amount)}),{n:0,sum:0});
+  const ti=S.sales.filter(s=>s.tradeIn&&App.ts(s.createdAt)>=f&&App.ts(s.createdAt)<t&&(!u.anPoint||s.pointId===u.anPoint)).reduce((a,s)=>({n:a.n+1,sum:a.sum+num(s.tradeIn.amount)}),{n:0,sum:0});
   const table=(title,fn)=>{const cur=agg(L,fn).sort((a,b)=>b.rev-a.rev),pm=Object.fromEntries(agg(P,fn).map(a=>[a.key,a.rev]));
     return `<section class="card"><div class="card-h"><h2>${title}</h2></div><div class="tbl-wrap"><table><thead><tr><th></th><th class="n">Выручка</th><th class="n">Доля</th><th class="n">К прошлому</th>${cost?'<th class="n">Прибыль</th><th class="n">Маржа</th>':""}<th class="n">Шт</th></tr></thead><tbody>
       ${cur.map(a=>`<tr><td><b>${esc(a.key)}</b></td><td class="n">${money(a.rev)}</td><td class="n"><span class="share"><i style="width:${tot?a.rev/tot*100:0}%"></i></span>${pct(tot?a.rev/tot:0)}</td><td class="n">${dTag(a.rev,pm[a.key]||0)||"—"}</td>${cost?`<td class="n">${money(a.profit)}</td><td class="n">${pct(a.margin)}</td>`:""}<td class="n">${a.qty}</td></tr>`).join("")||'<tr><td colspan="7" class="empty">Нет данных</td></tr>'}

@@ -53,14 +53,31 @@ App.me = {id:null, role:null, pointId:null, name:"", email:""};
 const $ = App.$ = s=>document.querySelector(s);
 const esc = App.esc = v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const num = App.num = v=>{if(typeof v==="number")return isFinite(v)?v:0;const n=Number(String(v==null?"":v).replace(/\s/g,"").replace(",","."));return isFinite(n)?n:0};
-const money = App.money = n=>Math.round(num(n)).toLocaleString("ru-RU")+" ₽";
+const _nf=new Intl.NumberFormat("ru-RU",{maximumFractionDigits:0});
+const money = App.money = n=>_nf.format(Math.round(num(n))||0)+" ₽";
 App.uid = p=>p+"_"+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 App.nowISO = ()=>new Date().toISOString();
-App.dt = iso=>iso?new Date(iso).toLocaleDateString("ru-RU",{day:"2-digit",month:"2-digit",year:"2-digit"}):"—";
-App.dtt = iso=>iso?new Date(iso).toLocaleString("ru-RU",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}):"—";
+/* даты: форматтеры создаются один раз, разбор ISO-строк кэшируется */
+const _df=new Intl.DateTimeFormat("ru-RU",{day:"2-digit",month:"2-digit",year:"2-digit"}),_dtf=new Intl.DateTimeFormat("ru-RU",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
+const _tsC=new Map();
+App.ts = v=>{if(v==null||v==="")return NaN;if(typeof v==="number")return v;if(v instanceof Date)return +v;let t=_tsC.get(v);if(t===undefined){t=Date.parse(v);if(_tsC.size>200000)_tsC.clear();_tsC.set(v,t)}return t};
+const _fmt=(f,iso)=>{if(!iso)return "—";const t=App.ts(iso);return isNaN(t)?"—":f.format(t)};
+App.dt = iso=>_fmt(_df,iso);
+App.dtt = iso=>_fmt(_dtf,iso);
 App.phoneKey = p=>String(p||"").replace(/\D/g,"").slice(-10);
 App.fmtPhone = p=>{const k=App.phoneKey(p);return k.length===10?"+7 "+k.slice(0,3)+" "+k.slice(3,6)+"-"+k.slice(6,8)+"-"+k.slice(8):(p||"")};
-App.byId = (col,id)=>id?S[col].find(x=>x.id===id):undefined;
+/* индексы по id: строятся лениво и сбрасываются, когда коллекция заменена или изменилась её длина */
+const _ix=new WeakMap();
+App.idx = (arr,key="id")=>{let e=_ix.get(arr);if(!e)_ix.set(arr,e={});let m=e[key];
+  if(!m||m.n!==arr.length){m=e[key]={n:arr.length,map:new Map()};const f=typeof key==="function"?key:x=>x[key];for(const x of arr){const k=f(x);if(k!=null&&k!==""&&!m.map.has(k))m.map.set(k,x)}}return m.map};
+/* группировка по ключу: живёт в пределах одной синхронной задачи (отрисовки, обработчика), потом сбрасывается */
+let _gen=0,_genQ=false;const _gx=new WeakMap();
+App.grp = (arr,key)=>{if(!_genQ){_genQ=true;queueMicrotask(()=>{_gen++;_genQ=false})}
+  let e=_gx.get(arr);if(!e||e.g!==_gen||e.n!==arr.length)_gx.set(arr,e={g:_gen,n:arr.length,m:{}});let m=e.m[key];
+  if(!m){m=e.m[key]=new Map();for(const x of arr){const k=x[key];if(k==null||k==="")continue;let l=m.get(k);if(!l)m.set(k,l=[]);l.push(x)}}return m};
+App.grpOf = (arr,key,val)=>App.grp(arr,key).get(val)||[];
+App.byId = (col,id)=>{if(!id)return undefined;const a=S[col];if(!a)return undefined;const x=App.idx(a).get(id);return x&&x.id===id?x:a.find(y=>y.id===id)};
+const _coll=new Intl.Collator("ru",{numeric:true});App.coll=(a,b)=>_coll.compare(String(a==null?"":a),String(b==null?"":b));
 App.sortDesc = (arr,f="createdAt")=>arr.slice().sort((a,b)=>String(b[f]||"").localeCompare(String(a[f]||"")));
 App.val = id=>{const el=document.getElementById(id);return el?String(el.value).trim():""};
 App.checked = id=>{const el=document.getElementById(id);return !!(el&&el.checked)};
@@ -127,7 +144,7 @@ App.shiftTotals = function(sh){
 /* ---------- деньги ---------- */
 App.saleCost = s=>(s.items||[]).reduce((a,i)=>a+num(i.cost)*num(i.qty),0);
 App.saleProfit = s=>num(s.total)+num(s.tradeIn&&s.tradeIn.amount)-App.saleCost(s);
-App.returnedQty = (saleId,productId,line)=>S.returns.filter(r=>r.saleId===saleId).reduce((a,r)=>a+(r.items||[]).filter(i=>i.line===line).reduce((b,i)=>b+num(i.qty),0),0);
+App.returnedQty = (saleId,productId,line)=>App.grpOf(S.returns,"saleId",saleId).reduce((a,r)=>a+(r.items||[]).filter(i=>i.line===line).reduce((b,i)=>b+num(i.qty),0),0);
 App.repairPartsCost = r=>(r.parts||[]).filter(p=>!p.returned).reduce((a,p)=>a+num(p.cost)*num(p.qty),0);
 App.repairPartsSum = r=>(r.parts||[]).filter(p=>!p.returned).reduce((a,p)=>a+num(p.price)*num(p.qty),0);
 App.repairWorksSum = r=>(r.services||[]).reduce((a,s)=>a+num(s.price)*num(s.qty||1),0);
@@ -138,7 +155,7 @@ App.isStored = r=>r.status==="ready"&&r.readyAt&&App.days(r.readyAt)>App.setting
 
 /* выручка за период; pointId — только по точке */
 App.periodStats = function(from,to,pointId){
-  const inP=d=>{const t=new Date(d);return t>=from&&t<to};
+  const f0=+from,t0=+to,inP=d=>{const t=App.ts(d);return t>=f0&&t<t0};
   const inPt=x=>!pointId||x.pointId===pointId;
   const sales=S.sales.filter(s=>inP(s.createdAt)&&inPt(s));
   const rets=S.returns.filter(r=>inP(r.createdAt)&&inPt(App.byId("sales",r.saleId)||{}));

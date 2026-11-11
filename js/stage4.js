@@ -9,7 +9,7 @@ const today=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4)
 const LDEF={on:false,earn_pct:3,max_pay_pct:30,welcome:0};
 App.loyalty=()=>({...LDEF,...(App.settings().loyalty||{})});
 App.bonusOn=()=>!!App.loyalty().on;
-App.bonusBal=cid=>Math.round(S.bonusops.filter(o=>o.customerId===cid).reduce((a,o)=>a+num(o.amount),0));
+App.bonusBal=cid=>Math.round(App.grpOf(S.bonusops,"customerId",cid).reduce((a,o)=>a+num(o.amount),0));
 const BK={earn:"Начислено",spend:"Оплата бонусами",return:"Возврат покупки",manual:"Корректировка",welcome:"Приветственные"};
 App.loyaltyTab=function(){const l=App.loyalty(),ed=App.can("settings"),dis=ed?"":"disabled";
   const total=S.customers.reduce((a,c)=>a+Math.max(0,App.bonusBal(c.id)),0),m0=new Date(new Date().getFullYear(),new Date().getMonth(),1);
@@ -180,7 +180,7 @@ ACT.bankGo=(_,btn)=>run(btn,async()=>{const acc=App.val("bkAcc"),list=BK2.rows.f
 /* --- точки входа --- */
 if(App.VIEWS.receive){const a=App.VIEWS.receive.actions;App.VIEWS.receive.actions=()=>`<button class="btn" data-act="dealsList">Выкуп и комиссия</button>`+a()}
 if(App.VIEWS.finance){const a=App.VIEWS.finance.actions;App.VIEWS.finance.actions=()=>(App.can("finance")?`<button class="btn" data-act="bankImport">Выписка банка</button>`:"")+a()}
-const ce=App.clientExtra;App.clientExtra=function(id){const ds=S.deals.filter(d=>d.customerId===id),b=App.bonusOn()?App.bonusBal(id):null;
+const ce=App.clientExtra;App.clientExtra=function(id){const ds=App.grpOf(S.deals,"customerId",id),b=App.bonusOn()?App.bonusBal(id):null;
   return (b!=null||S.bonusops.some(o=>o.customerId===id)?`<section><h3 class="sub-h">Бонусы</h3><div class="list-mini"><button data-act="bonusHist" data-id="${esc(id)}"><span>На счёте <b>${App.bonusBal(id)}</b> бонусов<small>история и корректировка</small></span><span class="pill ok">бонусы</span></button></div></section>`:"")
     +(ds.length?`<section><h3 class="sub-h">Выкуп и комиссия</h3><div class="list-mini">${ds.map(d=>`<button data-act="dealOpen" data-id="${d.id}"><span>${esc(d.num)} · ${esc(d.device)}<small>${App.dt(d.createdAt)} · ${money(d.amount)}</small></span>${dPill(d)}</button>`).join("")}</div></section>`:"")
     +(ce?ce(id):"")};

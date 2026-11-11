@@ -63,10 +63,11 @@ VIEWS.stock={
     const qty=p=>u.stockWh?App.qtyIn(p,u.stockWh):App.qtyTotal(p);
     const list=stockBase("");
     let whs=App.whs().filter(w=>list.some(p=>App.qtyIn(p,w.id)));if(!whs.length)whs=App.whs().slice(0,1);
-    const cmp={name:(a,b)=>String(a.name).localeCompare(b.name,"ru",{numeric:true}),new:(a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")),
+    const col=App.coll,cmp={name:(a,b)=>col(a.name,b.name),new:(a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")),
       qty:(a,b)=>qty(b)-qty(a),price_asc:(a,b)=>num(a.price)-num(b.price),price_desc:(a,b)=>num(b.price)-num(a.price),markup:(a,b)=>(num(b.price)-num(b.cost))-(num(a.price)-num(a.cost))}[f.sort]||((a,b)=>0);
     const gkey={cat:p=>App.catName(p),brand:brandOf,model:p=>p.model||"Без модели",none:()=>""}[f.group]||(()=>"");
-    list.sort((a,b)=>String(gkey(a)).localeCompare(String(gkey(b)),"ru",{numeric:true})||cmp(a,b)||String(a.name).localeCompare(b.name));
+    const gk=new Map(list.map(p=>[p,String(gkey(p))]));
+    list.sort((a,b)=>col(gk.get(a),gk.get(b))||cmp(a,b)||col(a.name,b.name));
     const totCost=list.reduce((a,p)=>a+num(p.cost)*Math.max(0,qty(p)),0),totPrice=list.reduce((a,p)=>a+num(p.price)*Math.max(0,qty(p)),0),totQty=list.reduce((a,p)=>a+Math.max(0,qty(p)),0);
     const shown=list.slice(0,u.stockLimit||300);App.ui.stockShown=shown.map(p=>p.id);
     const cols=3+(showCost?2:1);

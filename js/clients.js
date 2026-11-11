@@ -5,7 +5,7 @@ const {S,$,esc,num,money,ACT,VIEWS,TITLES}=App;
 TITLES.clients="Клиенты";
 Object.assign(App.ui,{clientQ:"",clientTag:"",clientSort:"last"});
 function stat(c){
-  const s=S.sales.filter(x=>x.customerId===c.id),r=S.repairs.filter(x=>x.customerId===c.id),ret=S.returns.filter(x=>x.customerId===c.id);
+  const s=App.grpOf(S.sales,"customerId",c.id),r=App.grpOf(S.repairs,"customerId",c.id),ret=App.grpOf(S.returns,"customerId",c.id);
   const spent=s.reduce((a,x)=>a+num(x.total),0)-ret.reduce((a,x)=>a+num(x.amount),0)+r.filter(x=>x.status==="done"||x.status==="cancel").reduce((a,x)=>a+num(x.finalPrice),0);
   const last=[...s.map(x=>x.createdAt),...r.map(x=>x.createdAt)].sort().pop()||c.createdAt;
   return{s,r,ret,spent,last};
