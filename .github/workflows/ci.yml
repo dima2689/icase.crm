@@ -1,0 +1,71 @@
+name: CI
+on:
+  push:
+    branches: [main, "devops/**"]
+  pull_request:
+  workflow_dispatch:
+concurrency: { group: ci-${{ github.ref }}, cancel-in-progress: true }
+permissions: { contents: read }
+
+jobs:
+  lint:
+    name: Проверка кода
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: JavaScript (синтаксис)
+        run: for f in js/*.js sw.js; do node --check "$f"; done
+      - name: Shell-скрипты (shellcheck)
+        run: shellcheck -S warning -x deploy/*.sh deploy/icase-release db/tests/compare.sh tests/smoke.sh
+      - uses: denoland/setup-deno@v2
+        with: { deno-version: v2.x }
+      - name: Edge-функции (типы и тесты без сети)
+        run: |
+          deno check supabase/functions/site-api/index.ts supabase/functions/site-sync/index.ts supabase/functions/staff-admin/index.ts supabase/functions/evotor/index.ts
+          deno run supabase/functions/tests/staff_admin_test.ts
+      - name: Секреты не попали в код
+        run: |
+          ! grep -rInE 'service_role"|sb_secret_|SERVICE_ROLE_KEY=ey' --exclude-dir=.git --exclude-dir=.github . || { echo "найден секретный ключ"; exit 1; }
+
+  stack:
+    name: Чистая установка + бэкап/восстановление
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      SB_DIR: ${{ github.workspace }}/../sb
+      CRM_DIR: ${{ github.workspace }}/../crm
+      ICASE_ENV: /nonexistent
+      BACKUP_DIR: ${{ github.workspace }}/../bk
+      BACKUP_PASSPHRASE: ci-test-passphrase
+      OWNER_EMAIL: owner@ci.icase.test
+      OWNER_PASSWORD: Ci-Owner-Pass-123
+    steps:
+      - uses: actions/checkout@v4
+      - name: Supabase + схема iCase с нуля (deploy.sh --ci)
+        run: ICASE_VERSION=ci-${GITHUB_SHA::7} deploy/deploy.sh --ci
+      - name: Схема совпадает с рабочей базой
+        run: db/tests/compare.sh
+      - name: Владелец и сквозные проверки
+        run: |
+          deploy/create-owner.sh "$OWNER_EMAIL" "Владелец CI" --ci
+          API=http://localhost:8000 ANON=$(grep -m1 '^ANON_KEY=' "$SB_DIR/.env" | cut -d= -f2-) EMAIL=$OWNER_EMAIL PASS=$OWNER_PASSWORD tests/smoke.sh
+      - name: Бэкап → полный сброс → восстановление
+        run: |
+          before=$(docker exec supabase-db psql -U postgres -qAt -c "select md5(string_agg(name||decrypted_secret,',' order by name)) from vault.decrypted_secrets")
+          deploy/backup.sh --local --tag ci
+          f=$(ls -t "$BACKUP_DIR"/*.tar.gpg | head -1); ls -la "$f"
+          deploy/restore.sh "$f" --fresh --yes
+          after=$(docker exec supabase-db psql -U postgres -qAt -c "select md5(string_agg(name||decrypted_secret,',' order by name)) from vault.decrypted_secrets")
+          [ "$before" = "$after" ] && echo "секреты Vault восстановлены" || { echo "секреты Vault не совпали: $before / $after"; exit 1; }
+      - name: После восстановления — схема и вход
+        run: |
+          db/tests/compare.sh
+          deploy/healthcheck.sh --ci
+          API=http://localhost:8000 ANON=$(grep -m1 '^ANON_KEY=' "$SB_DIR/.env" | cut -d= -f2-) EMAIL=$OWNER_EMAIL PASS=$OWNER_PASSWORD tests/smoke.sh
+      - name: Повторная выкладка поверх (идемпотентность)
+        run: ICASE_VERSION=ci2 deploy/deploy.sh --ci && db/tests/compare.sh
+      - name: Логи при ошибке
+        if: failure()
+        run: |
+          docker ps -a --format '{{.Names}}\t{{.Status}}'
+          cd "$SB_DIR" && docker compose logs --tail 80 db auth rest storage functions api-gw 2>&1 | tail -400

@@ -1,4 +1,5 @@
 -- v3: обмен с сайтом (WooCommerce): выгрузка цен/остатков/товаров/б/у экземпляров, приём заказов с резервом
+-- (историческая миграция; адрес функций в расписаниях теперь задаёт db/migrations/0001_portable_cron.sql + db/always/10_cron.sql)
 create extension if not exists pg_net schema extensions;
 create extension if not exists pg_cron;
 

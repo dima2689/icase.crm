@@ -1,0 +1,8 @@
+[Unit]
+Description=iCase: резервная копия базы и фото
+After=docker.service
+[Service]
+Type=oneshot
+ExecStart=/opt/icase/app/deploy/backup.sh
+Nice=10
+IOSchedulingClass=idle

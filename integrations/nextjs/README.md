@@ -4,7 +4,7 @@
 
 ## 1. Переменные окружения сайта (`.env.local`, на хостинге — в настройках проекта)
 ```
-ICASE_API_URL=https://wputkpwptwaxwzebszua.supabase.co/functions/v1/site-api
+ICASE_API_URL=https://api.<ваш-домен>/functions/v1/site-api   # тестовая база: https://wputkpwptwaxwzebszua.supabase.co/functions/v1/site-api
 ICASE_API_KEY=…        # CRM → Настройки → Сайт → «Ключ API» (Показать)
 ICASE_HOOK_SECRET=…    # CRM → Настройки → Сайт → «Секрет уведомлений» (Показать)
 ```

@@ -1,0 +1,7 @@
+[Unit]
+Description=iCase: проверка каждые 10 минут
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=10min
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,6 @@
+[Unit]
+Description=iCase: проверка работоспособности
+After=docker.service
+[Service]
+Type=oneshot
+ExecStart=/opt/icase/app/deploy/healthcheck.sh --cron

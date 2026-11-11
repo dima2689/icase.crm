@@ -1,0 +1,45 @@
+# Дополнение к официальному docker-compose.yml Supabase (кладётся рядом с ним в /opt/icase/supabase).
+# Включается строкой в .env:  COMPOSE_FILE=docker-compose.yml:docker-compose.icase.yml
+services:
+  # шлюз API наружу не публикуем — к нему ходит только Caddy
+  api-gw:
+    ports: !reset []
+
+  # Studio — только с самого сервера (ssh -L 3000:127.0.0.1:3000 ...)
+  studio:
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  # пулер Postgres (5432/6543) — только с самого сервера; наружу база не торчит
+  supavisor:
+    ports: !override
+      - "127.0.0.1:${POSTGRES_PORT}:5432"
+      - "127.0.0.1:${POOLER_PROXY_PORT_TRANSACTION}:6543"
+
+  caddy:
+    container_name: icase-caddy
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    depends_on:
+      api-gw:
+        condition: service_healthy
+    environment:
+      CRM_DOMAIN: ${CRM_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./icase/Caddyfile:/etc/caddy/Caddyfile:ro
+      - /srv/icase/crm:/srv/crm:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+volumes:
+  caddy_data:
+  caddy_config:

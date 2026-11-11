@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Устанавливается в /opt/icase/bin/icase-release. Пользователь deploy может запускать только его (через sudo).
+#   icase-release <версия>      — выложить /home/deploy/incoming/<версия>.tar.gz (кладёт GitHub Actions)
+#   icase-release --rollback    — вернуть предыдущую версию приложения (база не откатывается)
+#   icase-release --list        — список версий
+set -euo pipefail
+REL=/opt/icase/releases; IN=/home/deploy/incoming; mkdir -p "$REL"
+case "${1:-}" in
+  --list) ls -1t "$REL"; echo "текущая: $(cat /opt/icase/CURRENT 2>/dev/null)"; exit 0;;
+  --rollback)
+    cur=$(cat /opt/icase/CURRENT 2>/dev/null || true)
+    prev=$(find "$REL" -mindepth 1 -maxdepth 1 -type d ! -name "$cur" -printf "%T@ %f\n" | sort -rn | head -1 | cut -d" " -f2); [ -n "$prev" ] || { echo "нет предыдущей версии"; exit 1; }
+    echo "откат: $cur → $prev"; cd "$REL/$prev"; ICASE_VERSION="$prev" exec deploy/deploy.sh;;
+esac
+V="${1:?версия}"; [[ "$V" =~ ^[0-9A-Za-z._-]{4,64}$ ]] || { echo "недопустимая версия"; exit 2; }
+T="$IN/$V.tar.gz"; [ -f "$T" ] || { echo "нет $T"; exit 2; }
+D="$REL/$V"; rm -rf "$D"; mkdir -p "$D"; tar -C "$D" -xzf "$T"; rm -f "$T"
+echo "$V" > "$D/VERSION"
+ln -sfn "$D" /opt/icase/app
+cd "$D"; ICASE_VERSION="$V" deploy/deploy.sh
+ls -1t "$REL" | tail -n +6 | while read -r old; do [ "$old" = "$V" ] || rm -rf "${REL:?}/$old"; done

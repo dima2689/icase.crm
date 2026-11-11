@@ -1,0 +1,54 @@
+name: Deploy
+# Выкладка на сервер: после зелёного CI на main или вручную (Actions → Deploy → Run workflow).
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      ref: { description: "Ветка/коммит (по умолчанию main)", required: false, default: main }
+concurrency: { group: deploy-production, cancel-in-progress: false }
+permissions: { contents: read }
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 30
+    steps:
+      - name: Есть ли сервер
+        id: chk
+        env: { H: "${{ secrets.DEPLOY_HOST }}" }
+        run: |
+          if [ -z "$H" ]; then echo "::notice::Секрет DEPLOY_HOST не задан — выкладка пропущена (см. docs/deploy.md)"; echo "go=0" >> "$GITHUB_OUTPUT"; else echo "go=1" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/checkout@v4
+        if: steps.chk.outputs.go == '1'
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || inputs.ref }}
+      - name: Пакет версии
+        if: steps.chk.outputs.go == '1'
+        run: |
+          V="$(date -u +%Y%m%d-%H%M)-$(git rev-parse --short=7 HEAD)"; echo "V=$V" >> "$GITHUB_ENV"
+          git archive --format=tar.gz -o "/tmp/$V.tar.gz" HEAD -- index.html styles.css sw.js manifest*.webmanifest icons js db deploy supabase
+          ls -la "/tmp/$V.tar.gz"
+      - name: SSH
+        if: steps.chk.outputs.go == '1'
+        env:
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KH: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/id_deploy; chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$KH" > ~/.ssh/known_hosts
+      - name: Выкладка
+        if: steps.chk.outputs.go == '1'
+        env:
+          H: ${{ secrets.DEPLOY_HOST }}
+          U: ${{ secrets.DEPLOY_USER || 'deploy' }}
+        run: |
+          S="ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes -o ConnectTimeout=20"
+          scp -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes "/tmp/$V.tar.gz" "$U@$H:incoming/$V.tar.gz"
+          $S "$U@$H" "sudo /opt/icase/bin/icase-release $V"
+          echo "### Выложена версия \`$V\`" >> "$GITHUB_STEP_SUMMARY"
