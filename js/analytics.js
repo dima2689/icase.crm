@@ -22,6 +22,7 @@ const plural=(n,a,b,c)=>{const x=n%10,y=n%100;return x===1&&y!==11?a:x>=2&&x<=4&
 
 /* ---------- период ---------- */
 const PERS=[["7","7 дней"],["30","30 дней"],["90","90 дней"],["180","Полгода"],["365","Год"],["month","Этот месяц"],["prev","Прошлый месяц"],["all","Всё время"],["custom","Свой период"]];
+App.anRange=p=>range(p);App.anHbars=(r,f)=>hbars(r,f);App.anProdStats=(d,p)=>prodStats(d,p);
 function range(p){
   const t=d0(Date.now()),tom=new Date(+t+DAY);
   if(p==="month")return [new Date(t.getFullYear(),t.getMonth(),1),tom];
@@ -155,11 +156,12 @@ VIEWS.analytics={
   actions:()=>`<button class="btn" data-act="printView">Печать</button><button class="btn" data-act="anExport">Скачать таблицу товаров</button>`,
   render(){
     const u=App.ui,t=u.anTab,pts=App.points(true);
-    const per=t==="fc"||t==="stock"?"":App.sel("anPer",PERS,u.anPer,'data-filter-sel="anPer" aria-label="Период"');
+    const per=t==="fc"||t==="stock"||t==="ext_noper"?"":App.sel("anPer",PERS,u.anPer,'data-filter-sel="anPer" aria-label="Период"');
     const pt=pts.length>1&&t!=="stock"?App.sel("anPoint",[["","Все точки"],...pts.map(p=>[p.id,p.name])],u.anPoint,'data-filter-sel="anPoint" aria-label="Точка"'):"";
-    return `<div class="tabs">${TABS.map(([k,l])=>`<button class="tab ${t===k?"on":""}" data-act="anTab" data-id="${k}">${l}</button>`).join("")}</div>
+    const TB=[...TABS,...(App.AN_TABS||[]).map(x=>[x[0],x[1]])];
+    return `<div class="tabs">${TB.map(([k,l])=>`<button class="tab ${t===k?"on":""}" data-act="anTab" data-id="${k}">${l}</button>`).join("")}</div>
       ${per||pt?`<div class="anbar">${per}${per&&u.anPer==="custom"?App.inp("anFrom",u.anFrom||"","date","",'data-filter-sel="anFrom" aria-label="С"')+App.inp("anTo",u.anTo||"","date","",'data-filter-sel="anTo" aria-label="По"'):""}${pt}${per?`<span class="muted">${perText()}</span>`:""}</div>`:""}
-      <div class="an" data-nodirty>${S.sales.length?({over,fc,prod,cat,cust,time,team,stock})[t]():`<section class="card"><div class="empty">Продаж пока нет — аналитика появится после первых продаж.</div></section>`}</div>`;
+      <div class="an" data-nodirty>${S.sales.length||(App.AN_TABS||[]).some(x=>x[0]===t)?({over,fc,prod,cat,cust,time,team,stock,...Object.fromEntries((App.AN_TABS||[]).map(x=>[x[0],x[2]]))}[t]||over)():`<section class="card"><div class="empty">Продаж пока нет — аналитика появится после первых продаж.</div></section>`}</div>`;
   }
 };
 ACT.anTab=k=>{App.ui.anTab=k;App.render()};
@@ -439,7 +441,7 @@ function team(){
   const pts=keys(s=>s.pointId||"").map(k=>[k,row(c.L.filter(l=>(l.point||"")===k),c.sales.filter(s=>(s.pointId||"")===k))]).sort((a,b)=>b[1].rev-a[1].rev);
   const ch=keys(s=>s.channel||"store").map(k=>[k,row(c.L.filter(l=>l.channel===k),c.sales.filter(s=>(s.channel||"store")===k))]);
   return tbl("Сотрудники",staff,k=>App.nameOf(k)||"—")+tbl("Точки",pts,k=>(App.byId("points",k)||{}).name||"Без точки")+tbl("Каналы продаж",ch,k=>({store:"Магазин",site:"Сайт",avito:"Авито"})[k]||k)+
-    `<p class="muted">«Товаров в чеке» и «Услуги» показывают, кто лучше допродаёт. «Скидки» — сколько скидок дал сотрудник и какую долю от цен по прайсу. «С телефоном» — доля чеков, где продавец записал телефон покупателя.</p>`;
+    `<p class="muted">«Товаров в чеке» и «Услуги» показывают, кто лучше допродаёт. «Скидки» — сколько скидок дал сотрудник и какую долю от цен по прайсу. «С телефоном» — доля чеков, где продавец записал телефон покупателя.</p>`+(App.anTeamExtra?App.anTeamExtra(f,t,u.anPoint):"");
 }
 
 /* --- склад --- */

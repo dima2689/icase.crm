@@ -26,6 +26,7 @@ VIEWS.dashboard={
       <a class="tile click" href="#pos"><span>Касса</span><b>${sh?money(App.shiftTotals(sh).expectedCash):"закрыта"}</b><small>${sh?"наличных в смене "+esc(sh.num):"откройте смену"}</small></a>
       ${hasRep?`<a class="tile click" href="#repairs"><span>Ремонт в работе</span><b>${act.length}</b><small>${ready.length} готовы · ${waitParts.length} ждут запчасть</small></a>
       <button class="tile click ${late.length?"alert":""}" data-act="repFilter" data-id="late"><span>Просрочено</span><b>${late.length}</b><small>${stored.length?stored.length+" на хранении дольше "+App.settings().storageDays+" дн.":"срок ремонта прошёл"}</small></button>`:""}
+      ${App.tasksDue?`<a class="tile click ${App.tasksDue()?"alert":""}" href="#tasks"><span>Задачи на сегодня</span><b>${App.tasksDue()}</b><small>${S.waitlist.filter(w=>w.status==="ready").length?S.waitlist.filter(w=>w.status==="ready").length+" клиентов ждут звонка: товар пришёл":"напоминания и звонки"}</small></a>`:""}
       <button class="tile click ${low.length?"alert":""}" data-act="lowStock"><span>Заканчивается</span><b>${low.length}</b><small>товаров ниже минимума</small></button>
     </div>
     <div class="grid g2">

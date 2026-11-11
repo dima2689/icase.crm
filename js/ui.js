@@ -26,7 +26,7 @@ App.NAV = [
 ];
 App.navAllowed = v=>{const n=App.NAV.find(x=>x[0]===v);return n&&App.VIEWS[v]&&(!n[3]||App.can(n[3]))};
 function drawNav(){
-  const counts={orders:S.siteorders.filter(o=>o.status==="new").length,repairs:S.repairs.filter(r=>App.ACTIVE.includes(r.status)).length,stock:S.products.filter(App.isLow).length};
+  const counts={tasks:App.tasksDue?App.tasksDue():0,orders:S.siteorders.filter(o=>o.status==="new").length,repairs:S.repairs.filter(r=>App.ACTIVE.includes(r.status)).length,stock:S.products.filter(App.isLow).length};
   const items=App.NAV.filter(n=>App.VIEWS[n[0]]&&(!n[3]||App.can(n[3])));
   $("#navlist").innerHTML=items.map(([v,l,ic])=>`<a class="nav ${App.ui.view===v?"on":""}" href="#${v}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">${ic}</svg><span>${l}</span>${counts[v]?`<span class="cnt">${counts[v]}</span>`:""}</a>`).join("");
   const sh=App.openShift(),pts=App.myPoints(),cur=App.point();
@@ -223,7 +223,7 @@ function gsearch(){
   const k=App.phoneKey(q),out=[];
   S.repairs.forEach(r=>{if([r.num,r.device,r.imei].join(" ").toLowerCase().includes(q))out.push(`<button data-act="openRepair" data-id="${esc(r.id)}"><b>Ремонт ${esc(r.num)}</b> · ${esc(r.device)} <small>${esc((App.RS[r.status]||{}).label)}</small></button>`)});
   S.customers.forEach(c=>{if(!c.mergedInto&&(String(c.name).toLowerCase().includes(q)||(k.length>=4&&App.phoneKey(c.phone).includes(k))))out.push(`<button data-act="openClient" data-id="${esc(c.id)}"><b>${esc(c.name)}</b> <small>${esc(c.phone)}</small></button>`)});
-  if(q.length>=4)S.units.filter(u=>[u.imei,u.imei2,u.serialNo].some(x=>x&&x.toLowerCase().includes(q))).slice(0,6).forEach(u=>{const p=App.byId("products",u.productId)||{};out.push(`<button data-act="openUnit" data-id="${esc(u.id)}"><b>${esc(App.unitCode(u))}</b> <small>${esc(p.name||"")} · ${esc((App.UNIT_ST[u.status]||[u.status])[0])}</small></button>`)});
+  if(q.length>=4)S.units.filter(u=>[u.imei,u.imei2,u.serialNo].some(x=>x&&x.toLowerCase().includes(q))).slice(0,6).forEach(u=>{const p=App.byId("products",u.productId)||{};out.push(`<button data-act="unitHist" data-id="${esc(u.id)}"><b>${esc(App.unitCode(u))}</b> <small>${esc(p.name||"")} · ${esc((App.UNIT_ST[u.status]||[u.status])[0])}</small></button>`)});
   App.searchProducts(q,{limit:8}).forEach(p=>out.push(`<button data-act="openProduct" data-id="${esc(p.id)}"><b>${esc(p.name)}</b> <small>${App.qtyTotal(p)} шт · ${money(p.price)}</small></button>`));
   S.sales.forEach(s=>{if(String(s.num).toLowerCase().includes(q))out.push(`<button data-act="openSale" data-id="${esc(s.id)}"><b>Продажа ${esc(s.num)}</b> <small>${App.dtt(s.createdAt)} · ${money(s.total)}</small></button>`)});
   S.docs.forEach(d=>{if(String(d.num).toLowerCase().includes(q))out.push(`<button data-act="openDoc" data-id="${esc(d.id)}"><b>${esc(App.DOCT[d.type].one)} ${esc(d.num)}</b> <small>${App.dt(d.createdAt)}</small></button>`)});

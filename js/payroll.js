@@ -10,9 +10,9 @@ const range=m=>{const [y,mo]=m.split("-").map(Number);return [new Date(y,mo-1,1)
 const inR=(t,[a,b])=>{const d=new Date(t);return d>=a&&d<b};
 const rule=id=>S.payrules.find(r=>r.staffId===id)||{base:0,perShift:0,pctSales:0,pctProfit:0,pctWorks:0,note:"",none:true};
 const isPay=o=>!o.cancelledAt&&o.kind==="out"&&o.payee;
-/* расчёт начисления сотруднику за месяц */
-App.payCalc=function(st,m){
-  const R=range(m),r=rule(st.id);
+/* расчёт начисления за любой период: оклад — пропорционально дням в каждом месяце */
+App.payCalcRange=function(st,R){
+  const r=rule(st.id);
   const shifts=S.shifts.filter(s=>s.openedBy===st.id&&inR(s.openedAt,R)).length;
   const sales=S.sales.filter(s=>s.by===st.id&&s.status!=="cancelled"&&inR(s.createdAt,R));
   const rets=S.returns.filter(x=>inR(x.createdAt,R)&&(App.byId("sales",x.saleId)||{}).by===st.id);
@@ -21,11 +21,16 @@ App.payCalc=function(st,m){
   const profit=sales.reduce((a,s)=>a+App.saleProfit(s),0)-rets.reduce((a,x)=>a+num(x.amount),0)+retCost;
   const reps=S.repairs.filter(x=>x.status==="done"&&x.masterId===st.id&&x.closedAt&&inR(x.closedAt,R));
   const works=reps.reduce((a,x)=>a+App.repairWorksSum(x),0);
-  const parts={base:num(r.base),shifts:shifts*num(r.perShift),sales:rev*num(r.pctSales)/100,profit:Math.max(0,profit)*num(r.pctProfit)/100,works:works*num(r.pctWorks)/100};
+  let base=0;if(num(r.base)){let d=new Date(R[0].getFullYear(),R[0].getMonth(),1);
+    while(d<R[1]){const e=new Date(d.getFullYear(),d.getMonth()+1,1),a=Math.max(+d,+R[0]),b=Math.min(+e,+R[1]);if(b>a)base+=num(r.base)*(b-a)/(e-d);d=e}}
+  const parts={base,shifts:shifts*num(r.perShift),sales:rev*num(r.pctSales)/100,profit:Math.max(0,profit)*num(r.pctProfit)/100,works:works*num(r.pctWorks)/100};
   const total=Math.round(Object.values(parts).reduce((a,b)=>a+b,0));
-  const paid=S.finops.filter(o=>isPay(o)&&o.payee===st.id&&String(o.date).slice(0,7)===m).reduce((a,o)=>a+num(o.amount),0);
-  return {r,shifts,nSales:sales.length,rev,profit,nRep:reps.length,works,parts,total,paid,left:total-paid};
+  return {r,shifts,nSales:sales.length,rev,profit,nRep:reps.length,works,parts,total};
 };
+App.payCalc=function(st,m){const c=App.payCalcRange(st,range(m));
+  c.paid=S.finops.filter(o=>isPay(o)&&o.payee===st.id&&String(o.date).slice(0,7)===m).reduce((a,o)=>a+num(o.amount),0);c.left=c.total-c.paid;return c};
+/* начислено всем за период — для прибыли «по начислению» */
+App.payAccrued=(from,to)=>S.staff.filter(s=>S.payrules.some(r=>r.staffId===s.id)).map(s=>({staff:s,pointId:s.pointId||"",total:App.payCalcRange(s,[from,to]).total})).filter(x=>x.total);
 const MONTHS=["январь","февраль","март","апрель","май","июнь","июль","август","сентябрь","октябрь","ноябрь","декабрь"];
 const mName=m=>{const [y,mo]=m.split("-");return MONTHS[+mo-1]+" "+y};
 const mOpts=()=>{const out=[],d=new Date();for(let i=0;i<12;i++){const x=new Date(d.getFullYear(),d.getMonth()-i,1);const k=x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0");out.push([k,mName(k)])}return out};

@@ -3,7 +3,7 @@
 (function(){
 const {S,$,esc,num,money,ACT,VIEWS,TITLES}=App;
 TITLES.finance="Финансы";
-Object.assign(App.ui,{finTab:"sum",finPeriod:"month",finAcc:"",finKind:"",finCat:"",finQ:"",debtDir:"in",debtSt:"open",debtQ:"",repFinPeriod:"month"});
+Object.assign(App.ui,{repFinPoint:"",finTab:"sum",finPeriod:"month",finAcc:"",finKind:"",finCat:"",finQ:"",debtDir:"in",debtSt:"open",debtQ:"",repFinPeriod:"month"});
 const run=async(btn,fn)=>{if(btn&&btn.disabled)return;if(btn)btn.disabled=true;try{await fn()}catch(e){App.toast(e.message)}finally{if(btn&&document.body.contains(btn))btn.disabled=false}};
 const RELOAD=["finops","finaccounts","debts","finplans","cashops","shifts"];
 const today=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
@@ -80,6 +80,7 @@ function sum(){
       <button class="tile" data-act="finDebts" data-id="in"><span>Нам должны</span><b class="okc">${money(sumLeft(inD))}</b><small>${inD.length?inD.length+" "+plural(inD.length,"долг","долга","долгов"):"долгов нет"}${inD.some(overdue)?` · <span class="badc">просрочено ${inD.filter(overdue).length}</span>`:""}</small></button>
       <button class="tile" data-act="finDebts" data-id="out"><span>Мы должны</span><b class="badc">${money(sumLeft(outD))}</b><small>${outD.length?outD.length+" "+plural(outD.length,"долг","долга","долгов"):"долгов нет"}${outD.some(overdue)?` · <span class="badc">просрочено ${outD.filter(overdue).length}</span>`:""}</small></button>
       <button class="tile" data-act="finTab" data-id="report"><span>Прибыль за месяц</span><b class="${pnl.net<0?"badc":""}">${money(pnl.net)}</b><small>выручка ${money(pnl.rev)} · расходы ${money(pnl.expSum)}</small></button>
+      ${App.psnTile?App.psnTile():""}
     </div>
     <div class="fgrid">
       <section class="card"><div class="card-h"><h2>Счета</h2><button class="btn sm" data-act="finOp" data-id="transfer">Инкассация / перевод</button></div>
@@ -145,20 +146,23 @@ ACT.finOp=(kind,_,pre)=>{
       ${k==="transfer"?App.fld("foTo","Куда",App.sel("foTo",list.map(a=>[a.id,a.name]),toDef.id)):""}
       ${k!=="transfer"?App.fld("foCat","Статья",App.sel("foCat",[["","— без статьи —"],...cats.map(c=>[c.id,c.name])],pre.cat||(d?(cats.find(c=>c.name===(d.direction==="in"?"Оплата долга клиентом":d.kind==="supplier"?"Закупка товара":d.kind==="loan"?"Возврат займа":""))||{}).id:"")||""))
         +App.fld("foCp",k==="in"?"От кого":"Кому",App.inp("foCp",d?d.counterparty:pre.plan?pre.plan.counterparty||"":pre.cp||"","text",k==="in"?"Клиент, банк, владелец…":"Арендодатель, поставщик…")):""}
+      ${k!=="transfer"?App.fld("foPoint","Точка",App.sel("foPoint",[["","Общий (делится между точками)"],...S.points.filter(p=>p.active!==false).map(p=>[p.id,p.name])],pre.point||(def.kind==="drawer"?def.pointId:"")||"")):""}
+      ${k==="out"?`<div class="fld" id="foChW" hidden><label for="foCh">Рекламный канал</label>${App.sel("foCh",[["","—"],...App.SOURCES.map(s=>[s,s])],"")}</div>`:""}
       ${App.fld("foNote","Комментарий",App.inp("foNote","","text","Необязательно"),"full")}
     </div>
     <p class="muted" id="foHint">${hintFor(def,k)}</p>
     <div class="acts"><button class="btn pri" data-act="finOpSave">${k==="in"?"Записать приход":k==="out"?"Записать расход":"Перевести"}</button></div>`);
   App.ui.finOpCtx={kind:k,debtId:d?d.id:null,planId:pre.plan?pre.plan.id:null,payee:pre.payee||null};
-  const a=$("#foAcc");if(a)a.addEventListener("change",()=>{$("#foHint").textContent=hintFor(acc(a.value),k)});
+  const a=$("#foAcc");if(a)a.addEventListener("change",()=>{$("#foHint").textContent=hintFor(acc(a.value),k);const x=acc(a.value),fp=$("#foPoint");if(fp&&x.kind==="drawer")fp.value=x.pointId});
+  const fc=$("#foCat"),chw=$("#foChW"),tg=()=>{if(chw)chw.hidden=!(fc&&/реклам/i.test((cat(fc.value)||{}).name||""))};if(fc)fc.addEventListener("change",tg);tg();
 };
 const hintFor=(a,k)=>a&&a.kind==="drawer"?(S.shifts.some(s=>s.pointId===a.pointId&&s.status==="open")?(k==="in"?"Наличные попадут в кассу точки — будут видны в X-отчёте смены.":"Наличные будут изъяты из кассы точки — будут видны в X-отчёте смены."):"Смена на этой точке закрыта: чтобы двигать наличные в кассе, откройте смену."):"";
 ACT.finOpSave=(_,btn)=>run(btn,async()=>{
   const c=App.ui.finOpCtx||{},V=App.val;const amt=num(V("foAmt"));if(!(amt>0))throw new Error("Укажите сумму");
   const p={kind:c.kind,account_id:V("foAcc"),amount:amt,op_date:V("foDate")||today(),note:V("foNote")||null,debt_id:c.debtId,plan_id:c.planId};
-  if(c.kind==="transfer")p.to_account_id=V("foTo");else{p.category_id=V("foCat")||null;p.counterparty=V("foCp")||null}
-  if(c.payee&&c.kind==="out"){p.payee_staff=c.payee;await App.api.rpc("fin_op_create_payee",{p},["fin_ops","debts","fin_plans","cash_ops"])}
-  else await App.api.rpc("fin_op_create",{p},["fin_ops","debts","fin_plans","cash_ops"]);
+  if(c.kind==="transfer")p.to_account_id=V("foTo");else{p.category_id=V("foCat")||null;p.counterparty=V("foCp")||null;p.point_id=V("foPoint")||null;p.channel=V("foCh")||null}
+  if(c.payee&&c.kind==="out")p.payee_staff=c.payee;
+  await App.api.rpc("fin_op_create_payee",{p},["fin_ops","debts","fin_plans","cash_ops"]);
   await App.reload(RELOAD);App.closeModal();App.render();App.toast(c.kind==="in"?"Приход записан":c.kind==="out"?"Расход записан":"Перевод выполнен");
 });
 ACT.finOpOpen=id=>{
@@ -172,9 +176,12 @@ ACT.finOpOpen=id=>{
       ${d?`<div><span>Долг</span><b><a href="#" data-act="debtOpen" data-id="${d.id}">${esc(d.num)} · ${esc(d.counterparty)}</a></b></div>`:""}
       ${pl?`<div><span>Регулярный платёж</span><b>${esc(pl.name)}</b></div>`:""}
       ${o.note?`<div><span>Комментарий</span><b>${esc(o.note)}</b></div>`:""}
+      ${o.kind!=="transfer"?`<div><span>Точка</span><b>${o.pointId?esc((App.byId("points",o.pointId)||{}).name||"—"):"общий расход"}</b></div>`:""}
+      ${o.channel?`<div><span>Рекламный канал</span><b>${esc(o.channel)}</b></div>`:""}${o.payee?`<div><span>Сотрудник</span><b>${esc(App.nameOf(o.payee))}</b></div>`:""}
       <div><span>Кто записал</span><b>${esc(App.nameOf(o.by))} · ${App.dtt(o.createdAt)}</b></div>
       ${o.cashOpIds.length?`<div><span>Касса точки</span><b>движение наличных в смене</b></div>`:""}
     </div>
+    ${live(o)&&App.finOpTagForm?App.finOpTagForm(o):""}
     ${live(o)?`<div class="acts"><button class="btn" data-act="printFinOp" data-id="${o.id}">Печать ордера</button><button class="btn danger" data-act="finOpCancel" data-id="${o.id}">Отменить операцию</button></div>
       <p class="muted">Отмена вернёт деньги на счёт${o.debtId?" и снова откроет долг":""}. Наличные в кассе вернутся, только пока смена открыта.</p>`:""}`);
 };
@@ -281,7 +288,7 @@ ACT.planDel=(id,btn)=>{if(!App.confirm2(btn,"Удалить платёж? Ещё
 
 /* --- прибыль и движение денег --- */
 function report(){
-  const u=App.ui,[from,to]=App.periodRange(u.repFinPeriod),p=App.finPnl(from,to),cost=App.can("cost");
+  const u=App.ui,[from,to]=App.periodRange(u.repFinPeriod),pt=u.repFinPoint||"",p=App.finPnl(from,to,pt||null),cost=App.can("cost");
   const inP=o=>{const t=new Date(o.date+"T12:00");return t>=from&&t<to},inPa=x=>{const t=new Date(x.at);return t>=from&&t<to};
   const cash=S.cashops.filter(inPa),sumM=(f)=>cash.filter(f).reduce((s,c)=>s+num(c.amount),0);
   const salesCash=sumM(c=>["sale","refund","repair","prepay"].includes(c.type)&&c.method==="cash"),salesNon=sumM(c=>["sale","refund","repair","prepay"].includes(c.type)&&NONCASH.includes(c.method));
@@ -289,7 +296,8 @@ function report(){
   const grp=k=>{const m={};ops.filter(o=>o.kind===k).forEach(o=>{const n=(cat(o.catId)||{}).name||"Без статьи";m[n]=(m[n]||0)+o.amount});return Object.entries(m).sort((a,b)=>b[1]-a[1])};
   const fin=grp("in"),fout=grp("out"),finS=fin.reduce((s,x)=>s+x[1],0),foutS=fout.reduce((s,x)=>s+x[1],0);
   const line=(l,v,cls="")=>`<div class="pl ${cls}"><span>${l}</span><b>${money(v)}</b></div>`;
-  return `<div class="cfilt fin2">${App.sel("repFinPeriod",App.PERIODS,u.repFinPeriod,'data-filter-sel="repFinPeriod" aria-label="Период"')}<span></span></div>
+  return `<div class="cfilt fin2">${App.sel("repFinPeriod",App.PERIODS,u.repFinPeriod,'data-filter-sel="repFinPeriod" aria-label="Период"')}${S.points.length>1?App.sel("repFinPoint",[["","Вся сеть"],...S.points.filter(x=>x.active!==false).map(x=>[x.id,x.name])],pt,'data-filter-sel="repFinPoint" aria-label="Точка"'):"<span></span>"}</div>
+    ${pt?`<p class="muted">Точка: продажи и ремонт этой точки, её расходы, зарплата её сотрудников и ${Math.round(p.share*100)}% общих расходов. Движение денег ниже — по всей сети.</p>`:""}
     <div class="fgrid">
       <section class="card"><div class="card-h"><h2>Прибыль</h2></div>
         ${line("Выручка (продажи − возвраты + ремонт)",p.rev)}
@@ -308,12 +316,12 @@ function report(){
         ${fout.map(([n,v])=>line(n,-v,"sub")).join("")||`<div class="pl sub"><span>Выплат не было</span><b>0 ₽</b></div>`}
         ${line("Всего выплачено",-foutS,"tot")}
         ${line("Итого за период",salesCash+salesNon+finS-foutS,"tot big "+(salesCash+salesNon+finS-foutS<0?"neg":""))}</section>
-    </div>`;
+    </div>${pt?"":App.finPointsTable?App.finPointsTable(from,to):""}`;
 }
 
 /* --- счета и статьи --- */
 function setup(){
-  return `<div class="fgrid">
+  return (App.finConfigCard?App.finConfigCard():"")+`<div class="fgrid">
     <section class="card"><div class="card-h"><h2>Счета</h2><button class="btn sm" data-act="accForm">+ Счёт</button></div>
       <div class="flist">${accs(true).map(a=>`<button class="frow ${a.active?"":"off"}" data-act="accForm" data-id="${a.id}"><span class="fic ${a.kind}">${icon(a.kind)}</span>
         <span class="cnm"><b>${esc(a.name)}</b><small>${KIND[a.kind]}${a.noncash?" · сюда безнал с касс":""}${a.kind!=="drawer"&&a.opening?" · начальный остаток "+money(a.opening):""}${a.active?"":" · скрыт"}</small></span><span class="csum">${money(App.finBalance(a))}</span></button>`).join("")}</div>
