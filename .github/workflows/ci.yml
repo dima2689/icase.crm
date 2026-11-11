@@ -18,7 +18,7 @@ jobs:
       - name: JavaScript (синтаксис)
         run: for f in js/*.js sw.js; do node --check "$f"; done
       - name: Shell-скрипты (shellcheck)
-        run: shellcheck -S warning -x deploy/*.sh deploy/icase-release db/tests/compare.sh tests/smoke.sh
+        run: shellcheck -S warning -x deploy/*.sh deploy/icase-release db/tests/compare.sh tests/smoke.sh tests/ci-run.sh
       - uses: denoland/setup-deno@v2
         with: { deno-version: v2.x }
       - name: Edge-функции (типы и тесты без сети)
@@ -44,30 +44,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Supabase + схема iCase с нуля (deploy.sh --ci)
-        run: ICASE_VERSION=ci-${GITHUB_SHA::7} deploy/deploy.sh --ci
+        run: ICASE_VERSION=ci-${GITHUB_SHA::7} tests/ci-run.sh deploy deploy/deploy.sh --ci
       - name: Схема совпадает с рабочей базой
-        run: db/tests/compare.sh
+        run: tests/ci-run.sh compare db/tests/compare.sh
       - name: Владелец и сквозные проверки
+        shell: bash
         run: |
-          deploy/create-owner.sh "$OWNER_EMAIL" "Владелец CI" --ci
-          API=http://localhost:8000 ANON=$(grep -m1 '^ANON_KEY=' "$SB_DIR/.env" | cut -d= -f2-) EMAIL=$OWNER_EMAIL PASS=$OWNER_PASSWORD tests/smoke.sh
+          set -o pipefail
+          tests/ci-run.sh owner deploy/create-owner.sh "$OWNER_EMAIL" "Владелец CI" --ci
+          API=http://localhost:8000 ANON=$(grep -m1 '^ANON_KEY=' "$SB_DIR/.env" | cut -d= -f2-) EMAIL=$OWNER_EMAIL PASS=$OWNER_PASSWORD tests/ci-run.sh smoke tests/smoke.sh
       - name: Бэкап → полный сброс → восстановление
         run: |
           before=$(docker exec supabase-db psql -U postgres -qAt -c "select md5(string_agg(name||decrypted_secret,',' order by name)) from vault.decrypted_secrets")
-          deploy/backup.sh --local --tag ci
+          tests/ci-run.sh backup deploy/backup.sh --local --tag ci
           f=$(ls -t "$BACKUP_DIR"/*.tar.gpg | head -1); ls -la "$f"
-          deploy/restore.sh "$f" --fresh --yes
+          tests/ci-run.sh restore deploy/restore.sh "$f" --fresh --yes
           after=$(docker exec supabase-db psql -U postgres -qAt -c "select md5(string_agg(name||decrypted_secret,',' order by name)) from vault.decrypted_secrets")
           [ "$before" = "$after" ] && echo "секреты Vault восстановлены" || { echo "секреты Vault не совпали: $before / $after"; exit 1; }
       - name: После восстановления — схема и вход
         run: |
-          db/tests/compare.sh
-          deploy/healthcheck.sh --ci
-          API=http://localhost:8000 ANON=$(grep -m1 '^ANON_KEY=' "$SB_DIR/.env" | cut -d= -f2-) EMAIL=$OWNER_EMAIL PASS=$OWNER_PASSWORD tests/smoke.sh
+          tests/ci-run.sh compare2 db/tests/compare.sh
+          tests/ci-run.sh health deploy/healthcheck.sh --ci
+          API=http://localhost:8000 ANON=$(grep -m1 '^ANON_KEY=' "$SB_DIR/.env" | cut -d= -f2-) EMAIL=$OWNER_EMAIL PASS=$OWNER_PASSWORD tests/ci-run.sh smoke2 tests/smoke.sh
       - name: Повторная выкладка поверх (идемпотентность)
-        run: ICASE_VERSION=ci2 deploy/deploy.sh --ci && db/tests/compare.sh
+        run: ICASE_VERSION=ci2 tests/ci-run.sh redeploy deploy/deploy.sh --ci && tests/ci-run.sh compare3 db/tests/compare.sh
       - name: Логи при ошибке
         if: failure()
         run: |
           docker ps -a --format '{{.Names}}\t{{.Status}}'
-          cd "$SB_DIR" && docker compose logs --tail 80 db auth rest storage functions api-gw 2>&1 | tail -400
+          cd "$SB_DIR" && "$GITHUB_WORKSPACE/tests/ci-run.sh" logs sh -c 'docker compose logs --tail 30 db auth rest storage functions 2>&1 | tail -110; exit 1' || true
