@@ -140,7 +140,7 @@ const ICON=v=>{if(v==="__scan")return '<path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 1
 function drawTabs(){let bar=document.getElementById("tabbar");const app=document.querySelector(".app");if(!app||app.hidden||!App.me.role){if(bar)bar.hidden=true;return}
   if(!bar){bar=document.createElement("nav");bar.id="tabbar";bar.className="tabbar";bar.setAttribute("aria-label","Быстрые разделы");app.appendChild(bar)}
   bar.hidden=false;const v=App.ui.view;
-  const items=TABS.filter(([k])=>k.startsWith("__")||App.navAllowed(k));
+  const items=(App.wsTabs?App.wsTabs():TABS).filter(([k])=>k.startsWith("__")||App.navAllowed(k));
   const due=App.tasksDue?App.tasksDue():0,reps=S.repairs.filter(r=>App.ACTIVE&&App.ACTIVE.includes(r.status)).length;
   const html=items.map(([k,l])=>{const badge=k==="tasks"&&due?`<em>${due}</em>`:k==="repairs"&&reps?`<em>${reps}</em>`:"";
     if(k==="__scan")return `<button type="button" class="tb scan" data-act="camScan"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON(k)}</svg></span>${l}</button>`;

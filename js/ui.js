@@ -24,13 +24,13 @@ App.NAV = [
   ["print","Печать",'<path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M6 14h12v7H6z"/><path d="M17 12h.01"/>',null],
   ["settings","Настройки",'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',"settings"]
 ];
-App.navAllowed = v=>{const n=App.NAV.find(x=>x[0]===v);return n&&App.VIEWS[v]&&(!n[3]||App.can(n[3]))};
+App.navAllowed = v=>{const n=App.NAV.find(x=>x[0]===v);return n&&App.VIEWS[v]&&(!n[3]||App.can(n[3]))&&(!App.wsHas||App.wsHas(v))};
 function drawNav(){
   const counts={tasks:App.tasksDue?App.tasksDue():0,orders:S.siteorders.filter(o=>o.status==="new").length,repairs:S.repairs.filter(r=>App.ACTIVE.includes(r.status)).length,stock:S.products.filter(App.isLow).length+(App.apprCount?App.apprCount():0)};
-  const items=App.NAV.filter(n=>App.VIEWS[n[0]]&&(!n[3]||App.can(n[3])));
+  const items=App.NAV.filter(n=>App.navAllowed(n[0]));
   $("#navlist").innerHTML=items.map(([v,l,ic])=>`<a class="nav ${App.ui.view===v?"on":""}" href="#${v}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">${ic}</svg><span>${l}</span>${counts[v]?`<span class="cnt">${counts[v]}</span>`:""}</a>`).join("");
   const sh=App.openShift(),pts=App.myPoints(),cur=App.point();
-  $("#who").innerHTML=`<button type="button" class="whobtn" data-act="profile" title="Мой профиль"><b>${esc(App.me.name)}</b><span>${esc(App.ROLES[App.me.role]||"")} · профиль</span></button>
+  $("#who").innerHTML=(App.wsSwitch?App.wsSwitch():"")+`<button type="button" class="whobtn" data-act="profile" title="Мой профиль"><b>${esc(App.me.name)}</b><span>${esc(App.ROLES[App.me.role]||"")} · профиль</span></button>
     ${pts.length>1?`<select id="pointSel" aria-label="Точка">${pts.map(p=>`<option value="${esc(p.id)}"${cur&&cur.id===p.id?" selected":""}>${esc(p.name)}</option>`).join("")}</select>`:`<span>${esc(cur?cur.name:"Точка не выбрана")}</span>`}
     <span class="pill ${sh?"ok":"mute"}">${sh?"Смена "+esc(sh.num)+" открыта":"Смена закрыта"}</span>
     <button class="btn sm ghost" data-act="logout">Выйти</button>`;
@@ -41,7 +41,7 @@ function drawNav(){
 let rq=0,lastView=null;
 App.schedule = ()=>{if(rq)return;rq=requestAnimationFrame(()=>{rq=0;App.render();if(App.modalRefresh&&!$("#scrim").hidden)App.modalRefresh()})};
 App.render = function(){
-  if(!App.navAllowed(App.ui.view)){App.ui.view="dashboard"}
+  if(!App.navAllowed(App.ui.view)){App.ui.view=App.wsHome?App.wsHome():"dashboard"}
   drawNav();
   const V=App.VIEWS[App.ui.view];
   $("#title").textContent=App.TITLES[App.ui.view]||"";
@@ -58,7 +58,7 @@ App.render = function(){
   if(fid){const n=document.getElementById(fid);if(n){n.focus();try{if(pos!=null)n.setSelectionRange(pos,pos)}catch(e){}}}
   if(V&&V.after)V.after();
 };
-App.route = function(){const h=location.hash.slice(1);App.ui.view=App.VIEWS[h]?h:"dashboard";App.render();$("#main").scrollTop=0;App.menuSet(false)};
+App.route = function(){const h=location.hash.slice(1);App.ui.view=App.VIEWS[h]&&App.navAllowed(h)?h:(App.wsHome?App.wsHome():"dashboard");App.render();$("#main").scrollTop=0;App.menuSet(false)};
 
 /* ---------- модальные окна ---------- */
 App.modalRefresh=null;

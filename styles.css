@@ -759,3 +759,13 @@ ol.steps{padding-left:20px;line-height:1.6}ol.steps li{margin-bottom:6px}
 .apprbox .acts{margin:0}
 .apprbar{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--warn-soft);border-radius:12px;padding:8px 14px;margin-bottom:12px}
 .linkbtn{background:none;border:0;padding:0;font:inherit;color:inherit;text-decoration:underline;cursor:pointer;text-align:left}
+
+/* ---------- рабочие места ---------- */
+.wsswitch{display:flex;gap:2px;padding:3px;border-radius:12px;background:var(--bg);border:1px solid var(--line);margin-bottom:10px}
+.wsswitch button{flex:1;border:0;background:none;padding:7px 4px;border-radius:9px;font:600 13px var(--f-body);color:var(--muted);cursor:pointer}
+.wsswitch button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(22,23,15,.12)}
+.posrep{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:8px 12px;margin-bottom:12px}
+.posrep>b{margin-right:4px}
+html[data-ws="pos"] .rail .brand b,html[data-ws="pos"] .login .brand b{color:var(--ink)}
+html[data-ws="service"] .rail{background:linear-gradient(var(--sage-soft),var(--surface) 160px)}
+html[data-ws="pos"] .rail{background:linear-gradient(#E9E6DA,var(--surface) 160px)}

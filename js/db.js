@@ -162,7 +162,7 @@ const T={settings:["settings"],points:["points"],warehouses:["warehouses"],categ
   unit_costs:["unitcosts"],waitlist:["waitlist"],lost_demand:["lostdemand"],tasks:["tasks"],bonus_ops:["bonusops"],buy_deals:["deals"],evotor_receipts:["evotor"]};
 
 App.reload = async function(cols){
-  cols=[...new Set(cols)].filter(c=>L[c]);
+  cols=[...new Set(cols)].filter(c=>L[c]&&!(App.wsSkip&&App.wsSkip(c)));
   await loadCols();
   const res=await Promise.allSettled(cols.map(c=>L[c]()));
   res.forEach((r,i)=>{if(r.status==="fulfilled")S[cols[i]]=r.value;else console.warn(cols[i],r.reason)});
@@ -213,6 +213,7 @@ App.enter = async function(user){
   if(st.must_change_password){App.showLogin("newpass",{forced:true});return}
   sb.rpc("staff_touch").then(()=>{},()=>{});
   try{const saved=localStorage.getItem("icase_point");if(saved)App.ui.pointId=saved}catch(e){}
+  if(App.pickWs)App.pickWs();
   await App.reload(Object.keys(L));
   App.banner("");subscribe();App.route();
 };
