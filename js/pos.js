@@ -322,7 +322,7 @@ function shiftReport(sh,title){
     `Наличные на начало: ${money(sh.openCash)}`,`Внесения: ${money(t.cashin)}`,`Изъятия: −${money(t.cashout)}`,`Должно быть наличных: ${money(t.expectedCash)}`,
     sh.status==="closed"?`Пересчитано: ${money(sh.countedCash)} · расхождение: ${money(sh.diff)}`:""].filter(x=>x!=="" ).join("\n");
 }
-ACT.xReport=()=>{const sh=App.openShift();if(sh)App.textModal("X-отчёт",shiftReport(sh,"X-отчёт"))};
+ACT.xReport=()=>{const sh=App.openShift();if(sh)App.textModal("X-отчёт",shiftReport(sh,"X-отчёт"),"",["printShift",sh.id])};
 ACT.closeShift=()=>{
   const sh=App.openShift();if(!sh)return;
   const t=App.shiftTotals(sh);
@@ -343,7 +343,7 @@ ACT.closeShiftOk=async(_,btn)=>{
     App.closeModal();App.toast("Смена "+sh.num+" закрыта");App.reload(["shifts"]);
   }catch(e){btn.disabled=false;App.toast(e.message)}
 };
-ACT.openShift=id=>{const sh=App.byId("shifts",id);if(sh)App.textModal("Смена "+sh.num,shiftReport(sh,sh.status==="open"?"X-отчёт":"Z-отчёт")+(sh.closeNote?"\nКомментарий: "+sh.closeNote:""))};
+ACT.openShift=id=>{const sh=App.byId("shifts",id);if(sh)App.textModal("Смена "+sh.num,shiftReport(sh,sh.status==="open"?"X-отчёт":"Z-отчёт")+(sh.closeNote?"\nКомментарий: "+sh.closeNote:""),"",["printShift",sh.id])};
 
 /* ======================= ПРОДАЖИ ======================= */
 TITLES.sales="Продажи";
@@ -357,7 +357,7 @@ App.periodRange=function(p,from,to){
 App.PERIODS=[["today","Сегодня"],["yesterday","Вчера"],["7d","7 дней"],["month","Этот месяц"],["prev","Прошлый месяц"],["all","Всё время"]];
 VIEWS.sales={
   ownSearch:true,
-  actions:()=>(App.can("sale")?'<a class="btn pri" href="#pos">+ Новая продажа</a>':""),
+  actions:()=>'<button class="btn" data-act="printView">Печать</button>'+(App.can("sale")?'<a class="btn pri" href="#pos">+ Новая продажа</a>':""),
   render(){
     const u=App.ui,[from,to]=App.periodRange(u.salesPeriod);
     const q=u.salesQ.toLowerCase();
@@ -408,8 +408,8 @@ ACT.openSale=id=>{
     ${(s.items||[]).map(i=>`<tr><td>${esc(i.name)}${i.serial?'<span class="sub">'+App.codeLbl(i.productId)+" "+esc(i.serial)+"</span>":""}</td><td class="n">${i.qty}</td><td class="n">${money(i.price)}</td><td class="n">${num(i.disc)?money(i.disc):"—"}</td><td class="n">${money(i.qty*i.price-num(i.disc))}</td><td class="n">${App.returnedQty(id,i.productId,i.line)||"—"}</td></tr>`).join("")}
     </tbody></table></div>
     <div class="sumlines"><span>Скидка на чек</span><span>${money(s.discount)}</span><span><b>Итого</b></span><span><b>${money(s.total)}</b></span>${App.can("cost")?`<span>Прибыль</span><span>${money(App.saleProfit(s))}</span>`:""}</div>
-    ${rets.length?`<h3 class="sub-h">Возвраты</h3><div class="hist">${rets.map(r=>`<span>${esc(r.num)} · ${App.dtt(r.createdAt)} · ${esc((r.items||[]).map(i=>i.name+" ×"+i.qty).join(", "))} · ${money(r.amount)} · ${esc(r.reason)}</span>`).join("")}</div>`:""}
-    <div class="acts"><button class="btn pri" data-act="printReceipt" data-id="${esc(id)}|a4">Товарный чек A4</button><button class="btn" data-act="printReceipt" data-id="${esc(id)}|80">Чек 80 мм</button><button class="btn" data-act="saleReceipt" data-id="${esc(id)}">Текст</button>${canRet?`<button class="btn danger" data-act="returnDlg" data-id="${esc(id)}">Возврат</button>`:""}</div>`);
+    ${rets.length?`<h3 class="sub-h">Возвраты</h3><div class="hist">${rets.map(r=>`<span>${esc(r.num)} · ${App.dtt(r.createdAt)} · ${esc((r.items||[]).map(i=>i.name+" ×"+i.qty).join(", "))} · ${money(r.amount)} · ${esc(r.reason)} <button class="btn sm ghost" data-act="printReturn" data-id="${esc(r.id)}">Печать акта</button></span>`).join("")}</div>`:""}
+    <div class="acts"><button class="btn pri" data-act="printReceipt" data-id="${esc(id)}|a4">Товарный чек A4</button><button class="btn" data-act="printReceipt" data-id="${esc(id)}|80">Чек 80 мм</button><button class="btn" data-act="saleReceipt" data-id="${esc(id)}">Текст</button>${(s.items||[]).some(i=>num(i.warranty)>0||i.serial)?`<button class="btn" data-act="printWarranty" data-id="${esc(id)}">Гарантийный талон</button>`:""}${canRet?`<button class="btn danger" data-act="returnDlg" data-id="${esc(id)}">Возврат</button>`:""}</div>`);
   };
   App.openModal("",{wide:true,refresh:draw});draw();
 };

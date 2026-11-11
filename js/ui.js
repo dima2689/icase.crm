@@ -90,8 +90,8 @@ App.payLabel = m=>App.PAYALL[m]||m||"—";
 App.paysText = pays=>(pays||[]).filter(p=>num(p.amount)).map(p=>App.payLabel(p.method)+" "+money(p.amount)).join(" + ");
 App.confirm2 = function(el,text){if(el.dataset.sure)return true;el.dataset.sure="1";const o=el.textContent;el.textContent=text||"Нажмите ещё раз для подтверждения";setTimeout(()=>{if(document.body.contains(el)){delete el.dataset.sure;el.textContent=o}},4000);return false};
 
-App.textModal = function(title,text,hint){
-  App.openModal(App.head(esc(title))+(hint?`<p class="muted">${esc(hint)}</p>`:"")+`<pre class="receipt" id="copytext">${esc(text)}</pre><div class="acts"><button class="btn pri" data-act="copy">Скопировать</button></div>`);
+App.textModal = function(title,text,hint,pr){
+  App.openModal(App.head(esc(title))+(hint?`<p class="muted">${esc(hint)}</p>`:"")+`<pre class="receipt" id="copytext">${esc(text)}</pre><div class="acts">${pr?`<button class="btn" data-act="${esc(pr[0])}" data-id="${esc(pr[1])}">Печать A4</button>`:""}<button class="btn pri" data-act="copy">Скопировать</button></div>`);
 };
 App.ACT.copy = async ()=>{const t=$("#copytext").textContent;try{await navigator.clipboard.writeText(t);App.toast("Скопировано")}catch(e){const r=document.createRange();r.selectNodeContents($("#copytext"));const s=getSelection();s.removeAllRanges();s.addRange(r);App.toast("Текст выделен: нажмите Ctrl+C")}};
 App.ACT.close = App.closeModal;

@@ -148,7 +148,7 @@ ACT.supSave=(id,btn)=>run(btn,async()=>{if(!App.val("uName"))return App.toast("�
 
 /* ---------- прайс работ ---------- */
 function services(){
-  return `<section class="card"><div class="card-h"><h2>Прайс работ сервиса</h2>${App.can("settings")?'<button class="btn pri sm" data-act="svcForm">+ Работа</button>':""}</div>
+  return `<section class="card"><div class="card-h"><h2>Прайс работ сервиса</h2><button class="btn sm" data-act="printServices">Печать</button>${App.can("settings")?'<button class="btn pri sm" data-act="svcForm">+ Работа</button>':""}</div>
   <div class="tbl-wrap"><table><thead><tr><th>Работа</th><th>Группа</th><th class="n">Цена</th></tr></thead><tbody>
   ${S.services.slice().sort((a,b)=>String(a.group||"").localeCompare(b.group||"")||String(a.name).localeCompare(b.name)).map(s=>`<tr class="rowlink" data-act="svcForm" data-id="${esc(s.id)}"><td>${esc(s.name)}</td><td>${esc(s.group||"")}</td><td class="n"><b>${money(s.price)}</b></td></tr>`).join("")||'<tr><td colspan="3" class="empty">Прайс пуст</td></tr>'}
   </tbody></table></div></section>`;

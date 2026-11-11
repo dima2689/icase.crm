@@ -53,7 +53,7 @@ App.finPnl=function(from,to){
 const TABS=[["sum","Сводка"],["ops","Операции"],["debts","Долги"],["plans","Платежи"],["report","Прибыль"],["pay","Зарплата"],["setup","Счета и статьи"]];
 VIEWS.finance={
   ownSearch:true,
-  actions:()=>`<button class="btn" data-act="finOp" data-id="in">+ Приход</button><button class="btn" data-act="finOp" data-id="out">− Расход</button><button class="btn pri" data-act="finOp" data-id="transfer">⇄ Перевод</button>`,
+  actions:()=>`<button class="btn" data-act="printView">Печать</button><button class="btn" data-act="finOp" data-id="in">+ Приход</button><button class="btn" data-act="finOp" data-id="out">− Расход</button><button class="btn pri" data-act="finOp" data-id="transfer">⇄ Перевод</button>`,
   render(){
     if(!S.finaccounts.length)return `<section class="card"><div class="empty"><p>Раздел ещё не настроен.</p><button class="btn pri" data-act="finSetup">Создать счета и статьи</button>
       <p class="muted">Появятся касса для каждой точки, расчётный счёт (сюда идёт безнал с касс), сейф и обычные статьи расходов. Всё можно поменять.</p></div></section>`;
@@ -175,7 +175,7 @@ ACT.finOpOpen=id=>{
       <div><span>Кто записал</span><b>${esc(App.nameOf(o.by))} · ${App.dtt(o.createdAt)}</b></div>
       ${o.cashOpIds.length?`<div><span>Касса точки</span><b>движение наличных в смене</b></div>`:""}
     </div>
-    ${live(o)?`<div class="acts"><button class="btn danger" data-act="finOpCancel" data-id="${o.id}">Отменить операцию</button></div>
+    ${live(o)?`<div class="acts"><button class="btn" data-act="printFinOp" data-id="${o.id}">Печать ордера</button><button class="btn danger" data-act="finOpCancel" data-id="${o.id}">Отменить операцию</button></div>
       <p class="muted">Отмена вернёт деньги на счёт${o.debtId?" и снова откроет долг":""}. Наличные в кассе вернутся, только пока смена открыта.</p>`:""}`);
 };
 ACT.finOpCancel=(id,btn)=>{if(!App.confirm2(btn,"Точно отменить? Нажмите ещё раз"))return;run(btn,async()=>{await App.api.rpc("fin_op_cancel",{p_id:id});await App.reload(RELOAD);App.closeModal();App.render();App.toast("Операция отменена")})};
@@ -219,7 +219,7 @@ ACT.debtOpen=id=>{
       ${d.status!=="cancelled"?`<div class="form">${App.fld("dDue","Вернуть до",App.inp("dDue",d.dueDate||"","date"))}${App.fld("dAmt","Сумма долга, ₽",App.inp("dAmt",d.amount,"number"))}${App.fld("dNote","Комментарий",App.inp("dNote",d.note||""),"full")}</div>`:""}
       <h3 class="sub-h">Оплаты</h3>
       ${pays.length?opsList(pays):`<div class="empty">Оплат ещё не было</div>`}
-      <div class="acts">${d.status!=="cancelled"&&d.amount-left===0?`<button class="btn danger" data-act="debtCancel" data-id="${d.id}">Отменить долг</button>`:""}
+      <div class="acts"><button class="btn" data-act="printDebt" data-id="${d.id}">Акт сверки</button>${d.status!=="cancelled"&&d.amount-left===0?`<button class="btn danger" data-act="debtCancel" data-id="${d.id}">Отменить долг</button>`:""}
         ${d.status!=="cancelled"?`<button class="btn" data-act="debtSave" data-id="${d.id}">Сохранить</button>`:""}
         ${d.status==="open"?`<button class="btn pri" data-act="debtPay" data-id="${d.id}">${d.direction==="in"?"Получить оплату":"Оплатить"}</button>`:""}</div>`)};
   App.openModal("",{wide:true,refresh:draw});draw();

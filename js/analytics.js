@@ -152,7 +152,7 @@ function forecast(pt){
 const TABS=[["over","Обзор"],["fc","Прогноз"],["prod","Товары"],["cat","Категории"],["cust","Клиенты"],["time","Время"],["team","Сотрудники и точки"],["stock","Склад"]];
 VIEWS.analytics={
   ownSearch:true,
-  actions:()=>`<button class="btn" data-act="anExport">Скачать таблицу товаров</button>`,
+  actions:()=>`<button class="btn" data-act="printView">Печать</button><button class="btn" data-act="anExport">Скачать таблицу товаров</button>`,
   render(){
     const u=App.ui,t=u.anTab,pts=App.points(true);
     const per=t==="fc"||t==="stock"?"":App.sel("anPer",PERS,u.anPer,'data-filter-sel="anPer" aria-label="Период"');

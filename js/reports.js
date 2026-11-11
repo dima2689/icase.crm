@@ -7,7 +7,7 @@ Object.assign(App.ui,{repPeriod:"month",repFrom:"",repTo:"",repPoint:""});
 function bars(rows,fmt=money){const max=Math.max(1,...rows.map(r=>Math.abs(r[1])));
   return `<div class="hbars">${rows.map(([l,v,sub])=>`<div class="hb"><span class="hb-l">${esc(l)}${sub?`<small>${esc(sub)}</small>`:""}</span><span class="hb-t"><i style="width:${Math.max(1,Math.abs(v)/max*100)}%"></i></span><b>${fmt(v)}</b></div>`).join("")||'<div class="empty sm">Нет данных</div>'}</div>`}
 VIEWS.reports={
-  actions:()=>App.can("io")?'<button class="btn" data-act="exportDlg">Экспорт данных</button>':"",
+  actions:()=>'<button class="btn" data-act="printView">Печать</button>'+(App.can("io")?'<button class="btn" data-act="exportDlg">Экспорт данных</button>':""),
   render(){
     const u=App.ui,[from,to]=App.periodRange(u.repPeriod,u.repFrom,u.repTo),st=App.periodStats(from,to,u.repPoint||null),cost=App.can("cost");
     const byPoint=App.points(true).map(p=>[p.name,App.periodStats(from,to,p.id).rev]);

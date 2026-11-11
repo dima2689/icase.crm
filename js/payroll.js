@@ -55,7 +55,7 @@ ACT.payOpen=id=>{const s=App.byId("staff",id),m=App.ui.payM,c=App.payCalc(s,m),r
       ${App.fld("prBase","Оклад в месяц, ₽",App.inp("prBase",r.base||"","number","0"))}${App.fld("prShift","За каждую смену, ₽",App.inp("prShift",r.perShift||"","number","0"))}
       ${App.fld("prSales","% от выручки своих продаж",App.inp("prSales",r.pctSales||"","number","0"))}${App.fld("prProfit","% от прибыли своих продаж",App.inp("prProfit",r.pctProfit||"","number","0"))}
       ${App.fld("prWorks","% от работ в ремонтах (мастер)",App.inp("prWorks",r.pctWorks||"","number","0"))}${App.fld("prNote","Заметка",App.inp("prNote",r.note||"","text","Премия за план, штрафы…"))}</div>`:""}
-    <div class="acts">${owner?`<button class="btn" data-act="payRuleSave" data-id="${esc(id)}">Сохранить правила</button>`:""}${App.can("finance")?`<button class="btn pri" data-act="payOut" data-id="${esc(id)}">Выплатить</button>`:""}</div>`,{wide:true})};
+    <div class="acts"><button class="btn" data-act="printPayslip" data-id="${esc(id)}">Расчётный лист</button>${owner?`<button class="btn" data-act="payRuleSave" data-id="${esc(id)}">Сохранить правила</button>`:""}${App.can("finance")?`<button class="btn pri" data-act="payOut" data-id="${esc(id)}">Выплатить</button>`:""}</div>`,{wide:true})};
 ACT.payRuleSave=(id,btn)=>run(btn,async()=>{const V=App.val,row={staff_id:id,base_month:num(V("prBase")),per_shift:num(V("prShift")),pct_sales:num(V("prSales")),pct_profit:num(V("prProfit")),pct_works:num(V("prWorks")),note:V("prNote")||null};
   if([row.pct_sales,row.pct_profit,row.pct_works].some(x=>x<0||x>100))throw new Error("Процент — от 0 до 100");
   await App.api.upsertRule(row);await App.reload(["payrules"]);App.toast("Правила сохранены");ACT.payOpen(id)});

@@ -164,7 +164,7 @@ function whBody(id,{noActs=false}={}){
   const qn=ps.reduce((a,p)=>a+Math.max(0,App.qtyIn(p,id)),0);
   const sumC=ps.reduce((a,p)=>a+Math.max(0,App.qtyIn(p,id))*num(p.cost),0),sumP=ps.reduce((a,p)=>a+Math.max(0,App.qtyIn(p,id))*num(p.price),0);
   return `<div class="tiles"><div class="tile"><span>Штук</span><b>${qn}</b><small>${ps.length} поз.</small></div>${cost?`<div class="tile"><span>В закупке</span><b>${money(sumC)}</b></div>`:""}<div class="tile"><span>В рознице</span><b>${money(sumP)}</b></div></div>
-    ${st&&!noActs?`<div class="row-f whacts"><button class="btn pri sm" data-act="whDoc" data-id="in|${esc(id)}">+ Приход</button><button class="btn sm" data-act="whDoc" data-id="transfer|${esc(id)}">Переместить</button><button class="btn sm" data-act="whDoc" data-id="writeoff|${esc(id)}">Списать</button><button class="btn sm" data-act="whDoc" data-id="inventory|${esc(id)}">Инвентаризация</button></div>`:""}
+    ${st&&!noActs?`<div class="row-f whacts"><button class="btn pri sm" data-act="whDoc" data-id="in|${esc(id)}">+ Приход</button><button class="btn sm" data-act="whDoc" data-id="transfer|${esc(id)}">Переместить</button><button class="btn sm" data-act="whDoc" data-id="writeoff|${esc(id)}">Списать</button><button class="btn sm" data-act="whDoc" data-id="inventory|${esc(id)}">Инвентаризация</button><button class="btn sm" data-act="printWh" data-id="${esc(id)}">Печать остатков</button></div>`:""}
     <input type="search" class="whQ" placeholder="Найти товар на этом складе" autocomplete="off" data-nodirty aria-label="Поиск по складу" style="width:100%;margin:12px 0 8px">
     <div class="whlist">${ps.map(p=>{const q=App.qtyIn(p,id),units=p.trackSerial?App.unitsOf(p.id,{wh:id}):[];
       return `<div class="whr" data-s="${esc([p.name,p.brand,p.sku,p.barcode,App.catName(p),...units.map(App.unitCode)].join(" ").toLowerCase())}">
@@ -378,6 +378,7 @@ function docEditor(){
     <div class="sumlines">${inv?`<span>Строк</span><span>${D.lines.length}</span><span>Излишки</span><span>${cost?money(plusC):""}</span><span>Недостача</span><span>${cost?money(minusC):""}</span><span>Итог в шт.</span><span>${sumQ>0?"+":""}${sumQ}</span>`:`<span>Всего, шт.</span><span>${sumQ}</span>${cost?`<span>Сумма</span><span>${money(sumC)}</span>`:""}`}</div>
     ${D.postedAt?`<p class="muted">Проведён ${App.dtt(D.postedAt)}${D.cancelledAt?" · отменён "+App.dtt(D.cancelledAt):""}</p>`:""}
     <div class="acts">
+      ${D.id?`<button class="btn" data-act="printStockDoc" data-id="${esc(D.id)}">Печать</button>`:""}
       ${D.id&&D.status==="draft"?`<button class="btn danger" data-act="docDelete">Удалить черновик</button>`:""}
       ${D.status==="posted"&&App.can("docCancel")?`<button class="btn danger" data-act="docCancel">Отменить проведение</button>`:""}
       ${!ro?`<button class="btn" data-act="docSave">Сохранить черновик</button>${App.can("docPost")?`<button class="btn pri" data-act="docPost">Провести</button>`:""}`:""}
