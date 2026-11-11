@@ -436,13 +436,24 @@ App.tagsHtml=function(list,t0){
 };
 
 /* ---------- печать через скрытый фрейм ---------- */
+/* печать через окно просмотра: документ виден на экране, печать по кнопке.
+   Скрытое окно печати блокируют iPhone и встроенные окна — поэтому всегда показываем документ. */
 App.printHtml=function(html){
-  let f=document.getElementById("printFrame");if(f)f.remove();
-  f=document.createElement("iframe");f.id="printFrame";f.title="Печать";
-  f.style.cssText="position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
-  document.body.appendChild(f);
-  const w=f.contentWindow;w.document.open();w.document.write(html);w.document.close();
-  setTimeout(()=>{try{w.focus();w.print()}catch(e){App.toast("Не удалось открыть печать")}},300);
+  let box=document.getElementById("prv");if(box)box.remove();
+  const t=(String(html).match(/<title>([^<]*)<\/title>/i)||[])[1]||"Документ";
+  box=document.createElement("div");box.id="prv";box.className="prv";box.setAttribute("role","dialog");box.setAttribute("aria-label","Просмотр: "+t);
+  box.innerHTML=`<div class="prv-bar"><b>${App.esc(t)}</b><span class="prv-sp"></span><button class="btn pri" data-prv="print">Печать</button><button class="btn" data-prv="open">Открыть отдельно</button><button class="btn" data-prv="close" aria-label="Закрыть просмотр">Закрыть</button></div>
+    <div class="prv-body"><iframe title="${App.esc(t)}"></iframe></div><p class="prv-hint" hidden>Окно печати не появилось? Нажмите «Открыть отдельно» и печатайте оттуда (Ctrl+P / «Поделиться → Напечатать» на iPhone).</p>`;
+  document.body.appendChild(box);
+  const f=box.querySelector("iframe"),w=f.contentWindow;w.document.open();w.document.write(html);w.document.close();
+  const fit=()=>{try{f.style.height=Math.max(400,w.document.documentElement.scrollHeight+20)+"px"}catch(e){}};setTimeout(fit,60);setTimeout(fit,400);
+  const close=()=>{box.remove();document.removeEventListener("keydown",esc)},esc=e=>{if(e.key==="Escape"){e.stopPropagation();close()}};
+  document.addEventListener("keydown",esc);
+  box.addEventListener("click",e=>{const a=e.target.closest("[data-prv]");if(!a)return;const k=a.dataset.prv;
+    if(k==="close")close();
+    else if(k==="print"){try{w.focus();w.print()}catch(err){}setTimeout(()=>{const h=box.querySelector(".prv-hint");if(h)h.hidden=false},1200)}
+    else if(k==="open"){const u=URL.createObjectURL(new Blob([html],{type:"text/html"}));const nw=window.open(u,"_blank");if(!nw)App.toast("Браузер не дал открыть вкладку — разрешите всплывающие окна");setTimeout(()=>URL.revokeObjectURL(u),60000)}});
+  setTimeout(()=>{const b=box.querySelector('[data-prv="print"]');if(b)b.focus()},50);
 };
 App.ACT.printReceipt=(arg)=>{const [id,fmt]=String(arg).split("|");const s=App.byId("sales",id);if(!s)return;
   App.printHtml(fmt==="80"?App.receipt80(s):App.receiptA4(s))};

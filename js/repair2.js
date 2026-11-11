@@ -25,8 +25,10 @@ const CK={};   // состояние чек-листа в открытой фо�
 ACT.chkToggle=v=>{const [p,k]=v.split(/\|(.*)/s);CK[p]=CK[p]||{};CK[p][k]=nextS(CK[p][k]);const b=document.querySelector(`[data-act="chkToggle"][data-id="${CSS.escape(v)}"]`);
   if(b){const s=CK[p][k]||"";b.className="chkst "+CS[s][2];b.querySelector("i").textContent=CS[s][0];b.title=k+": "+CS[s][1]}};
 ACT.chkAll=v=>{const [p,s]=v.split("|");CK[p]={};App.CHECK.forEach(k=>CK[p][k]=s);const box=document.getElementById("chk_"+p);if(box)box.innerHTML=App.checkHtml(p,CK[p])};
-const checkSummary=st=>{const bad=Object.entries(st||{}).filter(([k,v])=>v==="bad").map(([k])=>k),na=Object.values(st||{}).filter(v=>v==="na").length;
-  return bad.length?"Дефекты: "+bad.join(", "):na?"Проверить не удалось: "+na+" пунктов":Object.keys(st||{}).length?"Без замечаний":""};
+const checkSummary=st=>{const e=Object.entries(st||{}),of=v=>e.filter(([,x])=>x===v).map(([k])=>k),bad=of("bad"),na=of("na"),ok=of("ok");
+  const out=[];if(bad.length)out.push("дефект: "+bad.join(", "));if(na.length)out.push(na.length>=App.CHECK.length-1?"не включается, проверить нельзя":"не проверить: "+na.join(", "));
+  if(!out.length&&ok.length)out.push(ok.length>=App.CHECK.length?"всё в порядке":"в порядке: "+ok.length+" из "+App.CHECK.length);
+  const t=out.join("; ");return t?t[0].toUpperCase()+t.slice(1):""};
 
 /* ---------- графический ключ ---------- */
 let PAT=[];
@@ -62,29 +64,27 @@ document.addEventListener("change",async e=>{const t=e.target;if(!t.dataset||!t.
   try{App.toast("Загружаем фото…");const n=await App.repUploadPhotos(r,[...t.files],kind);await App.reload(["repairs"]);App.toast("Фото добавлено: "+n)}catch(err){App.toast(err.message)}});
 ACT.phView=path=>{const u=URLS.get(path);if(!u)return;const w=window.open("","_blank");if(w){w.document.write(`<title>Фото</title><body style="margin:0;background:#111;display:grid;place-items:center;min-height:100vh"><img src="${esc(u.url)}" style="max-width:100%;max-height:100vh">`);w.document.close()}};
 
-/* ---------- приём: дополнительные блоки формы ---------- */
+/* ---------- приём ---------- */
 let NEWPH=[],SEL=new Set(),INMODEL=null;
-App.repIntakeTop=()=>`<div class="full" id="rDevs"></div><div class="full" id="rInModel"></div>`;
-App.repIntakeExtra=pre=>{NEWPH=[];SEL=new Set();INMODEL=null;CK.in={};PAT=[];
-  return `<div class="fld full"><label>Осмотр при приёме <small class="muted">нажимайте: ✓ в порядке → ✕ дефект → ? не проверить</small></label>
-      <div id="chk_in">${App.checkHtml("in",{})}</div>
-      <div class="row-f"><button type="button" class="btn sm ghost" data-act="chkAll" data-id="in|ok">Всё в порядке</button><button type="button" class="btn sm ghost" data-act="chkAll" data-id="in|na">Не включается</button></div></div>
-    <div class="fld full"><label>Фото устройства</label><div class="phgrid" id="rPhPrev"><label class="ph add"><input type="file" accept="image/*" capture="environment" multiple id="rPhIn" hidden><span>+ Фото</span></label></div></div>
-    <div class="fld full"><button type="button" class="btn sm" data-act="patOpen">Графический ключ</button><div id="patBox" class="patbox" hidden></div></div>`};
+App.checkSummary=st=>checkSummary(st);
+App.repPhotosHtml=r=>`<div class="rph"><small class="muted">Фото${(r.photos||[]).length?" · "+r.photos.length:""}</small>${photosHtml(r)}</div>`;
+/* приём: блок проверки (сбрасывает состояние формы) */
+App.repIntakeCheck=()=>{NEWPH=[];SEL=new Set();INMODEL=null;CK.in={};PAT=[];
+  return `<div id="chk_in">${App.checkHtml("in",{})}</div>
+    <div class="qk"><button type="button" class="chip" data-act="chkAll" data-id="in|ok">Всё в порядке</button><button type="button" class="chip" data-act="chkAll" data-id="in|na">Не включается — проверить нельзя</button></div>`};
+App.repIntakePhotos=()=>`<div class="phgrid" id="rPhPrev"><label class="ph add"><input type="file" accept="image/*" capture="environment" multiple id="rPhIn" hidden><span>+ Фото</span></label></div>`;
 function drawInModel(){const box=$("#rInModel");if(!box)return;const m=INMODEL;
   if(!m){box.innerHTML="";return}
   const pt=App.point(),wh=pt&&pt.serviceWh?pt.serviceWh:pt&&pt.cashWh,rows=App.modelPrice(m.id);
-  box.innerHTML=`<div class="inmodel"><b>${esc(m.name)}</b>${rows.length?` <span class="muted">— отметьте работы, цена посчитается</span><div class="chips">${rows.map(x=>{const st=partStock(x.part,wh);
+  box.innerHTML=`<div class="inmodel"><b>${esc(m.name)}</b>${rows.length?` <span class="muted">— отметьте работы, стоимость посчитается</span><div class="qk">${rows.map(x=>{const st=partStock(x.part,wh);
     return `<button type="button" class="chip ${SEL.has(x.svc.id)?"on":""}" data-act="inSvc" data-id="${esc(x.svc.id)}">${esc(x.svc.name)} · ${money(x.price)}${x.part?` <small class="${st>0?"okc":"badc"}">${st>0?"запчасть есть":"запчасти нет"}</small>`:""}</button>`}).join("")}</div>`
-    :` <span class="muted">— цен по этой модели нет (Настройки → Прайс работ → Цены по моделям)</span>`}</div>`}
-ACT.inSvc=id=>{SEL.has(id)?SEL.delete(id):SEL.add(id);drawInModel();const sum=App.modelPrice(INMODEL.id).filter(x=>SEL.has(x.svc.id)).reduce((a,x)=>a+x.price,0);const e=$("#rEst");if(e)e.value=sum||""};
+    :` <span class="muted">· цен по этой модели пока нет</span>`}</div>`}
+ACT.inSvc=id=>{SEL.has(id)?SEL.delete(id):SEL.add(id);drawInModel();const sum=App.modelPrice(INMODEL.id).filter(x=>SEL.has(x.svc.id)).reduce((a,x)=>a+x.price,0);const e=$("#rEst");if(e){e.value=sum||"";e.dispatchEvent(new Event("input",{bubbles:true}))}};
 App.repIntakeBind=()=>{
   const dev=$("#rDevice");if(dev){const upd=()=>{const m=App.detectModel(dev.value);if((m&&m.id)!==(INMODEL&&INMODEL.id)){INMODEL=m;SEL=new Set();drawInModel()}};dev.addEventListener("input",upd);dev.addEventListener("change",upd);upd()}
-  const ph=$("#rPhone");if(ph){const show=()=>{const c=App.findCustomerByPhone(ph.value),box=$("#rDevs");if(!box)return;const ds=c?App.clientDevices(c.id):[];
-    box.innerHTML=ds.length?`<div class="row-f wrap"><span class="muted">Устройства клиента:</span>${ds.slice(0,6).map((d,i)=>`<button type="button" class="chip" data-act="inDev" data-id="${i}">${esc(d.name)}${d.code?` <small>${esc(d.code)}</small>`:""}</button>`).join("")}</div>`:"";box._ds=ds};ph.addEventListener("input",show);show()}
   const fi=$("#rPhIn");if(fi)fi.addEventListener("change",()=>{NEWPH.push(...fi.files);const pv=$("#rPhPrev");[...fi.files].forEach(f=>{const u=URL.createObjectURL(f);pv.insertAdjacentHTML("afterbegin",`<span class="ph"><img src="${u}" alt="Новое фото"></span>`)});fi.value=""});
 };
-ACT.inDev=i=>{const box=$("#rDevs");const d=box&&box._ds&&box._ds[+i];if(!d)return;const dv=$("#rDevice"),im=$("#rImei");if(dv){dv.value=d.name;dv.dispatchEvent(new Event("input",{bubbles:true}))}if(im&&d.code)im.value=d.code};
+ACT.inDev=i=>{const box=$("#rCust");const d=box&&box._ds&&box._ds[+i];if(!d)return;const dv=$("#rDevice"),im=$("#rImei");if(dv){dv.value=d.name;dv.dispatchEvent(new Event("input",{bubbles:true}))}if(im&&d.code)im.value=d.code};
 /* после создания ремонта: работы из прайса, модель, чек-лист, фото */
 App.repAfterCreate=async id=>{if(!id)return;const r={id};
   const rows=INMODEL?App.modelPrice(INMODEL.id).filter(x=>SEL.has(x.svc.id)):[];
@@ -94,24 +94,16 @@ App.repAfterCreate=async id=>{if(!id)return;const r={id};
   if(NEWPH.length){try{await App.repUploadPhotos(r,NEWPH,"intake")}catch(e){App.toast(e.message)}}
   NEWPH=[]};
 
-/* ---------- карточка ремонта ---------- */
-const RQS={ordered:["заказана","warn"],arrived:["пришла","ok"],cancelled:["отменена","mute"]};
-App.repCardExtra=r=>{const open=App.ACTIVE.includes(r.status),m=App.repModel(r),ck=r.checklist||{},dec=r.clientDecision;
-  const reqs=r.partReqs||[];
-  return `${dec?`<div class="apprbox ${dec.decision==="yes"?"":"bad"}" style="${dec.decision==="yes"?"background:var(--ok-soft);border-color:transparent":""}"><div><b>${dec.decision==="yes"?"Клиент согласовал по ссылке":"Клиент отказался по ссылке"}</b><span>${App.dtt(dec.at)} · ${money(dec.sum)}${dec.comment?" · «"+esc(dec.comment)+"»":""}</span></div></div>`:""}
-    <div class="repx">
-      <div><h3 class="sub-h">Модель</h3><div class="row-f">${open?App.sel("rxModel",[["","— не определена —"],...App.models(m?m.family:"").map(x=>[x.id,x.name])],m?m.id:"",'aria-label="Модель устройства" data-rid="'+esc(r.id)+'"'):`<b>${esc(m?m.name:"—")}</b>`}${r.devicePass&&App.patSvg(r.devicePass)?App.patSvg(r.devicePass):""}</div></div>
-      <div><h3 class="sub-h">Осмотр</h3>${["intake","issue"].filter(k=>ck[k]).map(k=>`<div class="muted">${k==="intake"?"При приёме":"При выдаче"}: ${esc(checkSummary(ck[k])||"—")}</div>`).join("")||'<div class="muted">Не заполнен</div>'}
-        <button type="button" class="btn sm" data-act="repCheck" data-id="${esc(r.id)}">${ck.intake?"Открыть чек-лист":"Заполнить"}</button></div>
-    </div>
-    <h3 class="sub-h">Фото <small class="muted">${(r.photos||[]).length||""}</small></h3>${photosHtml(r)}
-    ${reqs.length||open?`<h3 class="sub-h">Запчасти под заказ</h3><div class="rpl">${reqs.map(q=>`<div class="rpr ${q.status==="cancelled"?"off":""}"><span>${esc(q.name)}${q.qty>1?" × "+q.qty:""}<small>заказана ${App.dt(q.at)}${q.arrivedAt?" · пришла "+App.dt(q.arrivedAt):""}${q.note?" · "+esc(q.note):""}</small></span><span class="pill ${RQS[q.status][1]}">${RQS[q.status][0]}</span>
-        ${q.status==="ordered"&&open?`<button class="btn sm ghost" data-act="rqSet" data-id="${esc(q.id)}|arrived" title="Пришла">✓</button><button class="btn sm ghost" data-act="rqSet" data-id="${esc(q.id)}|cancelled" title="Отменить заказ">✕</button>`:""}</div>`).join("")||'<div class="muted">Не заказывали</div>'}</div>
-      ${open?`<button type="button" class="btn sm" data-act="rqNew" data-id="${esc(r.id)}">+ Заказать запчасть</button>`:""}`:""}`};
-App.repWorksExtra=r=>{if(!App.ACTIVE.includes(r.status))return "";const m=App.repModel(r);if(!m)return "";const rows=App.modelPrice(m.id);if(!rows.length)return "";
+/* ---------- карточка ремонта: модель, прайс модели ---------- */
+App.repModelSel=(r,m)=>App.sel("rxModel",[["","— не определена —"],...App.models(m?m.family:"").map(x=>[x.id,x.name])],m?m.id:"",'aria-label="Модель устройства" data-rid="'+esc(r.id)+'"');
+App.repModelChips=r=>{const m=App.repModel(r);if(!m)return "";const rows=App.modelPrice(m.id);if(!rows.length)return "";
   const wh=App.serviceWhOf(r),have=new Set((r.services||[]).map(s=>s.serviceId));
-  return `<div class="inmodel"><span class="muted">Прайс ${esc(m.name)}:</span><div class="chips">${rows.map(x=>{const st=partStock(x.part,wh);
-    return `<button type="button" class="chip ${have.has(x.svc.id)?"on":""}" data-act="rxAdd" data-id="${esc(r.id)}|${esc(x.svc.id)}" ${have.has(x.svc.id)?"disabled":""}>${esc(x.svc.name)} · ${money(x.price)}${x.part?` <small class="${st>0?"okc":"badc"}">${st>0?"+ запчасть":"нет запчасти"}</small>`:""}</button>`}).join("")}</div></div>`};
+  return `<div class="inmodel"><span class="muted">Прайс ${esc(m.name)} — нажмите, чтобы добавить:</span><div class="qk">${rows.map(x=>{const st=partStock(x.part,wh);
+    return `<button type="button" class="chip ${have.has(x.svc.id)?"on":""}" data-act="rxAdd" data-id="${esc(r.id)}|${esc(x.svc.id)}" ${have.has(x.svc.id)?"disabled":""}>${esc(x.svc.name)} · ${money(x.price)}${x.part?` <small class="${st>0?"okc":"badc"}">${st>0?"+ запчасть со склада":"запчасть закажем"}</small>`:""}</button>`}).join("")}</div></div>`};
+/* выдача: проверка при клиенте */
+App.repIssueCheckInit=r=>{CK.out=Object.assign({},((r.checklist||{}).issue)||{})};
+App.repIssueCheckHtml=()=>`<div id="chk_out">${App.checkHtml("out",CK.out||{})}</div><div class="qk"><button type="button" class="chip" data-act="chkAll" data-id="out|ok">Всё работает</button></div>`;
+App.repIssueCheckSave=async id=>{if(Object.keys(CK.out||{}).length)await App.api.rpc("repair_set",{p_id:id,p:{checklist:{issue:CK.out}}})};
 ACT.rxAdd=(arg,btn)=>run(btn,async()=>{const [id,sid]=arg.split("|"),r=App.byId("repairs",id),m=App.repModel(r),x=App.modelPrice(m.id).find(y=>y.svc.id===sid);if(!x)return;
   await App.api.insert("repair_services",{repair_id:id,service_id:sid,name:x.svc.name,price:x.price,qty:1});
   let msg="Работа добавлена";
@@ -217,3 +209,5 @@ ACT.mpSave=(_,btn)=>run(btn,async()=>{const cur=new Map(S.svcprices.filter(x=>x.
     if(x){if(num(v)!==x.price||(part||"")!==(x.partId||"")){await App.api.update("service_prices",x.id,{price:row.price,part_product_id:part});n++}}else{await App.api.insert("service_prices",row);n++}}
   await App.reload(["svcprices"]);App.toast(n?"Сохранено: "+n:"Без изменений");drawMP()});
 })();
+/* открывая новое окно, закрываем просмотр документа — иначе он остаётся поверх */
+(function(){const om=App.openModal;App.openModal=function(){const p=document.getElementById("prv");if(p)p.remove();return om.apply(this,arguments)}})();
