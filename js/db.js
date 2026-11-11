@@ -16,6 +16,23 @@ function err(e,ctx){
   if(/Failed to fetch|NetworkError|network/i.test(m))return new Error("Нет связи с базой. Проверьте интернет");
   return new Error(m);
 }
+/* закупочные цены закрыты в базе: читаем разрешённые колонки, а себестоимость — функциями costs_* (если есть право) */
+const SECURED=["products","units","sale_items","stock_doc_lines","repair_parts"];
+let COLSEL=null;
+async function loadCols(){if(COLSEL)return COLSEL;try{const {data,error}=await sb.rpc("api_cols",{p_tables:SECURED});COLSEL=!error&&data&&Object.keys(data).length?data:{}}catch(e){COLSEL={}}return COLSEL}
+const sel=t=>(COLSEL&&COLSEL[t])||"*";
+const secured=()=>!!(COLSEL&&Object.keys(COLSEL).length);
+async function allRpc(fn){const out=[];for(let from=0;from<200000;from+=1000){const {data,error}=await sb.rpc(fn).range(from,from+999);if(error)throw err(error,fn);out.push(...data);if(data.length<1000)break}return out}
+async function applyCosts(cols){if(!secured()||!App.can("cost"))return;
+  const need=c=>cols.includes(c);
+  try{
+    if(need("products")){const m=new Map((await allRpc("costs_products")).map(r=>[r.id,r]));S.products.forEach(p=>{const r=m.get(p.id);if(r){p.cost=num(r.cost);p.lastCost=num(r.last_cost)}})}
+    if(need("units")){const m=new Map((await allRpc("costs_units")).map(r=>[r.id,num(r.cost)]));S.units.forEach(u=>{if(m.has(u.id))u.cost=m.get(u.id)})}
+    if(need("sales")||need("returns")){const m=new Map((await allRpc("costs_sale_items")).map(r=>[r.id,num(r.cost)]));
+      S.sales.forEach(s=>(s.items||[]).forEach(i=>{if(m.has(i.line))i.cost=m.get(i.line)}));S.returns.forEach(r=>(r.items||[]).forEach(i=>{if(m.has(i.line))i.cost=m.get(i.line)}))}
+    if(need("docs")){const m=new Map((await allRpc("costs_doc_lines")).map(r=>[r.id,num(r.cost)]));S.docs.forEach(d=>d.lines.forEach(l=>{if(m.has(l.id))l.cost=m.get(l.id)}))}
+    if(need("repairs")){const m=new Map((await allRpc("costs_repair_parts")).map(r=>[r.id,num(r.cost)]));S.repairs.forEach(r=>(r.parts||[]).forEach(p=>{if(m.has(p.id))p.cost=m.get(p.id)}))}
+  }catch(e){console.warn("costs",e)}}
 async function q(promise,ctx){const {data,error}=await promise;if(error)throw err(error,ctx);return data}
 /* выборка всех строк с постраничной загрузкой (у Supabase лимит 1000 строк на запрос) */
 async function all(table,select="*",mod){
@@ -31,7 +48,7 @@ async function all(table,select="*",mod){
 /* ---------- преобразование строк базы в объекты интерфейса ---------- */
 const M={
   settings:r=>({id:"main",shopName:r.shop_name,city:r.city||"",address:r.address||"",phone:r.phone||"",inn:r.inn||"",
-    deviceWarrantyMonths:r.device_warranty_months,repairWarrantyDays:r.repair_warranty_days,requireShift:r.require_shift,storageDays:r.storage_days,deadDays:r.dead_days,receiptFooter:r.receipt_footer||"",finConfig:r.fin_config||{},legalName:r.legal_name||"",ogrnip:r.ogrnip||"",siteUrl:r.site_url||"",reviewUrl:r.review_url||"",receiptAck:r.receipt_ack||"",docConfig:r.doc_config||{},siteSync:!!r.site_sync,siteOrders:!!r.site_orders,siteWarehouses:r.site_warehouses||[],siteNewStatus:r.site_new_status||"draft",siteReserveWh:r.site_reserve_wh||"",siteLastSync:r.site_last_sync||"",siteLastError:r.site_last_error||"",siteFields:r.site_fields||null,siteMode:r.site_mode||"custom",siteHookUrl:r.site_hook_url||"",tagTemplates:Array.isArray(r.tag_templates)?r.tag_templates:[]}),
+    deviceWarrantyMonths:r.device_warranty_months,repairWarrantyDays:r.repair_warranty_days,requireShift:r.require_shift,storageDays:r.storage_days,deadDays:r.dead_days,receiptFooter:r.receipt_footer||"",finConfig:r.fin_config||{},loyalty:r.loyalty||{},legalName:r.legal_name||"",ogrnip:r.ogrnip||"",siteUrl:r.site_url||"",reviewUrl:r.review_url||"",receiptAck:r.receipt_ack||"",docConfig:r.doc_config||{},siteSync:!!r.site_sync,siteOrders:!!r.site_orders,siteWarehouses:r.site_warehouses||[],siteNewStatus:r.site_new_status||"draft",siteReserveWh:r.site_reserve_wh||"",siteLastSync:r.site_last_sync||"",siteLastError:r.site_last_error||"",siteFields:r.site_fields||null,siteMode:r.site_mode||"custom",siteHookUrl:r.site_hook_url||"",tagTemplates:Array.isArray(r.tag_templates)?r.tag_templates:[]}),
   points:r=>({id:r.id,name:r.name,address:r.address||"",phone:r.phone||"",patentNo:r.patent_no||"",evotorStoreId:r.evotor_store_id||"",cashWh:r.cash_wh,serviceWh:r.service_wh,order:r.sort,active:r.is_active}),
   warehouses:r=>({id:r.id,name:r.name,kind:r.kind||"",address:r.address||"",pointId:r.point_id,order:r.sort,active:r.is_active}),
   categories:r=>({id:r.id,name:r.name,parentId:r.parent_id||"",isDevice:r.is_device,isUsed:!!r.is_used}),
@@ -54,7 +71,7 @@ const M={
     items:(r.return_items||[]).map(i=>({line:i.sale_item_id,qty:i.qty,productId:i.sale_items&&i.sale_items.product_id,name:i.sale_items&&i.sale_items.name,price:num(i.sale_items&&i.sale_items.price),cost:num(i.sale_items&&i.sale_items.cost)}))}),
   docs:r=>({id:r.id,num:r.num,type:r.type,poId:r.po_id||"",status:r.status,whFrom:r.wh_from||"",whTo:r.wh_to||"",supplierId:r.supplier_id||"",invoice:r.invoice||"",reason:r.reason||"",catId:r.category_id||"",note:r.note||"",
     by:r.created_by,createdAt:r.created_at,postedAt:r.posted_at,cancelledAt:r.cancelled_at,
-    lines:(r.stock_doc_lines||[]).sort((a,b)=>a.id-b.id).map(l=>({productId:l.product_id,name:(App.byId("products",l.product_id)||{}).name||"Товар",qty:l.qty,expected:l.expected,counted:l.counted==null?"":l.counted,cost:num(l.cost),newUnits:l.new_units||[],unitIds:l.unit_ids||[],foundCodes:l.found_codes||[],unitLog:l.unit_log||[]}))}),
+    lines:(r.stock_doc_lines||[]).sort((a,b)=>a.id-b.id).map(l=>({id:l.id,productId:l.product_id,name:(App.byId("products",l.product_id)||{}).name||"Товар",qty:l.qty,expected:l.expected,counted:l.counted==null?"":l.counted,cost:num(l.cost),newUnits:l.new_units||[],unitIds:l.unit_ids||[],foundCodes:l.found_codes||[],unitLog:l.unit_log||[]}))}),
   units:r=>({id:r.id,productId:r.product_id,imei:r.imei||"",imei2:r.imei2||"",serialNo:r.serial_no||"",whId:r.warehouse_id||"",status:r.status,condition:r.condition||"",batteryHealth:r.battery_health,
     diagnostics:r.diagnostics||"",kit:r.kit||"",cost:num(r.cost),price:r.price==null?"":num(r.price),note:r.note||"",saleItemId:r.sale_item_id,lastRef:r.last_ref||"",attrs:r.attrs||{},createdAt:r.created_at,updatedAt:r.updated_at,onSite:r.on_site!==false,wooId:r.woo_id||null,originRef:r.origin_ref||""}),
   models:r=>({id:r.id,family:r.family,name:r.name,year:r.year,memories:r.memories||[],colors:r.colors||[],options:r.options||{},order:r.sort,active:r.is_active}),
@@ -87,6 +104,9 @@ const M={
   waitlist:r=>({id:r.id,customerId:r.customer_id||"",productId:r.product_id||"",request:r.request,qty:num(r.qty)||1,maxPrice:r.max_price==null?"":num(r.max_price),pointId:r.point_id||"",status:r.status,note:r.note||"",by:r.created_by,createdAt:r.created_at,readyAt:r.ready_at||"",closedAt:r.closed_at||""}),
   lostdemand:r=>({id:r.id,request:r.request,productId:r.product_id||"",qty:num(r.qty)||1,reason:r.reason||"",pointId:r.point_id||"",by:r.staff_id,createdAt:r.created_at}),
   tasks:r=>({id:r.id,title:r.title,note:r.note||"",dueDate:r.due_date||"",assignee:r.assignee||"",pointId:r.point_id||"",customerId:r.customer_id||"",refType:r.ref_type||"",refId:r.ref_id||"",autoKey:r.auto_key||"",status:r.status,by:r.created_by,createdAt:r.created_at,doneAt:r.done_at||"",doneBy:r.done_by||""}),
+  bonusops:r=>({id:r.id,customerId:r.customer_id,saleId:r.sale_id||"",kind:r.kind,amount:num(r.amount),note:r.note||"",by:r.staff_id,at:r.created_at}),
+  deals:r=>({id:r.id,num:r.num,kind:r.kind,customerId:r.customer_id,pointId:r.point_id||"",productId:r.product_id||"",unitId:r.unit_id||"",device:r.device,imei:r.imei||"",amount:num(r.amount),price:r.price==null?null:num(r.price),
+    termDays:r.term_days,payMethod:r.pay_method||"",person:r.person||{},status:r.status,saleId:r.sale_id||"",debtId:r.debt_id||"",note:r.note||"",by:r.created_by,createdAt:r.created_at,closedAt:r.closed_at||""}),
   log:r=>({id:r.id,at:r.created_at,by:r.staff_id,action:r.action,ref:r.ref||"",details:r.details||""})
 };
 /* что загружать для каждого раздела */
@@ -98,17 +118,17 @@ const L={
   suppliers:async()=>(await all("suppliers")).map(M.suppliers),
   services:async()=>(await all("services")).map(M.services),
   customers:async()=>(await all("customers")).map(M.customers),
-  products:async()=>{const [ps,st]=await Promise.all([all("products"),all("stock")]);const list=ps.map(M.products);const by=Object.fromEntries(list.map(p=>[p.id,p]));
+  products:async()=>{const [ps,st]=await Promise.all([all("products",sel("products")),all("stock")]);const list=ps.map(M.products);const by=Object.fromEntries(list.map(p=>[p.id,p]));
     st.forEach(s=>{const p=by[s.product_id];if(p)p.stock[s.warehouse_id]=s.qty});return list},
-  sales:async()=>(await all("sales","*,sale_items(*),sale_payments(*)",r=>r.order("created_at",{ascending:false}))).map(M.sales),
-  returns:async()=>(await all("returns","*,return_items(*,sale_items(product_id,name,price,cost))")).map(M.returns),
-  docs:async()=>(await all("stock_docs","*,stock_doc_lines(*)")).map(M.docs),
+  sales:async()=>(await all("sales","*,sale_items("+sel("sale_items")+"),sale_payments(*)",r=>r.order("created_at",{ascending:false}))).map(M.sales),
+  returns:async()=>(await all("returns","*,return_items(*,sale_items(product_id,name,price"+(secured()?"":",cost")+"))")).map(M.returns),
+  docs:async()=>(await all("stock_docs","*,stock_doc_lines("+sel("stock_doc_lines")+")")).map(M.docs),
   movements:async()=>(await q(sb.from("stock_movements").select("*").order("created_at",{ascending:false}).limit(1000),"movements")).map(M.movements),
   shifts:async()=>(await all("shifts")).map(M.shifts),
   cashops:async()=>(await all("cash_ops","*",r=>r.order("created_at",{ascending:false}))).map(M.cashops),
   staff:async()=>(await all("staff")).map(M.staff),
   staffreq:async()=>(await all("staff_requests")).map(M.staffreq),
-  units:async()=>(await all("units")).map(M.units),
+  units:async()=>(await all("units",sel("units"))).map(M.units),
   models:async()=>(await all("apple_models","*",r=>r.order("sort"))).map(M.models),
   siteorders:async()=>(await all("site_orders","*",r=>r.order("created_at",{ascending:false}))).map(M.siteorders),
   sprices:async()=>App.can("cost")?(await all("supplier_prices")).map(M.sprices):[],
@@ -117,13 +137,15 @@ const L={
   finops:async()=>App.can("finance")?(await all("fin_ops")).map(M.finops):[],
   debts:async()=>App.can("finance")?(await all("debts")).map(M.debts):[],
   finplans:async()=>App.can("finance")?(await all("fin_plans")).map(M.finplans):[],
-  repairs:async()=>(await all("repairs","*,repair_services(*),repair_parts(*),repair_history(*)",r=>r.order("created_at",{ascending:false}))).map(M.repairs),
+  repairs:async()=>(await all("repairs","*,repair_services(*),repair_parts("+sel("repair_parts")+"),repair_history(*)",r=>r.order("created_at",{ascending:false}))).map(M.repairs),
   porders:async()=>App.can("stock")?(await all("purchase_orders","*,purchase_order_lines(*)",r=>r.order("created_at",{ascending:false}))).map(M.porders):[],
   payrules:async()=>(await all("pay_rules")).map(M.payrules),
   unitcosts:async()=>App.can("cost")||App.me.role==="master"?(await all("unit_costs")).map(M.unitcosts):[],
   waitlist:async()=>(await all("waitlist","*",r=>r.order("created_at",{ascending:false}))).map(M.waitlist),
   lostdemand:async()=>(await q(sb.from("lost_demand").select("*").order("created_at",{ascending:false}).limit(3000),"lost_demand")).map(M.lostdemand),
   tasks:async()=>(await all("tasks","*",r=>r.order("created_at",{ascending:false}))).map(M.tasks),
+  bonusops:async()=>(await all("bonus_ops")).map(M.bonusops),
+  deals:async()=>(await all("buy_deals","*",r=>r.order("created_at",{ascending:false}))).map(M.deals),
   log:async()=>(await q(sb.from("audit_log").select("*").order("created_at",{ascending:false}).limit(500),"log")).map(M.log)
 };
 /* таблица базы → разделы, которые нужно перечитать */
@@ -134,12 +156,14 @@ const T={settings:["settings"],points:["points"],warehouses:["warehouses"],categ
   fin_accounts:["finaccounts"],fin_categories:["fincats"],fin_ops:["finops"],debts:["debts"],fin_plans:["finplans"],
   repairs:["repairs"],repair_services:["repairs"],repair_parts:["repairs"],repair_history:["repairs"],
   purchase_orders:["porders"],purchase_order_lines:["porders"],pay_rules:["payrules"],
-  unit_costs:["unitcosts"],waitlist:["waitlist"],lost_demand:["lostdemand"],tasks:["tasks"]};
+  unit_costs:["unitcosts"],waitlist:["waitlist"],lost_demand:["lostdemand"],tasks:["tasks"],bonus_ops:["bonusops"],buy_deals:["deals"]};
 
 App.reload = async function(cols){
   cols=[...new Set(cols)].filter(c=>L[c]);
+  await loadCols();
   const res=await Promise.allSettled(cols.map(c=>L[c]()));
   res.forEach((r,i)=>{if(r.status==="fulfilled")S[cols[i]]=r.value;else console.warn(cols[i],r.reason)});
+  await applyCosts(cols);
   // названия товаров в документах и движениях
   if(cols.includes("returns")||cols.includes("sales"))S.returns.forEach(r=>r.saleNum=(App.byId("sales",r.saleId)||{}).num||"");
   if(cols.includes("products")){S.movements.forEach(m=>{const p=App.byId("products",m.productId);if(p)m.productName=p.name});S.docs.forEach(d=>d.lines.forEach(l=>{const p=App.byId("products",l.productId);if(p)l.name=p.name}))}
@@ -198,9 +222,9 @@ App.api = {
   // автозадачи: повторно с тем же auto_key не создаются
   tasksAuto:async rows=>{if(!rows.length)return;await q(sb.from("tasks").upsert(rows,{onConflict:"auto_key",ignoreDuplicates:true}),"tasks");App.refresh("tasks")},
   upsertRule:async row=>{await q(sb.from("pay_rules").upsert(row,{onConflict:"staff_id"}).select(),"pay_rules");App.refresh("pay_rules")},
-  insert:async(table,row)=>{const d=await q(sb.from(table).insert(snake(row)).select().single(),table);App.refresh(table);return d},
-  insertMany:async(table,rows)=>{if(!rows.length)return[];const d=await q(sb.from(table).insert(rows.map(snake)).select(),table);App.refresh(table);return d},
-  update:async(table,id,patch,key="id")=>{const d=await q(sb.from(table).update(snake(patch)).eq(key,id).select(),table);if(!d.length)throw new Error("Нет прав на изменение или запись не найдена");App.refresh(table);return d[0]},
+  insert:async(table,row)=>{const d=await q(sb.from(table).insert(snake(row)).select(sel(table)).single(),table);App.refresh(table);return d},
+  insertMany:async(table,rows)=>{if(!rows.length)return[];const d=await q(sb.from(table).insert(rows.map(snake)).select(sel(table)),table);App.refresh(table);return d},
+  update:async(table,id,patch,key="id")=>{const d=await q(sb.from(table).update(snake(patch)).eq(key,id).select(SECURED.includes(table)?"id":"*"),table);if(!d.length)throw new Error("Нет прав на изменение или запись не найдена");App.refresh(table);return d[0]},
   remove:async(table,id,key="id")=>{await q(sb.from(table).delete().eq(key,id),table);App.refresh(table)},
   invoke:async(fn,body)=>{const {data,error}=await sb.functions.invoke(fn,{body:body||{}});if(error){let m=error.message;try{const j=await error.context.json();m=j.error||m}catch(e){}throw new Error(m)}return data},
   rpc:async(fn,args,refresh=[])=>{const d=await q(sb.rpc(fn,args),fn);App.refresh(...refresh);return d},

@@ -703,3 +703,5 @@ label.chip{cursor:pointer}
 .tkchk{flex:0 0 24px;width:24px;height:24px;border:2px solid var(--line-strong,#9a9a8a);border-radius:7px;background:var(--surface);cursor:pointer;font:700 14px/1 inherit;color:#fff;display:grid;place-items:center;margin-top:2px;padding:0}
 .tkchk:hover{border-color:var(--olive)}.tkrow.off .tkchk{background:var(--olive);border-color:var(--olive)}.tkrow.off b{text-decoration:line-through;opacity:.6}
 .dot.ok{background:var(--ok,#2e7d32)}
+.bonusbox{margin-bottom:10px}
+.seg{flex-shrink:0}.modal>*{flex-shrink:0}

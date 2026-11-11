@@ -4,12 +4,12 @@
 const {S,$,esc,num,money,ACT,VIEWS,TITLES}=App;
 TITLES.settings="Настройки";
 App.ui.setTab="shop";
-const TABS=[["shop","Магазин"],["points","Точки и склады"],["categories","Категории"],["catalog","Каталог Apple"],["suppliers","Поставщики"],["services","Прайс работ"],["site","Сайт"],["staff","Сотрудники"],["log","Журнал"],["data","Данные"]];
+const TABS=[["shop","Магазин"],["points","Точки и склады"],["categories","Категории"],["catalog","Каталог Apple"],["suppliers","Поставщики"],["services","Прайс работ"],["loyalty","Бонусы"],["site","Сайт"],["staff","Сотрудники"],["log","Журнал"],["data","Данные"]];
 const run=async(btn,fn)=>{if(btn&&btn.disabled)return;if(btn)btn.disabled=true;try{await fn()}catch(e){App.toast(e.message)}finally{if(btn&&document.body.contains(btn))btn.disabled=false}};
 VIEWS.settings={
   render(){
     const t=App.ui.setTab;
-    const body={shop,points,categories,catalog:()=>App.catalogTab(),site:()=>App.siteTab(),suppliers,services,staff,log,data}[t]();
+    const body={shop,points,categories,catalog:()=>App.catalogTab(),site:()=>App.siteTab(),suppliers,services,staff,log,data,loyalty:()=>App.loyaltyTab?App.loyaltyTab():""}[t]();
     return `<div class="tabs">${TABS.filter(([k])=>k!=="staff"||App.can("staff")).filter(([k])=>k!=="site"||App.can("settings")).filter(([k])=>k!=="log"||App.can("log")).map(([k,l])=>`<button class="tab ${t===k?"on":""}" data-act="settingsTab" data-id="${k}">${l}</button>`).join("")}</div>${body}`;
   }
 };

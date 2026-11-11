@@ -124,7 +124,7 @@ VIEWS.pos={
           ${App.fld("posPhone","Телефон клиента",App.inp("posPhone",P.phone,"tel","необязательно",'data-pos="phone" autocomplete="off"'))}
           ${App.fld("posName","Имя",App.inp("posName",P.name,"text","",'data-pos="name"'))}
         </div>
-        ${c?`<div class="hint ${c.blacklisted?"bad":"ok"}" style="margin-top:6px">${c.blacklisted?'<span class="pill bad">Чёрный список</span> '+esc(c.blackReason||"")+" · ":""}${esc(c.name)} · покупок ${S.sales.filter(s=>s.customerId===c.id).length}${num(c.discount)?" · скидка "+num(c.discount)+"%":""}${(c.tags||[]).length?" · "+esc(c.tags.join(", ")):""}</div>`:App.phoneKey(P.phone).length===10?'<div class="hint" style="margin-top:6px">Новый клиент, добавится при продаже</div>':""}
+        ${c?`<div class="hint ${c.blacklisted?"bad":"ok"}" style="margin-top:6px">${c.blacklisted?'<span class="pill bad">Чёрный список</span> '+esc(c.blackReason||"")+" · ":""}${esc(c.name)} · покупок ${S.sales.filter(s=>s.customerId===c.id).length}${num(c.discount)?" · скидка "+num(c.discount)+"%":""}${(c.tags||[]).length?" · "+esc(c.tags.join(", ")):""}${App.bonusOn&&App.bonusOn()?" · бонусов "+App.bonusBal(c.id):""}</div>`:App.phoneKey(P.phone).length===10?'<div class="hint" style="margin-top:6px">Новый клиент, добавится при продаже</div>':""}
         <div class="clist">
         ${P.cart.length?P.cart.map((i,k)=>{const p=App.byId("products",i.productId);const below=p&&num(i.price)-num(i.disc)/Math.max(1,num(i.qty))<num(i.unitId?i.cost:p.cost);
           return `<div class="cline"><div class="cl-top"><div class="cl-name"><b>${esc(i.name)}${i.productId?"":` <span class="pill ${i.kind==="goods"?"":"info"}">${i.kind==="goods"?"вне каталога":"услуга"}</span>`}</b>${i.serial?'<span class="sub">'+App.codeLbl(i.productId)+" "+esc(i.serial)+(i.battery!=null&&i.battery!==""?" · АКБ "+i.battery+"%":"")+"</span>":""}${below?'<span class="sub bad">ниже закупки</span>':""}</div>
@@ -232,7 +232,9 @@ ACT.posPay=()=>{
   const t=posTotals();
   for(const i of P.cart){const p=App.byId("products",i.productId);if(p&&num(i.price)-num(i.disc)/Math.max(1,num(i.qty))<num(i.unitId?i.cost:p.cost)&&!App.can("belowCost"))return App.toast("«"+i.name+"» дешевле закупки: продать так может только управляющий")}
   const c=App.findCustomerByPhone(P.phone);
+  const bal=c&&App.bonusOn&&App.bonusOn()?App.bonusBal(c.id):0,bmax=bal?Math.min(bal,Math.floor(t.total*num((App.settings().loyalty||{}).max_pay_pct||100)/100)):0;
   App.openModal(App.head("Оплата · "+money(t.total))+`
+    ${bmax>0?`<div class="fbox bonusbox"><div class="fld"><label for="pay_bonus">Списать бонусы <small class="muted">есть ${bal}, можно до ${bmax}</small></label><div class="row-f">${App.inp("pay_bonus","","number","0",'min="0" max="'+bmax+'"')}<button class="btn sm" data-act="payBonusMax">Максимум</button></div></div></div>`:""}
     ${c&&c.blacklisted?`<div class="banner err">Клиент в чёрном списке: ${esc(c.blackReason||"без причины")}</div>`:""}
     <div class="paygrid">${Object.entries(App.PAY).map(([m,l])=>`<div class="fld"><label for="pay_${m}">${l}</label><div class="row-f">${App.inp("pay_"+m,"","number","0")}<button class="btn sm" data-act="payAll" data-id="${m}">Всё</button></div></div>`).join("")}</div>
     ${App.phoneKey(P.phone).length===10?`<div class="paydebt"><div class="fld"><label for="pay_debt">В долг</label><div class="row-f">${App.inp("pay_debt","","number","0")}<button class="btn sm" data-act="payAll" data-id="debt">Всё</button></div></div>
@@ -241,11 +243,13 @@ ACT.posPay=()=>{
     <div class="total"><span>Осталось распределить</span><b id="payLeft">${money(t.total)}</b></div>
     ${App.fld("payWarr","Гарантия на устройства, мес.",App.inp("payWarr",App.settings().deviceWarrantyMonths,"number"))}
     <div class="acts"><button class="btn" data-act="close">Назад</button><button class="btn pri" data-act="posConfirm" id="payOk">Провести продажу</button></div>`);
-  const upd=()=>{const paid=PAYK().reduce((a,m)=>a+num(App.val("pay_"+m)),0);const left=t.total-paid;
+  const bon=()=>Math.max(0,Math.min(bmax,Math.round(num(App.val("pay_bonus")))));
+  const upd=()=>{const paid=PAYK().reduce((a,m)=>a+num(App.val("pay_"+m)),0);const left=t.total-bon()-paid;
     $("#payLeft").textContent=money(left);$("#payLeft").className=Math.abs(left)<0.5?"ok":"bad";
     const got=num(App.val("payGot")),cash=num(App.val("pay_cash"));$("#payChange").textContent=got?money(got-cash):"—"};
   document.querySelectorAll("#modal input").forEach(el=>el.addEventListener("input",upd));
-  ACT.payAll=m=>{PAYK().forEach(k=>{document.getElementById("pay_"+k).value=k===m?t.total:""});upd()};
+  ACT.payAll=m=>{PAYK().forEach(k=>{document.getElementById("pay_"+k).value=k===m?t.total-bon():""});upd()};
+  ACT.payBonusMax=()=>{$("#pay_bonus").value=bmax;const filled=PAYK().filter(k=>num(App.val("pay_"+k)));if(filled.length===1)ACT.payAll(filled[0]);else upd()};
   if(t.total===0){upd()}
 };
 ACT.posConfirm=async(_,btn)=>{
@@ -253,9 +257,10 @@ ACT.posConfirm=async(_,btn)=>{
   const t=posTotals(),wh=posWh();
   const payments=PAYK().map(m=>({method:m,amount:num(App.val("pay_"+m))})).filter(p=>p.amount);
   const paid=payments.reduce((a,p)=>a+p.amount,0),debt=payments.filter(p=>p.method==="debt").reduce((a,p)=>a+p.amount,0);
+  const bonus=Math.max(0,Math.round(num(App.val("pay_bonus"))));
   if(payments.some(p=>p.amount<0))return App.toast("Суммы оплат не могут быть отрицательными");
   if(debt&&App.phoneKey(P.phone).length!==10)return App.toast("Для продажи в долг укажите телефон покупателя");
-  if(Math.abs(paid-t.total)>=0.5)return App.toast("Сумма оплат ("+money(paid)+") не равна сумме чека ("+money(t.total)+")");
+  if(Math.abs(paid+bonus-t.total)>=0.5)return App.toast("Сумма оплат ("+money(paid+bonus)+") не равна сумме чека ("+money(t.total)+")");
   const sh=App.openShift();
   if(!sh&&(App.settings().requireShift||payments.some(p=>p.method==="cash")))return App.toast("Для этой оплаты нужна открытая смена");
   btn.disabled=true;btn.textContent="Проводим…";
@@ -265,10 +270,12 @@ ACT.posConfirm=async(_,btn)=>{
       :{product_id:null,name:i.name,kind:i.kind,serial:i.serial||null,qty:num(i.qty),price:num(i.price),discount:num(i.disc),cost:num(i.cost),warranty:num(i.warranty)});
     const args={p_wh:wh,p_customer:customerId,p_items:items,p_payments:payments,p_discount:t.disc,p_tradein_device:P.tiDev||null,p_tradein_amount:num(P.tiAmt),p_tradein_imei:P.tiImei||null};
     if(debt)args.p_due=App.val("payDue")||null;
-    const id=await App.api.rpc(debt?"create_sale_debt":"create_sale",args,["sales","stock","stock_movements","cash_ops","products","audit_log","units","debts"]);
+    const id=bonus?await App.api.rpc("create_sale_bonus",{p_bonus:bonus,p:args},["sales","stock","stock_movements","cash_ops","products","audit_log","units","debts","bonus_ops"])
+      :await App.api.rpc(debt?"create_sale_debt":"create_sale",args,["sales","stock","stock_movements","cash_ops","products","audit_log","units","debts"]);
+    if(bonus)App.toast("Списано бонусов: "+bonus);
     if(debt)App.toast("В долг: "+money(debt));
     ACT.posClear();App.closeModal();App.toast("Продажа проведена");
-    await App.reload(["sales","products","cashops","units","debts"]);
+    await App.reload(["sales","products","cashops","units","debts","bonusops","deals"]);
     if(App.byId("sales",id))ACT.openSale(id);
   }catch(e){btn.disabled=false;btn.textContent="Провести продажу";App.toast(e.message||"Ошибка продажи")}
 };
