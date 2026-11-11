@@ -30,10 +30,14 @@ function drawNav(){
   const items=App.NAV.filter(n=>App.navAllowed(n[0]));
   $("#navlist").innerHTML=items.map(([v,l,ic])=>`<a class="nav ${App.ui.view===v?"on":""}" href="#${v}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">${ic}</svg><span>${l}</span>${counts[v]?`<span class="cnt">${counts[v]}</span>`:""}</a>`).join("");
   const sh=App.openShift(),pts=App.myPoints(),cur=App.point();
-  $("#who").innerHTML=(App.wsSwitch?App.wsSwitch():"")+`<button type="button" class="whobtn" data-act="profile" title="Мой профиль"><b>${esc(App.me.name)}</b><span>${esc(App.ROLES[App.me.role]||"")} · профиль</span></button>
-    ${pts.length>1?`<select id="pointSel" aria-label="Точка">${pts.map(p=>`<option value="${esc(p.id)}"${cur&&cur.id===p.id?" selected":""}>${esc(p.name)}</option>`).join("")}</select>`:`<span>${esc(cur?cur.name:"Точка не выбрана")}</span>`}
-    <span class="pill ${sh?"ok":"mute"}">${sh?"Смена "+esc(sh.num)+" открыта":"Смена закрыта"}</span>
-    <button class="btn sm ghost" data-act="logout">Выйти</button>`;
+  const ini=String(App.me.name||"?").trim().split(/\s+/).slice(0,2).map(w=>w[0]).join("").toUpperCase()||"?";
+  const ico=d=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  $("#who").innerHTML=(App.wsSwitch?App.wsSwitch():"")+`<div class="whocard">
+    <div class="whotop"><button type="button" class="whobtn" data-act="profile" title="Мой профиль"><span class="ava" aria-hidden="true">${esc(ini)}</span><span class="whonm"><b>${esc(App.me.name)}</b><small>${esc((App.ROLES[App.me.role]||"")!==App.me.name?App.ROLES[App.me.role]||"":"Мой профиль")}</small></span></button>
+      <button type="button" class="iconbtn" data-act="logout" title="Выйти" aria-label="Выйти">${ico('<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l-5-5 5-5M5 12h11"/>')}</button></div>
+    <div class="whorow">${ico('<path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>')}${pts.length>1?`<select id="pointSel" aria-label="Точка">${pts.map(p=>`<option value="${esc(p.id)}"${cur&&cur.id===p.id?" selected":""}>${esc(p.name)}</option>`).join("")}</select>`:`<span>${esc(cur?cur.name:"Точка не выбрана")}</span>`}</div>
+    <a class="whorow shift ${sh?"on":""}" href="#pos" title="${sh?"Смена открыта "+esc(App.dtt(sh.openedAt)):"Открыть смену на кассе"}"><i aria-hidden="true"></i><span>${sh?"Смена "+esc(sh.num):"Смена закрыта"}</span><small>${sh?"с "+esc(new Date(sh.openedAt).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})):"открыть"}</small></a>
+  </div>`;
   const ps=$("#pointSel");if(ps)ps.onchange=()=>{App.ui.pointId=ps.value;try{localStorage.setItem("icase_point",ps.value)}catch(e){}App.render()};
 }
 

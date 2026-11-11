@@ -44,9 +44,9 @@ h3{font-size:15px;font-weight:700}
 .nav svg{width:18px;height:18px;flex:none}
 .nav .cnt{margin-left:auto;font-size:12px;background:var(--sage-soft);color:var(--olive);border-radius:99px;padding:1px 8px}
 .nav.on .cnt{background:#5A6A42;color:#F3F0E6}
-.who{margin-top:auto;display:flex;flex-direction:column;gap:4px;padding:12px 10px 4px;font-size:12px;border-top:1px solid var(--line)}
-.who b{font-size:14px}
-.who .pill{align-self:flex-start}
+.who{margin-top:auto;display:flex;flex-direction:column;gap:8px;padding:12px 2px 2px;font-size:12px;border-top:1px solid var(--line)}
+
+
 
 .main{overflow-y:auto;padding:22px 26px 40px;min-width:0}
 .view{display:flex;flex-direction:column;gap:16px}
@@ -240,7 +240,7 @@ pre.receipt{background:#fff;border:1px dashed var(--line);border-radius:10px;pad
 .login-card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:28px;width:100%;max-width:400px;display:flex;flex-direction:column;gap:14px}
 .login-card .brand{padding:0}
 .login-card p{margin:0}
-.who select{width:100%}
+
 
 /* ---------- печать: ценники и редактор чека ---------- */
 .pgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:16px;align-items:start}
@@ -507,8 +507,8 @@ label.chip{cursor:pointer}
 /* вход и профиль */
 .pwbox{position:relative}.pwbox input{width:100%;padding-right:44px}.pwbox .pwtoggle{position:absolute;right:4px;top:50%;transform:translateY(-50%);padding:4px 8px}
 .muted.small,.small{font-size:12.5px}
-.whobtn{display:flex;flex-direction:column;gap:2px;border:0;background:none;padding:4px 6px;margin:-4px -6px 2px;border-radius:10px;text-align:left;cursor:pointer;font:inherit;color:inherit}
-.whobtn:hover{background:var(--sage-soft)}.whobtn span{font-size:12px;color:var(--muted)}
+
+
 .stafflist .lrow{width:100%;border:0;background:none;font:inherit;color:inherit;text-align:left;cursor:pointer;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 8px;border-radius:10px}
 .stafflist .lrow:hover{background:var(--sage-soft)}.stafflist .lrow+.lrow{border-top:1px solid var(--line)}
 .stafflist .row-f{gap:8px;align-items:center;flex-wrap:wrap}
@@ -769,3 +769,30 @@ ol.steps{padding-left:20px;line-height:1.6}ol.steps li{margin-bottom:6px}
 html[data-ws="pos"] .rail .brand b,html[data-ws="pos"] .login .brand b{color:var(--ink)}
 html[data-ws="service"] .rail{background:linear-gradient(var(--sage-soft),var(--surface) 160px)}
 html[data-ws="pos"] .rail{background:linear-gradient(#E9E6DA,var(--surface) 160px)}
+
+/* ---------- левый нижний угол: сотрудник, точка, смена ---------- */
+.whocard{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:6px;display:flex;flex-direction:column;gap:2px}
+.whotop{display:flex;align-items:center;gap:4px}
+.whobtn{flex:1;min-width:0;display:flex;align-items:center;gap:10px;border:0;background:none;padding:6px;border-radius:10px;text-align:left;cursor:pointer;font:inherit;color:inherit}
+.whobtn:hover{background:var(--surface)}
+.ava{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--olive);color:var(--bg);font:700 13px var(--f-display);letter-spacing:.02em}
+html[data-ws="pos"] .ava{background:var(--ink)}html[data-ws="service"] .ava{background:var(--sage);color:var(--ink)}
+.whonm{min-width:0;display:flex;flex-direction:column;line-height:1.2}
+.whonm b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.whonm small{font-size:12px;color:var(--muted)}
+.iconbtn{flex:none;width:34px;height:34px;display:grid;place-items:center;border:0;background:none;border-radius:10px;color:var(--muted);cursor:pointer}
+.iconbtn:hover{background:var(--bad-soft);color:var(--bad)}.iconbtn svg{width:18px;height:18px}
+.whorow{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:10px;color:var(--ink);text-decoration:none;font-size:13px;min-height:34px}
+.whorow>svg{flex:none;width:16px;height:16px;color:var(--muted)}
+.whorow select{flex:1;min-width:0;border:0;background:transparent;padding:0;font:600 13px var(--f-body);color:var(--ink);cursor:pointer;box-shadow:none;height:auto}
+.whorow select:focus-visible{outline:2px solid var(--olive);outline-offset:2px}
+.whorow>span{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.whorow.shift{border-top:1px solid var(--line);border-radius:0 0 10px 10px;margin-top:2px}
+.whorow.shift:hover{background:var(--surface)}
+.whorow.shift i{flex:none;width:8px;height:8px;margin:0 4px;border-radius:50%;background:var(--muted);box-shadow:0 0 0 3px rgba(106,109,92,.15)}
+.whorow.shift.on i{background:var(--ok);box-shadow:0 0 0 3px var(--ok-soft)}
+.whorow.shift span{font-weight:500;color:var(--muted)}.whorow.shift.on span{color:var(--ok);font-weight:600}
+.whorow.shift small{margin-left:auto;color:var(--muted);white-space:nowrap;flex:none}
+.rail>*{flex-shrink:0}
+@media (max-width:760px){.rail{padding-bottom:calc(16px + env(safe-area-inset-bottom))}}
+.wsswitch{margin-bottom:0}
