@@ -228,7 +228,7 @@ pre.receipt{background:#fff;border:1px dashed var(--line);border-radius:10px;pad
   .top-acts{order:4}
   .form,.paygrid{grid-template-columns:1fr}
   .kv{grid-template-columns:110px 1fr}
-  .scrim{padding:0;align-items:stretch}
+  .scrim{padding:0;align-items:flex-start}
   .modal{border-radius:0;min-height:100%;padding:16px}
   .hb{grid-template-columns:1fr 1fr auto}
 }
@@ -872,9 +872,24 @@ input.err,textarea.err,select.err{border-color:var(--bad)!important;box-shadow:0
 .rph{display:flex;flex-direction:column;gap:4px}.rph .phgrid{margin:0}.rside .ph{width:72px;height:72px}
 .rpay{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.rpay div{display:flex;flex-direction:column}.rpay span{font-size:12px;color:var(--muted)}.rpay b{font-size:17px}
 .rhist{border:1px solid var(--line);border-radius:12px;padding:10px 14px}.rhist summary{cursor:pointer;font-weight:700}.rhist .addrow{margin:10px 0}
-.racts{align-items:center}.rst-man{margin-right:auto;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);order:-1}.rst-man select{width:auto;padding:6px 8px}
+.racts{align-items:center}.rst-man{margin-right:auto;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);order:-1}.rst-man select{width:auto;padding:6px 34px 6px 10px;background-position:right 10px center}
 @media(max-width:820px){.rgrid{grid-template-columns:1fr}.rside{order:-1}.rln{grid-template-columns:minmax(0,1fr) auto 48px}.rln-k{display:none}
   .rflow li{font-size:10px}.rdl{grid-template-columns:96px minmax(0,1fr)}.rin-acts{bottom:-16px}}
 .rblk>.btn,.radd>.btn,.rblk>.row-f>.btn{align-self:flex-start}
 .chip.on small.okc,.chip.on small.badc{color:#F3F0E6;opacity:.85}
 .rblk .row-f select{flex:1;min-width:0}
+.radd .row-f.addrow{display:grid;grid-template-columns:minmax(0,1fr) 110px auto;gap:8px}
+.radd .row-f.addrow select{grid-column:1/-1}
+.radd .row-f.addrow input{min-width:0;width:100%}
+@media(max-width:420px){.radd .row-f.addrow{grid-template-columns:minmax(0,1fr) 90px}.radd .row-f.addrow .btn{grid-column:1/-1}}
+.rboard .rc-st{display:none}
+.repbar>.wl{flex:none}
+/* поля с кнопкой в одну строку: IMEI + Скан, пароль + ключ */
+.rsec .fld>.row-f{flex-wrap:nowrap}.rsec .fld>.row-f input{flex:1;min-width:0}.rsec .fld>.row-f .btn{flex:none}
+.rsec .fld>.row-f select{flex:0 0 auto;width:auto}
+@media(max-width:700px){.prv-bar b{display:none}.prv-bar .prv-sp{display:none}.prv-bar{justify-content:space-between;padding:8px}.prv-bar .btn{flex:1;padding:8px 6px;font-size:13px}}
+@media(max-width:700px){.rin-acts{flex-wrap:nowrap;gap:6px}.rin-sum{display:none}.rin-acts .btn.pri{flex:1;padding:10px 8px}}
+.rin-acts{bottom:0;margin:0 -22px -22px;padding:12px 22px;border-radius:0 0 18px 18px;box-shadow:0 -8px 18px rgba(30,32,20,.06)}
+@media(max-width:700px){.rin-acts{margin:0 -16px -16px;padding:10px 16px;border-radius:0}}
+.rin-acts{bottom:-36px}
+@media(max-width:700px){.rin-acts{bottom:0}}

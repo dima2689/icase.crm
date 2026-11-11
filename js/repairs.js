@@ -18,7 +18,7 @@ const flt=(f,r)=>f==="active"?App.ACTIVE.includes(r.status):f==="late"?App.isLat
 function card(r){
   const c=App.cust(r.customerId)||{},late=App.isLate(r),stored=App.isStored(r),due=App.repDue(r);
   return `<button class="rcard ${late?"late":""} ${r.status==="ready"?"ready":""}" data-act="openRepair" data-id="${esc(r.id)}">
-    <div class="rc-h"><b>${esc(r.num)}</b>${r.warrantyOf?'<span class="pill info">гарантия</span>':""}${App.statusPill(r.status)}</div>
+    <div class="rc-h"><b>${esc(r.num)}</b>${r.warrantyOf?'<span class="pill info">гарантия</span>':""}<span class="rc-st">${App.statusPill(r.status)}</span></div>
     <div class="rc-dev">${esc(r.device)}</div><div class="rc-m">${esc(r.problem)}</div>
     <div class="rc-m">${esc(c.name||"—")}${c.phone?" · "+esc(c.phone):""}</div>
     <div class="rc-f"><span>${r.masterId||r.master?esc(App.nameOf(r.masterId)||r.master):'<span class="badc">мастер не назначен</span>'}</span>
@@ -68,7 +68,7 @@ ACT.newRepair=(arg)=>{
     ${sec(2,"Устройство",`<div class="fld"><label for="rImei">IMEI / серийный номер</label><div class="row-f">${App.inp("rImei",pre.imei||"","text","Сканируйте или введите",'autocomplete="off"')}<button type="button" class="btn" data-act="repScanImei" aria-label="Сканировать IMEI камерой">Скан</button></div></div>
       ${App.fld("rDevice","Устройство",App.inp("rDevice",pre.device||"","text","iPhone 13, синий, 128 ГБ",'list="rDevList" autocomplete="off"'))}
       <div class="full" id="rInModel"></div>
-      <div class="fld full"><label for="rPass">Пароль / графический ключ</label><div class="row-f">${App.inp("rPass","","text","Если клиент оставляет")}<button type="button" class="btn" data-act="patOpen">Нарисовать ключ</button></div><div id="patBox" class="patbox" hidden></div></div>`,"IMEI подскажет модель")}
+      <div class="fld full"><label for="rPass">Пароль / графический ключ</label><div class="row-f">${App.inp("rPass","","text","Если клиент оставляет")}<button type="button" class="btn" data-act="patOpen">Ключ</button></div><div id="patBox" class="patbox" hidden></div></div>`,"IMEI подскажет модель")}
     ${sec(3,"Неисправность",`<div class="fld full"><label for="rProblem">Со слов клиента</label>${App.area("rProblem",pre.problem||"","Что случилось и когда")}${chips("rProblem")}</div>`)}
     ${sec(4,"Осмотр и комплектация",`<div class="fld full"><label>Проверка при клиенте <small class="muted">нажатие: ✓ в порядке → ✕ дефект → ? не проверить</small></label>${App.repIntakeCheck()}</div>
       <div class="fld full"><label for="rLook">Внешний вид</label>${App.inp("rLook","","text","Что видно на корпусе и экране")}${chips("rLook")}</div>

@@ -160,18 +160,19 @@ ACT.repLink=id=>{const r=App.byId("repairs",id),url=App.repApproveLink(r),c=App.
 ACT.rlCopy=()=>ACT.copyTxt?ACT.copyTxt(App.val("rlT")):navigator.clipboard.writeText(App.val("rlT"));
 
 /* ---------- список: мои ремонты, нагрузка мастеров ---------- */
+App.plural=App.plural||((n,a,b,c)=>{n=Math.abs(n)%100;const k=n%10;return n>10&&n<20?c:k===1?a:k>=2&&k<=4?b:c});
 const masters=()=>S.staff.filter(s=>s.active!==false&&["master","owner","manager"].includes(s.role));
 App.repWorkload=()=>{if(!["owner","manager"].includes(App.me.role))return "";const ms=masters().filter(m=>m.id!==App.me.id||App.me.role==="master");if(!ms.length)return "";
   const act=S.repairs.filter(r=>App.ACTIVE.includes(r.status));const un=act.filter(r=>!r.masterId).length;
   return `<div class="workload">${ms.map(m=>{const mine=act.filter(r=>r.masterId===m.id),late=mine.filter(App.isLate).length,ready=mine.filter(r=>r.status==="ready").length,inw=mine.length-ready;
     return `<button type="button" class="wl ${App.ui.repMaster===m.id?"on":""}" data-act="repMasterPick" data-id="${esc(m.id)}"><b>${esc(m.fullName)}</b><span>${inw} в работе${ready?" · "+ready+" готово":""}</span>${late?`<em>${late} просрочено</em>`:""}</button>`}).join("")}
-    ${un?`<button type="button" class="wl warn ${App.ui.repMaster==="__none"?"on":""}" data-act="repMasterPick" data-id="__none"><b>Без мастера</b><span>${un} ремонт.</span></button>`:""}</div>`};
+    ${un?`<button type="button" class="wl warn ${App.ui.repMaster==="__none"?"on":""}" data-act="repMasterPick" data-id="__none"><b>Без мастера</b><span>${un} ${App.plural?App.plural(un,"ремонт","ремонта","ремонтов"):"шт."}</span></button>`:""}</div>`};
 ACT.repMasterPick=id=>{App.ui.repMaster=App.ui.repMaster===id?"":id;App.render()};
 let mineInit=false;
 const rv=VIEWS.repairs;if(rv){const r0=rv.render.bind(rv);rv.render=function(){
   if(!mineInit){mineInit=true;if(App.me.role==="master")App.ui.repMaster=App.me.id}
   const mine=App.can("repairWork");const n=S.repairs.filter(r=>r.masterId===App.me.id&&App.ACTIVE.includes(r.status)).length;
-  const bar=mine||App.repWorkload()?`<div class="repbar">${mine?`<button type="button" class="chip ${App.ui.repMaster===App.me.id?"on":""}" data-act="repMine">Мои ремонты <b>${n}</b></button>`:""}${App.repWorkload()}</div>`:"";
+  const bar=mine||App.repWorkload()?`<div class="repbar">${mine?`<button type="button" class="wl ${App.ui.repMaster===App.me.id?"on":""}" data-act="repMine"><b>Мои ремонты</b><span>${n?n+" в работе":"нет активных"}</span></button>`:""}${App.repWorkload()}</div>`:"";
   return bar+r0()}}
 ACT.repMine=()=>{App.ui.repMaster=App.ui.repMaster===App.me.id?"":App.me.id;App.render()};
 
