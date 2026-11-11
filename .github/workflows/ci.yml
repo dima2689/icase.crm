@@ -26,8 +26,7 @@ jobs:
           deno check supabase/functions/site-api/index.ts supabase/functions/site-sync/index.ts supabase/functions/staff-admin/index.ts supabase/functions/evotor/index.ts
           deno run supabase/functions/tests/staff_admin_test.ts
       - name: Секреты не попали в код
-        run: |
-          ! grep -rInE 'service_role"|sb_secret_|SERVICE_ROLE_KEY=ey' --exclude-dir=.git --exclude-dir=.github . || { echo "найден секретный ключ"; exit 1; }
+        run: python3 tests/secrets.py
 
   stack:
     name: Чистая установка + бэкап/восстановление
