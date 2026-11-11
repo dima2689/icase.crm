@@ -27,7 +27,7 @@ VIEWS.dashboard={
       ${hasRep?`<a class="tile click" href="#repairs"><span>Ремонт в работе</span><b>${act.length}</b><small>${ready.length} готовы · ${waitParts.length} ждут запчасть</small></a>
       <button class="tile click ${late.length?"alert":""}" data-act="repFilter" data-id="late"><span>Просрочено</span><b>${late.length}</b><small>${stored.length?stored.length+" на хранении дольше "+App.settings().storageDays+" дн.":"срок ремонта прошёл"}</small></button>`:""}
       ${App.tasksDue?`<a class="tile click ${App.tasksDue()?"alert":""}" href="#tasks"><span>Задачи на сегодня</span><b>${App.tasksDue()}</b><small>${S.waitlist.filter(w=>w.status==="ready").length?S.waitlist.filter(w=>w.status==="ready").length+" клиентов ждут звонка: товар пришёл":"напоминания и звонки"}</small></a>`:""}
-      <button class="tile click ${low.length?"alert":""}" data-act="lowStock"><span>Заканчивается</span><b>${low.length}</b><small>товаров ниже минимума</small></button>
+      ${App.apprTile?App.apprTile():""}<button class="tile click ${low.length?"alert":""}" data-act="lowStock"><span>Заканчивается</span><b>${low.length}</b><small>товаров ниже минимума</small></button>
     </div>
     <div class="grid g2">
       <section class="card"><div class="card-h"><h2>Выручка за 14 дней</h2><span class="pill">продажи − возвраты + ремонт</span></div>${App.barChart(days,vals)}</section>
@@ -172,6 +172,7 @@ VIEWS.pos={
 };
 function posAdd(pid,unit){
   const p=App.byId("products",pid),wh=posWh();if(!p)return;
+  if(p.approval==="pending_create")return App.toast("«"+p.name+"» ещё не подтверждён управляющим — продать его нельзя");
   if(p.trackSerial){
     const add=u=>{if(P.cart.some(i=>i.unitId===u.id))return App.toast("Этот экземпляр уже в чеке");
       if(u.status!=="in_stock")return App.toast(App.codeLbl(u.productId)+" "+App.unitCode(u)+": "+(App.UNIT_ST[u.status]||[u.status])[0].toLowerCase());

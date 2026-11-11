@@ -48,7 +48,7 @@ async function all(table,select="*",mod){
 /* ---------- преобразование строк базы в объекты интерфейса ---------- */
 const M={
   settings:r=>({id:"main",shopName:r.shop_name,city:r.city||"",address:r.address||"",phone:r.phone||"",inn:r.inn||"",
-    deviceWarrantyMonths:r.device_warranty_months,repairWarrantyDays:r.repair_warranty_days,requireShift:r.require_shift,storageDays:r.storage_days,deadDays:r.dead_days,receiptFooter:r.receipt_footer||"",finConfig:r.fin_config||{},loyalty:r.loyalty||{},evotor:r.evotor||{},legalName:r.legal_name||"",ogrnip:r.ogrnip||"",siteUrl:r.site_url||"",reviewUrl:r.review_url||"",receiptAck:r.receipt_ack||"",docConfig:r.doc_config||{},siteSync:!!r.site_sync,siteOrders:!!r.site_orders,siteWarehouses:r.site_warehouses||[],siteNewStatus:r.site_new_status||"draft",siteReserveWh:r.site_reserve_wh||"",siteLastSync:r.site_last_sync||"",siteLastError:r.site_last_error||"",siteFields:r.site_fields||null,siteMode:r.site_mode||"custom",siteHookUrl:r.site_hook_url||"",tagTemplates:Array.isArray(r.tag_templates)?r.tag_templates:[]}),
+    deviceWarrantyMonths:r.device_warranty_months,repairWarrantyDays:r.repair_warranty_days,requireShift:r.require_shift,approvals:r.approvals||{},storageDays:r.storage_days,deadDays:r.dead_days,receiptFooter:r.receipt_footer||"",finConfig:r.fin_config||{},loyalty:r.loyalty||{},evotor:r.evotor||{},legalName:r.legal_name||"",ogrnip:r.ogrnip||"",siteUrl:r.site_url||"",reviewUrl:r.review_url||"",receiptAck:r.receipt_ack||"",docConfig:r.doc_config||{},siteSync:!!r.site_sync,siteOrders:!!r.site_orders,siteWarehouses:r.site_warehouses||[],siteNewStatus:r.site_new_status||"draft",siteReserveWh:r.site_reserve_wh||"",siteLastSync:r.site_last_sync||"",siteLastError:r.site_last_error||"",siteFields:r.site_fields||null,siteMode:r.site_mode||"custom",siteHookUrl:r.site_hook_url||"",tagTemplates:Array.isArray(r.tag_templates)?r.tag_templates:[]}),
   points:r=>({id:r.id,name:r.name,address:r.address||"",phone:r.phone||"",patentNo:r.patent_no||"",evotorStoreId:r.evotor_store_id||"",cashWh:r.cash_wh,serviceWh:r.service_wh,order:r.sort,active:r.is_active}),
   warehouses:r=>({id:r.id,name:r.name,kind:r.kind||"",address:r.address||"",pointId:r.point_id,order:r.sort,active:r.is_active}),
   categories:r=>({id:r.id,name:r.name,parentId:r.parent_id||"",isDevice:r.is_device,isUsed:!!r.is_used}),
@@ -60,7 +60,7 @@ const M={
     discount:num(r.discount),tags:r.tags||[],blacklisted:r.blacklisted,blackReason:r.black_reason||"",note:r.note||"",mergedInto:r.merged_into,createdAt:r.created_at}),
   products:r=>({id:r.id,name:r.name,categoryId:r.category_id||"",brand:r.brand||"",condition:r.condition,sku:r.sku||"",barcode:r.barcode||"",serial:r.serial||"",
     cost:num(r.cost),lastCost:num(r.last_cost),price:num(r.price),oldPrice:r.old_price==null?null:num(r.old_price),minQty:r.min_qty,warrantyMonths:r.warranty_months,batteryHealth:r.battery_health,diagnostics:r.diagnostics||"",
-    kit:r.kit||"",trackSerial:!!r.track_serial,attrs:r.attrs||{},catalogId:r.catalog_id||"",model:r.model||"",memory:r.memory||"",color:r.color||"",avitoPrice:r.avito_price==null?"":num(r.avito_price),ownership:r.ownership,onSite:r.on_site,onAvito:r.on_avito,archived:r.is_archived,note:r.description||"",
+    kit:r.kit||"",trackSerial:!!r.track_serial,attrs:r.attrs||{},catalogId:r.catalog_id||"",model:r.model||"",memory:r.memory||"",color:r.color||"",avitoPrice:r.avito_price==null?"":num(r.avito_price),ownership:r.ownership,onSite:r.on_site,onAvito:r.on_avito,archived:r.is_archived,note:r.description||"",approval:r.approval||"",approvalBy:r.approval_by||"",approvalAt:r.approval_at||"",approvalNote:r.approval_note||"",
     createdAt:r.created_at,stock:{}}),
   sales:r=>({id:r.id,num:r.num,pointId:r.point_id,whId:r.warehouse_id,shiftId:r.shift_id,customerId:r.customer_id,channel:r.channel,subtotal:num(r.subtotal),discount:num(r.discount),
     tradeIn:r.tradein_device?{device:r.tradein_device,amount:num(r.tradein_amount),imei:r.tradein_imei||""}:null,total:num(r.total),status:r.status,by:r.staff_id,createdAt:r.created_at,
@@ -109,7 +109,7 @@ const M={
     termDays:r.term_days,payMethod:r.pay_method||"",person:r.person||{},status:r.status,saleId:r.sale_id||"",debtId:r.debt_id||"",note:r.note||"",by:r.created_by,createdAt:r.created_at,closedAt:r.closed_at||""}),
   evotor:r=>({id:r.id,storeId:r.store_id,pointId:r.point_id||"",deviceId:r.device_id||"",type:r.doc_type,number:r.number||"",at:r.closed_at,total:num(r.total),payments:r.payments||{},items:r.items||[],
     saleId:r.sale_id||"",returnId:r.return_id||"",status:r.status,note:r.note||""}),
-  log:r=>({id:r.id,at:r.created_at,by:r.staff_id,action:r.action,ref:r.ref||"",details:r.details||""})
+  log:r=>({id:r.id,at:r.created_at,by:r.staff_id,action:r.action,ref:r.ref||"",details:r.details||"",entity:r.entity||"",entityId:r.entity_id||""})
 };
 /* что загружать для каждого раздела */
 const L={

@@ -23,7 +23,7 @@ const GROUPS=[["cat","По категориям"],["brand","По брендам"
 function stockBase(skip){
   const u=App.ui,f=u.sf,q=u.stockQ.trim().toLowerCase(),words=q?q.split(/\s+/):[];
   const qty=p=>u.stockWh?App.qtyIn(p,u.stockWh):App.qtyTotal(p);
-  return S.products.filter(p=>(f.arch?p.archived:!p.archived)
+  return S.products.filter(p=>(f.arch?p.archived:!p.archived)&&(!f.appr||p.approval)
     &&(skip==="cat"||App.inCat(p,f.cat==="__none"?"":f.cat)&&(f.cat!=="__none"||!p.categoryId))
     &&(skip==="brand"||!f.brands.length||f.brands.includes(brandOf(p)))
     &&(skip==="cond"||!f.conds.length||f.conds.includes(p.condition))
@@ -84,7 +84,7 @@ VIEWS.stock={
       if(f.group!=="none"&&k!==g&&mob){g=k;const inG=list.filter(x=>gkey(x)===k);rows+=`<div class="mgrow"><b>${esc(k)}</b><span>${inG.length} поз. · ${inG.reduce((a,x)=>a+Math.max(0,qty(x)),0)} шт</span></div>`}
       if(mob){const q=qty(p),mk=num(p.price)-num(p.cost);
         rows+=`<div class="pcard rowlink" data-act="openProduct" data-id="${esc(p.id)}"><input type="checkbox" class="pck" data-act="tagPick" data-id="${esc(p.id)}" aria-label="Ценник" ${App.ui.tagPick.has(p.id)?"checked":""}>
-          <div class="pci"><b>${esc(p.name)}</b><div class="chips">${p.condition&&p.condition!=="Новый"?`<span class="pill">${esc(p.condition)}</span>`:""}${p.trackSerial?'<span class="pill info">'+App.codeLbl(p)+'</span>':""}${p.onSite?'<span class="pill info">Сайт</span>':""}${p.onAvito?'<span class="pill info">Авито</span>':""}</div>
+          <div class="pci"><b>${esc(p.name)}</b><div class="chips">${App.apprPill?App.apprPill(p):""}${p.condition&&p.condition!=="Новый"?`<span class="pill">${esc(p.condition)}</span>`:""}${p.trackSerial?'<span class="pill info">'+App.codeLbl(p)+'</span>':""}${p.onSite?'<span class="pill info">Сайт</span>':""}${p.onAvito?'<span class="pill info">Авито</span>':""}</div>
           <span class="sub">${esc([f.group!=="cat"?App.catName(p):"",p.brand,p.sku?"арт. "+p.sku:""].filter(Boolean).join(" · "))}</span>
 </div>
           <div class="pcr"><b>${money(p.price)}</b><span>${qtyCell(q,p)} шт</span>${showCost?`<small>закупка ${money(p.cost)}</small>`:""}</div></div>`;return}
@@ -93,7 +93,7 @@ VIEWS.stock={
       const mk=num(p.price)-num(p.cost);
       rows+=`<tr class="rowlink" data-act="openProduct" data-id="${esc(p.id)}">
       <td class="tagsel"><input type="checkbox" data-act="tagPick" data-id="${esc(p.id)}" aria-label="Ценник" ${App.ui.tagPick.has(p.id)?"checked":""}></td>
-      <td><b>${esc(p.name)}</b>${p.condition&&p.condition!=="Новый"?` <span class="pill">${esc(p.condition)}</span>`:""}${p.trackSerial?' <span class="pill info">'+App.codeLbl(p)+'</span>':""}${p.onSite?' <span class="pill info">Сайт</span>':""}${p.onAvito?' <span class="pill info">Авито</span>':""}
+      <td><b>${esc(p.name)}</b>${App.apprPill?App.apprPill(p," "):""}${p.condition&&p.condition!=="Новый"?` <span class="pill">${esc(p.condition)}</span>`:""}${p.trackSerial?' <span class="pill info">'+App.codeLbl(p)+'</span>':""}${p.onSite?' <span class="pill info">Сайт</span>':""}${p.onAvito?' <span class="pill info">Авито</span>':""}
         <span class="sub">${esc([f.group!=="cat"?App.catName(p):"",f.group!=="brand"&&p.brand?p.brand:"",p.sku?"арт. "+p.sku:"",p.barcode?"ШК "+p.barcode:"",usedRange(p)].filter(Boolean).join(" · "))}</span></td>
       ${u.stockWh?`<td class="n">${qtyCell(App.qtyIn(p,u.stockWh),p)}</td>`:`<td class="n">${qtyCell(App.qtyTotal(p),p)}</td>`}
       ${showCost?`<td class="n">${money(p.cost)}</td>`:""}<td class="n"><b>${money(p.price)}</b></td></tr>`});
@@ -211,7 +211,7 @@ function productForm(id){
   const moves=id?App.sortDesc(S.movements.filter(m=>m.productId===id),"at").slice(0,15):[];
   const units=id&&p.trackSerial?App.sortDesc(S.units.filter(u=>u.productId===id&&(App.ui.unitAll||u.status==="in_stock")),"createdAt"):[];
   const attrs=Object.entries(p.attrs||{}).filter(([k,v])=>v);
-  App.openModal(App.head(id?esc(p.name):"Новый товар",id&&p.archived?'<span class="pill mute">архив</span>':"")+`
+  App.openModal(App.head(id?esc(p.name):"Новый товар",(id&&p.archived?'<span class="pill mute">архив</span>':"")+(id&&App.apprPill?App.apprPill(p):""))+(id&&App.apprPanel?App.apprPanel(p):"")+`
   ${id?`<div class="tiles">${App.whs().map(w=>`<button type="button" class="tile click" data-act="whOpen" data-id="${esc(w.id)}" title="Открыть склад"><span>${esc(w.name)}</span><b>${App.qtyIn(p,w.id)}</b></button>`).join("")}<div class="tile"><span>Всего</span><b>${App.qtyTotal(p)}</b></div></div>`:""}
   ${id&&p.onSite&&App.can("settings")?`<div class="row-f" style="margin:8px 0 0"><button type="button" class="btn sm" data-act="sitePreview" data-id="${esc(id)}">Как уйдёт на сайт</button></div>`:""}
   ${id&&App.can("cost")&&App.offersFor?(()=>{const of=App.offersFor(p).filter(o=>o.price>0).slice(0,5);return of.length?`<div class="offers"><span class="muted">Цены поставщиков:</span> ${of.map((o,i)=>`<button type="button" class="pill ${i?"":"ok"}" data-act="spOpen" data-id="${o.id}">${esc((App.byId("suppliers",o.supplierId)||{}).name||"")} — ${money(o.price)}</button>`).join(" ")}</div>`:""})():""}
@@ -248,8 +248,9 @@ function productForm(id){
       <td class="n">${u.batteryHealth!=null&&u.batteryHealth!==""?u.batteryHealth+"%":"—"}</td><td class="n">${money(App.unitPrice(u,p))}</td>${cost?`<td class="n">${money(u.cost)}</td>`:""}<td>${App.unitSt(u)}</td></tr>`).join("")||`<tr><td colspan="6" class="empty">Нет экземпляров. Оформите приход и отсканируйте IMEI</td></tr>`}
     </tbody></table></div></section>`:""}
   ${id?`<section><h3 class="sub-h">Движение</h3><div class="tbl-wrap"><table><tbody>${moves.map(m=>`<tr><td>${App.dtt(m.at)}</td><td>${esc(App.MOVE[m.type]||m.type)}</td><td>${esc(App.whName(m.whId))}</td><td class="n"><span class="pill ${num(m.qty)>0?"ok":"mute"}">${num(m.qty)>0?"+":""}${num(m.qty)}</span></td><td>${esc(m.ref)}${m.note?'<span class="sub">'+esc(m.note)+"</span>":""}</td></tr>`).join("")||'<tr><td class="empty">Движений нет</td></tr>'}</tbody></table></div></section>`:""}
+  ${id&&App.prodHist?App.prodHist(p):""}
   <div class="acts">
-    ${id&&App.can("del")?`<button class="btn danger" data-act="delProduct" data-id="${esc(id)}">${moves.length?(p.archived?"Вернуть из архива":"В архив"):"Удалить"}</button>`:""}
+    ${id&&App.prodDelBtn?App.prodDelBtn(p,moves):id&&App.can("del")?`<button class="btn danger" data-act="delProduct" data-id="${esc(id)}">${moves.length?(p.archived?"Вернуть из архива":"В архив"):"Удалить"}</button>`:""}
     ${id?`<button class="btn" data-act="tagOne" data-id="${esc(id)}">Ценник</button>`:""}
     ${id&&App.can("stock")?`<button class="btn" data-act="quickDoc" data-id="in|${esc(id)}">Приход</button><button class="btn" data-act="quickDoc" data-id="transfer|${esc(id)}">Переместить</button><button class="btn" data-act="quickDoc" data-id="writeoff|${esc(id)}">Списать</button>`:""}
     ${edit||price?`<button class="btn pri" data-act="saveProduct" data-id="${esc(id||"")}">Сохранить</button>`:""}
@@ -288,10 +289,10 @@ ACT.delProduct=async(id,el)=>{
   const p=App.byId("products",id),hasMoves=S.movements.some(m=>m.productId===id)||App.qtyTotal(p)>0;
   try{
     if(!hasMoves){if(!App.confirm2(el,"Удалить навсегда? Нажмите ещё раз"))return;
-      try{await App.api.remove("products",id)}catch(e){await App.api.update("products",id,{is_archived:true});App.closeModal();return App.toast("У товара есть история, он отправлен в архив")}
-      await App.api.audit("Удаление товара",p.name,"");App.closeModal();return App.toast("Товар удалён")}
+      try{await App.api.remove("products",id)}catch(e){if(/подтвержден/i.test(e.message||""))throw e;await App.api.update("products",id,{is_archived:true});App.closeModal();return App.toast("У товара есть история, он отправлен в архив")}
+      App.closeModal();return App.toast("Товар удалён")}
     if(!p.archived&&App.qtyTotal(p)>0)return App.toast("В архив можно отправить только товар с нулевым остатком. Сначала спишите или переместите");
-    await App.api.update("products",id,{is_archived:!p.archived});await App.api.audit(p.archived?"Из архива":"В архив",p.name,"");App.closeModal();App.toast(p.archived?"Товар возвращён":"Товар в архиве");
+    await App.api.update("products",id,{is_archived:!p.archived});App.closeModal();App.toast(p.archived?"Товар возвращён":"Товар в архиве");
   }catch(e){App.toast(e.message)}
 };
 

@@ -27,12 +27,16 @@ function shop(){
     ${App.fld("sStore","Бесплатное хранение готовых ремонтов, дней",App.inp("sStore",s.storageDays,"number"))}${App.fld("sDead","Товар «залежался» через, дней",App.inp("sDead",s.deadDays,"number"))}
     ${App.fld("sAck","Отметка покупателя в товарном чеке",App.inp("sAck",s.receiptAck),"full")}${App.fld("sFoot","Подпись в чеке",App.inp("sFoot",s.receiptFooter),"full")}
     <div class="fld full">${App.chk("sShift","Продажи только при открытой кассовой смене",s.requireShift)}</div>
+    <div class="fld full"><label>Подтверждение управляющим или владельцем</label>
+      ${App.chk("sApC","Новые товары, заведённые кладовщиком, — только после подтверждения (до этого их можно принять на склад, но нельзя продать)",!!(s.approvals||{}).productCreate)}
+      ${App.chk("sApD","Удаление и отправка товаров в архив кладовщиком — только по запросу с подтверждением",!!(s.approvals||{}).productDelete)}
+      <small class="muted">Создание, удаление, архив и переименование товаров всегда записываются в журнал.</small></div>
   </div><div class="acts">${ed?'<button class="btn pri" data-act="saveSettings">Сохранить</button>':'<span class="muted">Изменять может управляющий или владелец</span>'}</div></section>`;
 }
 ACT.saveSettings=(_,btn)=>run(btn,async()=>{
   const V=App.val;
   await App.api.update("settings",1,{shop_name:V("sName")||"iCase",city:V("sCity"),address:V("sAddr")||null,phone:V("sPhone")||null,inn:V("sInn")||null,legal_name:V("sLegal")||null,ogrnip:V("sOgrn")||null,site_url:V("sSite")||null,review_url:V("sRev")||null,receipt_ack:V("sAck")||App.DEFAULTS.receiptAck,
-    device_warranty_months:num(V("sWarr")),repair_warranty_days:num(V("sRw")),storage_days:num(V("sStore"))||30,dead_days:num(V("sDead"))||60,receipt_footer:V("sFoot")||null,require_shift:App.checked("sShift")});
+    device_warranty_months:num(V("sWarr")),repair_warranty_days:num(V("sRw")),storage_days:num(V("sStore"))||30,dead_days:num(V("sDead"))||60,receipt_footer:V("sFoot")||null,require_shift:App.checked("sShift"),approvals:{productCreate:App.checked("sApC"),productDelete:App.checked("sApD")}});
   await App.api.audit("Настройки изменены","","");App.toast("Настройки сохранены");
 });
 
@@ -269,7 +273,7 @@ function log(){
   const list=App.sortDesc(S.log,"at").filter(l=>!q||[l.action,l.ref,l.details,App.nameOf(l.by)].join(" ").toLowerCase().includes(q)).slice(0,300);
   return `<section class="card"><div class="card-h"><h2>Журнал действий</h2><input id="logQ" type="search" placeholder="Поиск" value="${esc(App.ui.logQ)}" data-filter="logQ" aria-label="Поиск в журнале"></div>
   <div class="tbl-wrap"><table><thead><tr><th>Когда</th><th>Кто</th><th>Действие</th><th>Объект</th><th>Подробности</th></tr></thead><tbody>
-  ${list.map(l=>`<tr><td>${App.dtt(l.at)}</td><td>${esc(App.nameOf(l.by))}</td><td>${esc(l.action)}</td><td>${esc(l.ref)}</td><td>${esc(l.details)}</td></tr>`).join("")||'<tr><td colspan="5" class="empty">Записей нет</td></tr>'}
+  ${list.map(l=>`<tr><td>${App.dtt(l.at)}</td><td>${esc(App.nameOf(l.by))}</td><td>${esc(l.action)}</td><td>${l.entity==="product"&&App.byId("products",l.entityId)?`<button class="linkbtn" data-act="openProduct" data-id="${esc(l.entityId)}">${esc(l.ref)}</button>`:esc(l.ref)}</td><td>${esc(l.details)}</td></tr>`).join("")||'<tr><td colspan="5" class="empty">Записей нет</td></tr>'}
   </tbody></table></div><p class="muted">Показаны последние 500 записей.</p></section>`;
 }
 
