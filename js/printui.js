@@ -54,7 +54,7 @@ function tags(){
   const items=queueItems(),total=printList().reduce((a,x)=>a+num(x.copies),0),res=found();
   return `<div class="pgrid pset">
   <section class="card"><div class="card-h"><h2>Что печатаем</h2>${items.length?`<span class="pill">${items.length} товаров · ${total} ценников</span>`:""}</div>
-    <div class="tsec"><input type="search" id="tagQ" class="wide" placeholder="Найти товар: название, артикул, штрихкод, IMEI" value="${esc(App.ui.tagQ)}" data-filter="tagQ" aria-label="Поиск товара">
+    <div class="tsec"><input type="search" id="tagQ" class="wide" placeholder="Название, штрихкод, IMEI" value="${esc(App.ui.tagQ)}" data-filter="tagQ" aria-label="Поиск товара">
     ${res.length?`<div class="list-mini tgap">${res.slice(0,8).map(p=>`<button data-act="tagAdd" data-id="${esc(p.id)}"><span>${esc(p.name)}<small>${esc(App.catName(p))} · остаток ${App.qtyTotal(p)}</small></span><b>${money(p.price)}</b></button>`).join("")}</div>
       ${res.length>1?`<div class="tgap"><button class="btn sm" data-act="tagAddFound">Добавить все найденные (${res.length})</button></div>`:""}`:App.ui.tagQ?'<p class="muted">Ничего не найдено</p>':""}
     <p class="szhint">Можно отметить товары галочками в разделе «Товары» и нажать «Ценники».</p></div>

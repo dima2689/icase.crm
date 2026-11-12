@@ -22,9 +22,10 @@ const CS={"":["—","не проверено",""],ok:["✓","в порядке",
 const nextS=v=>({"":"ok",ok:"bad",bad:"na",na:""})[v||""];
 App.checkHtml=(pref,state={},ro=false)=>`<div class="chk-grid">${App.CHECK.map(k=>{const v=state[k]||"";return `<button type="button" class="chkst ${CS[v][2]}" ${ro?"disabled":`data-act="chkToggle" data-id="${esc(pref+"|"+k)}"`} title="${esc(k)}: ${CS[v][1]}"><i>${CS[v][0]}</i><span>${esc(k)}</span></button>`}).join("")}</div>`;
 const CK={};   // состояние чек-листа в открытой форме: {pref: {item: state}}
-ACT.chkToggle=v=>{const [p,k]=v.split(/\|(.*)/s);CK[p]=CK[p]||{};CK[p][k]=nextS(CK[p][k]);const b=document.querySelector(`[data-act="chkToggle"][data-id="${CSS.escape(v)}"]`);
+ACT.chkToggle=v=>{const [p,k]=v.split(/\|(.*)/s);CK[p]=CK[p]||{};if(p==="out"){const o=document.getElementById("issOk");if(o)o.classList.remove("on")}CK[p][k]=nextS(CK[p][k]);const b=document.querySelector(`[data-act="chkToggle"][data-id="${CSS.escape(v)}"]`);
   if(b){const s=CK[p][k]||"";b.className="chkst "+CS[s][2];b.querySelector("i").textContent=CS[s][0];b.title=k+": "+CS[s][1]}};
-ACT.chkAll=v=>{const [p,s]=v.split("|");CK[p]={};App.CHECK.forEach(k=>CK[p][k]=s);const box=document.getElementById("chk_"+p);if(box)box.innerHTML=App.checkHtml(p,CK[p])};
+ACT.chkAll=v=>{const [p,s]=v.split("|");CK[p]={};App.CHECK.forEach(k=>CK[p][k]=s);const box=document.getElementById("chk_"+p);if(box)box.innerHTML=App.checkHtml(p,CK[p]);
+  const ok=document.getElementById("issOk");if(ok&&p==="out"&&s==="ok")ok.classList.add("on")};
 const checkSummary=st=>{const e=Object.entries(st||{}),of=v=>e.filter(([,x])=>x===v).map(([k])=>k),bad=of("bad"),na=of("na"),ok=of("ok");
   const out=[];if(bad.length)out.push("дефект: "+bad.join(", "));if(na.length)out.push(na.length>=App.CHECK.length-1?"не включается, проверить нельзя":"не проверить: "+na.join(", "));
   if(!out.length&&ok.length)out.push(ok.length>=App.CHECK.length?"всё в порядке":"в порядке: "+ok.length+" из "+App.CHECK.length);
@@ -102,7 +103,8 @@ App.repModelChips=r=>{const m=App.repModel(r);if(!m)return "";const rows=App.mod
     return `<button type="button" class="chip ${have.has(x.svc.id)?"on":""}" data-act="rxAdd" data-id="${esc(r.id)}|${esc(x.svc.id)}" ${have.has(x.svc.id)?"disabled":""}>${esc(x.svc.name)} · ${money(x.price)}${x.part?` <small class="${st>0?"okc":"badc"}">${st>0?"+ запчасть со склада":"запчасть закажем"}</small>`:""}</button>`}).join("")}</div></div>`};
 /* выдача: проверка при клиенте */
 App.repIssueCheckInit=r=>{CK.out=Object.assign({},((r.checklist||{}).issue)||{})};
-App.repIssueCheckHtml=()=>`<div id="chk_out">${App.checkHtml("out",CK.out||{})}</div><div class="qk"><button type="button" class="chip" data-act="chkAll" data-id="out|ok">Всё работает</button></div>`;
+App.repIssueCheckHtml=()=>`<div class="isschk"><button type="button" class="btn issok" data-act="chkAll" data-id="out|ok" id="issOk"><i aria-hidden="true">✓</i> Клиент проверил — всё работает</button>
+  <details class="issmore"><summary>Есть замечания — отметить по пунктам</summary><div id="chk_out">${App.checkHtml("out",CK.out||{})}</div></details></div>`;
 App.repIssueCheckSave=async id=>{if(Object.keys(CK.out||{}).length)await App.api.rpc("repair_set",{p_id:id,p:{checklist:{issue:CK.out}}})};
 ACT.rxAdd=(arg,btn)=>run(btn,async()=>{const [id,sid]=arg.split("|"),r=App.byId("repairs",id),m=App.repModel(r),x=App.modelPrice(m.id).find(y=>y.svc.id===sid);if(!x)return;
   await App.api.insert("repair_services",{repair_id:id,service_id:sid,name:x.svc.name,price:x.price,qty:1});
@@ -131,7 +133,7 @@ ACT.rqSet=(arg,btn)=>run(btn,async()=>{const [id,s]=arg.split("|");await App.api
 ACT.repCheck=id=>{const r=App.byId("repairs",id),ck=r.checklist||{};CK.ci=Object.assign({},ck.intake||{});CK.co=Object.assign({},ck.issue||{});
   App.openModal(App.head("Осмотр · "+esc(r.num))+`<h3 class="sub-h">При приёме</h3><div id="chk_ci">${App.checkHtml("ci",CK.ci)}</div>
     <h3 class="sub-h">При выдаче</h3><div id="chk_co">${App.checkHtml("co",CK.co)}</div><div class="row-f"><button type="button" class="btn sm ghost" data-act="chkAll" data-id="co|ok">Всё в порядке</button></div>
-    ${App.fld("ckNote","Заметка",App.inp("ckNote",ck.note||"","text","Например: царапина на рамке слева была при приёме"),"full")}
+    ${App.fld("ckNote","Заметка",App.inp("ckNote",ck.note||"","text","Например: царапина на рамке"),"full")}
     <div class="acts"><button class="btn" data-act="openRepair" data-id="${esc(id)}">Назад</button><button class="btn pri" data-act="repCheckSave" data-id="${esc(id)}">Сохранить</button></div>`,{wide:true})};
 ACT.repCheckSave=(id,btn)=>run(btn,async()=>{const c={intake:CK.ci||{},note:App.val("ckNote")||""};if(Object.keys(CK.co||{}).length)c.issue=CK.co;
   await App.api.rpc("repair_set",{p_id:id,p:{checklist:c}});await App.reload(["repairs"]);App.toast("Осмотр сохранён");ACT.openRepair(id)});

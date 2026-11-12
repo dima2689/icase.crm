@@ -41,7 +41,7 @@ VIEWS.receive={
       </div>
       ${!App.can("stock")?'<p class="muted">Закупочные цены подставятся из карточек товаров — управляющий проверит их по задаче. Новые товары могут потребовать подтверждения.</p>':""}
       <div class="scanbar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 17v3h-3M7 8v8M10 8v8M13 8v8M16 8v8"/></svg>
-        <input id="rcvQ" type="search" autocomplete="off" placeholder="Сканируйте штрихкод или IMEI, или найдите товар по названию" aria-label="Сканер или поиск товара"><div class="pick" id="rcvPick" hidden></div></div>
+        <input id="rcvQ" type="search" autocomplete="off" placeholder="Штрихкод или IMEI" aria-label="Сканер или поиск товара"><div class="pick" id="rcvPick" hidden></div></div>
       <p class="muted hintline">Новый IMEI → выберите модель, и устройство создастся само. Новый штрихкод → откроется карточка нового товара.</p>
       <div class="rlines">${R.lines.map((l,i)=>lineHtml(l,i,{cost,price})).join("")||`<div class="empty big">Пока пусто. Отсканируйте первый товар или нажмите «+ Устройство Apple»</div>`}</div>
     </section>

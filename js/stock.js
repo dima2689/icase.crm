@@ -121,7 +121,7 @@ VIEWS.stock={
     const pOpen=!!(f.sec||{}).panel;
     return `<div class="smain" data-nodirty>
       <div class="row-f stop">
-        <input id="stockQ" type="search" placeholder="Название, артикул, штрихкод, IMEI / S/N, модель, цвет" value="${esc(u.stockQ)}" data-filter="stockQ" aria-label="Поиск товара">
+        <input id="stockQ" type="search" placeholder="Название, штрихкод, IMEI" value="${esc(u.stockQ)}" data-filter="stockQ" aria-label="Поиск товара">
         ${App.sel("stockWh",[["","Все склады"],...App.whOpts()],u.stockWh,'data-filter-sel="stockWh" aria-label="Склад"')}
         <select data-sf="sort" aria-label="Сортировка">${SORTS.map(([v,l])=>`<option value="${v}"${f.sort===v?" selected":""}>${l}</option>`).join("")}</select>
         <select data-sf="group" aria-label="Группировка">${GROUPS.map(([v,l])=>`<option value="${v}"${f.group===v?" selected":""}>${l}</option>`).join("")}</select>
@@ -230,7 +230,7 @@ function productForm(id){
   ${id&&p.onSite&&App.can("settings")?`<div class="row-f" style="margin:8px 0 0"><button type="button" class="btn sm" data-act="sitePreview" data-id="${esc(id)}">Как уйдёт на сайт</button></div>`:""}
   ${id&&App.can("cost")&&App.offersFor?(()=>{const of=App.offersFor(p).filter(o=>o.price>0).slice(0,5);return of.length?`<div class="offers"><span class="muted">Цены поставщиков:</span> ${of.map((o,i)=>`<button type="button" class="pill ${i?"":"ok"}" data-act="spOpen" data-id="${o.id}">${esc((App.byId("suppliers",o.supplierId)||{}).name||"")} — ${money(o.price)}</button>`).join(" ")}</div>`:""})():""}
   <div class="form">
-    ${App.fld("pName","Название",App.inp("pName",p.name,"text","iPhone 15 Pro 256 ГБ, натуральный титан",edit?"":"disabled"),"full")}
+    ${App.fld("pName","Название",`<textarea id="pName" rows="2" class="namearea" placeholder="iPhone 15 Pro 256 ГБ, натуральный титан" ${edit?"":"disabled"}>${esc(p.name||"")}</textarea>`,"full")}
     ${App.fld("pCat","Категория",App.sel("pCat",App.catOpts(),p.categoryId||"",edit?"":"disabled"))}
     ${App.fld("pCond","Состояние",App.sel("pCond",App.CONDS,p.condition,edit?"":"disabled"))}
     ${App.fld("pModel","Модель",App.inp("pModel",p.model,"text","iPhone 15 Pro",edit?"":"disabled"))}
@@ -278,7 +278,7 @@ ACT.saveProduct=async(id,btn)=>{
   const V=App.val;if(!V("pName"))return App.toast("Укажите название");
   const old=id?App.byId("products",id):null;
   const n=v=>v===""?null:num(v);
-  const data={name:V("pName"),category_id:V("pCat")||null,condition:V("pCond"),brand:V("pBrand")||null,sku:V("pSku")||null,barcode:V("pBar")||null,serial:V("pSerial")||null,
+  const data={name:V("pName").replace(/\s*\n\s*/g," "),category_id:V("pCat")||null,condition:V("pCond"),brand:V("pBrand")||null,sku:V("pSku")||null,barcode:V("pBar")||null,serial:V("pSerial")||null,
     track_serial:App.checked("pTrack"),price:num(V("pPrice")),min_qty:num(V("pMin")),warranty_months:num(V("pWarr")),battery_health:n(V("pBatt")),diagnostics:V("pDiag")||null,kit:V("pKit")||null,model:V("pModel")||null,memory:V("pMem")||null,color:V("pColor")||null,
     avito_price:n(V("pAvito")),old_price:n(V("pOld")),on_site:App.checked("pSite"),on_avito:App.checked("pOnAvito"),description:V("pNote")||null};
   if(data.battery_health!=null&&(data.battery_health<0||data.battery_health>100))return App.toast("Ёмкость АКБ — от 0 до 100%");

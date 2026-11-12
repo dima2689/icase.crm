@@ -133,9 +133,10 @@ App.productPicker = function(inputId,boxId,{wh=null,inStock=false,onPick,showCos
   const q=document.getElementById(inputId),box=document.getElementById(boxId);if(!q)return;
   const draw=()=>{const s=q.value.trim();if(!s){box.hidden=true;return}
     const whv=typeof wh==="function"?wh():wh;
-    const list=App.searchProducts(s,{wh:whv,inStock,limit:10});
-    box.innerHTML=list.length?list.map(p=>{const here=whv?App.qtyIn(p,whv):App.qtyTotal(p);const other=whv&&here<=0?App.whereElse(p,whv):"";
-      return `<button type="button" data-pick="${esc(p.id)}"><span>${esc(p.name)}<small> · ${esc(App.catName(p))}${p.serial?" · "+esc(p.serial):""} · ${whv?"в наличии: ":"всего: "}${here} шт${other?" · есть: "+esc(other):""}</small></span><b>${money(showCost?p.cost:p.price)}</b></button>`}).join(""):'<div class="empty">Не найдено'+(inStock?" в наличии":"")+'</div>';
+    const hereOf=p=>whv?App.qtyIn(p,whv):App.qtyTotal(p);
+    const list=App.searchProducts(s,{wh:whv,inStock,limit:12}).map((p,i)=>[p,i]).sort((a,b)=>(hereOf(b[0])>0)-(hereOf(a[0])>0)||a[1]-b[1]).map(x=>x[0]).slice(0,10);
+    box.innerHTML=list.length?list.map(p=>{const here=hereOf(p);const other=whv&&here<=0?App.whereElse(p,whv):"";
+      return `<button type="button" data-pick="${esc(p.id)}" class="${here<=0&&!p.serviceKind?"zero":""}"><span>${esc(p.name)}<small> · ${esc(App.catName(p))}${p.serial?" · "+esc(p.serial):""} · ${whv?"в наличии: ":"всего: "}${here} шт${other?" · есть: "+esc(other):""}</small></span><b>${money(showCost?p.cost:p.price)}</b></button>`}).join(""):'<div class="empty">Не найдено'+(inStock?" в наличии":"")+'</div>';
     box.hidden=false};
   q.addEventListener("input",draw);
   q.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();const u=App.findUnit?App.findUnit(q.value):null;const p=App.findByCode(q.value)||(App.searchProducts(q.value,{wh:typeof wh==="function"?wh():wh,inStock,limit:2}).length===1?App.searchProducts(q.value,{wh:typeof wh==="function"?wh():wh,inStock,limit:1})[0]:null);
@@ -258,3 +259,26 @@ document.addEventListener("keydown",e=>{
 });
 window.addEventListener("hashchange",()=>{if(App.me.role)App.route()});
 })();
+
+/* ---------- таблицы на телефоне: каждая строка — карточка «подпись: значение» ---------- */
+(function(){
+  const SKIP="table.kv,table.stbl,table.sitbl,table.nostack,table.it,table.tagtbl";
+  App.stackTables=root=>{(root||document).querySelectorAll("table:not([data-st])").forEach(t=>{
+    if(t.matches(SKIP)||t.closest("#prv"))return;t.dataset.st="1";
+    const hr=t.tHead?t.tHead.rows[0]:(t.rows[0]&&[...t.rows[0].cells].every(c=>c.tagName==="TH")?t.rows[0]:null);
+    if(!hr){if(t.rows[0]&&t.rows[0].cells.length>=3)t.classList.add("rtbl-nh");return}
+    const hs=[];[...hr.cells].forEach(c=>{for(let k=0;k<(c.colSpan||1);k++)hs.push(c.textContent.trim())});
+    if(hs.length<3)return;t.classList.add("rtbl");if(!t.tHead)hr.classList.add("rtbl-h");
+    [...t.rows].forEach(tr=>{if(tr===hr)return;let i=0;[...tr.cells].forEach(td=>{if(!td.hasAttribute("data-label"))td.setAttribute("data-label",td.colSpan>1?"":(hs[i]||""));i+=td.colSpan||1;
+      if(td.textContent.trim().length<=22&&!td.querySelector("input,select,textarea,.sub,small,br"))td.classList.add("nw")})})})};
+  // телефон не разрывается посередине строки: оборачиваем номера в неразрывный span
+  const PHG=/\+7 \d{3} \d{3}-\d{2}-\d{2}/g;
+  App.noBreakPhones=root=>{const w=document.createTreeWalker(root||document.body,NodeFilter.SHOW_TEXT,{acceptNode:n=>{const p=n.parentElement;
+      if(!p||p.closest("script,style,textarea,input,select,option,.nwsp,svg"))return NodeFilter.FILTER_REJECT;PHG.lastIndex=0;return PHG.test(n.nodeValue)?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_SKIP}});
+    const list=[];while(w.nextNode())list.push(w.currentNode);
+    list.forEach(n=>{const f=document.createDocumentFragment();let last=0;const t=n.nodeValue;PHG.lastIndex=0;let m;
+      while((m=PHG.exec(t))){if(m.index>last)f.appendChild(document.createTextNode(t.slice(last,m.index)));const sp=document.createElement("span");sp.className="nwsp";sp.textContent=m[0];f.appendChild(sp);last=m.index+m[0].length}
+      if(last<t.length)f.appendChild(document.createTextNode(t.slice(last)));n.parentNode.replaceChild(f,n)})};
+  let q=0;new MutationObserver(()=>{if(q)return;q=requestAnimationFrame(()=>{q=0;App.stackTables(document);App.noBreakPhones(document)})}).observe(document.documentElement,{childList:true,subtree:true});
+})();
+document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target&&e.target.matches&&e.target.matches("textarea.namearea"))e.preventDefault()});

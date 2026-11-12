@@ -8,7 +8,11 @@ App.evoOn=()=>S.points.some(p=>p.evotorStoreId)||S.evotor.length>0;
 const since=()=>{const t=S.evotor.reduce((a,r)=>!a||r.at<a?r.at:a,"");return t?new Date(t):null}; // с какого момента идут чеки — раньше сверять нечего
 App.evoBadge=s=>{if(!App.evoOn())return "";const r=S.evotor.find(x=>x.saleId===s.id);const st=since();
   if(r)return `<dt>Фискальный чек</dt><dd><span class="pill ok">Эвотор № ${esc(r.number)}</span> ${App.dtt(r.at)}${r.status==="created"?" · продажа создана из чека":""}</dd>`;
-  if(st&&new Date(s.createdAt)>=st&&s.channel!=="site")return `<dt>Фискальный чек</dt><dd><span class="pill bad">не найден на Эвоторе</span></dd>`;return ""};
+  if(st&&new Date(s.createdAt)>=st&&s.channel!=="site"){
+    // чеки с кассы приходят сразу (вебхук) или раз в 10 минут — первые полчаса просто ждём
+    if(Date.now()-new Date(s.createdAt)<30*60000)return `<dt>Фискальный чек</dt><dd><span class="pill">ждём чек с кассы Эвотор</span></dd>`;
+    return `<dt>Фискальный чек</dt><dd><span class="pill bad">не найден на Эвоторе — пробит ли чек?</span></dd>`}
+  return ""};
 
 /* ---------- настройки ---------- */
 App.evoTab=function(){const own=App.me.role==="owner";

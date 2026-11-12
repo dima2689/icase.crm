@@ -28,7 +28,7 @@ App.prodDelBtn=(p,moves)=>{if(p.approval==="pending_delete")return "";
 
 ACT.prodReqDel=id=>{const p=App.byId("products",id);if(!p)return;
   App.openModal(App.head("Запрос на удаление")+`<p><b>${esc(p.name)}</b></p><p class="muted">Управляющий или владелец получат запрос и решат: удалить, отправить в архив или оставить.</p>
-    ${App.fld("prdNote","Причина",App.inp("prdNote","","text","Дубль, ошибка в названии, больше не продаём…"),"full")}
+    ${App.fld("prdNote","Причина",App.inp("prdNote","","text","Дубль или больше не продаём"),"full")}
     <div class="acts"><button class="btn" data-act="openProduct" data-id="${esc(id)}">Назад</button><button class="btn danger" data-act="prodReqGo" data-id="${esc(id)}">Отправить запрос</button></div>`)};
 ACT.prodReqGo=(id,btn)=>run(btn,async()=>{await App.api.rpc("product_request_delete",{p_id:id,p_note:App.val("prdNote")||null});await App.reload(RL);App.closeModal();App.toast("Запрос отправлен")});
 ACT.prodCancelReq=(id,btn)=>run(btn,async()=>{await App.api.rpc("product_cancel_request",{p_id:id});await App.reload(RL);App.closeModal();App.toast("Запрос отозван")});

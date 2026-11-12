@@ -21,11 +21,11 @@ function shop(){
   return `<section class="card"><div class="card-h"><h2>Магазин и правила</h2></div><div class="form">
     ${App.fld("sName","Название",App.inp("sName",s.shopName))}${App.fld("sCity","Город",App.inp("sCity",s.city))}
     ${App.fld("sAddr","Адрес (по умолчанию для чеков)",App.inp("sAddr",s.address))}${App.fld("sPhone","Телефон",App.inp("sPhone",s.phone))}
-    ${App.fld("sLegal","Продавец для документов",App.inp("sLegal",s.legalName,"text","ИП Фамилия Имя Отчество"))}${App.fld("sInn","ИНН",App.inp("sInn",s.inn))}${App.fld("sOgrn","ОГРНИП",App.inp("sOgrn",s.ogrnip))}
-    ${App.fld("sSite","Сайт (QR в чеке)",App.inp("sSite",s.siteUrl,"url","https://…"))}${App.fld("sRev","Ссылка на отзывы (QR в чеке)",App.inp("sRev",s.reviewUrl,"url","Яндекс Карты, 2ГИС, Авито"))}
+    ${App.fld("sLegal","Продавец для документов",App.inp("sLegal",s.legalName,"text","ИП Иванов И. И."))}${App.fld("sInn","ИНН",App.inp("sInn",s.inn))}${App.fld("sOgrn","ОГРНИП",App.inp("sOgrn",s.ogrnip))}
+    ${App.fld("sSite","Сайт (QR в чеке)",App.inp("sSite",s.siteUrl,"url","https://…"))}${App.fld("sRev","Ссылка на отзывы (QR в чеке)",App.inp("sRev",s.reviewUrl,"url","Яндекс Карты, 2ГИС"))}
     ${App.fld("sWarr","Гарантия на устройства, мес.",App.inp("sWarr",s.deviceWarrantyMonths,"number"))}${App.fld("sRw","Гарантия на ремонт, дней",App.inp("sRw",s.repairWarrantyDays,"number"))}
     ${App.fld("sStore","Бесплатное хранение готовых ремонтов, дней",App.inp("sStore",s.storageDays,"number"))}${App.fld("sDead","Товар «залежался» через, дней",App.inp("sDead",s.deadDays,"number"))}
-    ${App.fld("sAck","Отметка покупателя в товарном чеке",App.inp("sAck",s.receiptAck),"full")}${App.fld("sFoot","Подпись в чеке",App.inp("sFoot",s.receiptFooter),"full")}
+    ${App.fld("sAck","Отметка покупателя в товарном чеке",`<textarea id="sAck" rows="2">${esc(s.receiptAck||"")}</textarea>`,"full")}${App.fld("sFoot","Подпись в чеке",App.inp("sFoot",s.receiptFooter),"full")}
     <div class="fld full">${App.chk("sShift","Продажи только при открытой кассовой смене",s.requireShift)}</div>
     <div class="fld full"><label>Права и подтверждение управляющим или владельцем</label>
       ${App.chk("sApC","Новые товары, заведённые кладовщиком, — только после подтверждения (до этого их можно принять на склад, но нельзя продать)",!!(s.approvals||{}).productCreate)}
@@ -200,7 +200,7 @@ ACT.staffNew=()=>{
     ${App.fld("snName","Имя и фамилия",App.inp("snName",""))}${App.fld("snEmail","Email для входа",App.inp("snEmail","","email"))}
     ${App.fld("snRole","Роль",App.sel("snRole",roles,"seller"))}${App.fld("snPoint","Точка",App.sel("snPoint",pts,(App.point()||{}).id||""))}
     ${App.fld("snPhone","Телефон",App.inp("snPhone","","tel","+7"))}
-    ${App.fld("snHow","Как выдать доступ",App.sel("snHow",[["invite","Приглашение на email — сотрудник сам задаст пароль"],["create","Создать сейчас с временным паролем"]],"invite"),"full")}
+    ${App.fld("snHow","Как выдать доступ",App.sel("snHow",[["invite","Приглашение на email"],["create","Временный пароль сейчас"]],"invite"),"full")}
     <div class="fld full" id="snPassBox" hidden><label for="snPass">Временный пароль</label><div class="row-f">${App.inp("snPass",genPass(),"text","",'autocomplete="off"')}<button class="btn sm" type="button" data-act="snGen">Другой</button></div><small class="muted">Передайте его сотруднику лично. При первом входе CRM попросит сменить.</small></div>
   </div><div class="acts"><button class="btn" data-act="close">Отмена</button><button class="btn pri" data-act="staffCreate">Добавить</button></div>`);
   const how=document.getElementById("snHow");how.onchange=()=>{document.getElementById("snPassBox").hidden=how.value!=="create"};

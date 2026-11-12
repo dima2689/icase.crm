@@ -2,6 +2,10 @@
 "use strict";
 (function(){
 const {S,$,esc,num,money,ACT,VIEWS,TITLES}=App;
+/* широкий экран кассы: список товаров слева всегда открыт, чек справа */
+const WIDE=matchMedia("(min-width:1180px)");
+App.posWide=()=>WIDE.matches;
+WIDE.addEventListener("change",()=>{if(location.hash.replace("#","").split("/")[0]==="pos")App.render()});
 
 /* ======================= СВОДКА ======================= */
 TITLES.dashboard="Сводка";
@@ -100,15 +104,16 @@ VIEWS.pos={
       :`<div class="shiftbar ${st.requireShift?"bad":""}"><b>Смена закрыта.</b> ${st.requireShift?"Продажи и наличные операции недоступны, пока смена не открыта.":"Продажи без смены разрешены настройками, но наличные операции требуют смены."} <button class="btn sm pri" data-act="openShiftDlg">Открыть смену</button></div>`;
     const inStock=S.products.filter(p=>!p.archived&&App.qtyIn(p,wh)>0).sort((a,b)=>App.catName(a).localeCompare(App.catName(b))||String(a.name).localeCompare(b.name));
     const groups={};inStock.forEach(p=>{const k=App.catName(p);(groups[k]=groups[k]||[]).push(p)});
+    const wide=App.posWide(),lo=App.ui.posListOpen||wide,nPos=P.cart.reduce((a,i)=>a+num(i.qty),0);
 
     return `${sh?"":shiftBar}
     <div class="pos">
       <section class="card">
-        <div class="row-f"><div class="fld grow"><label for="posQ">Товар или сканер</label><input id="posQ" type="search" autocomplete="off" placeholder="Название, артикул, штрихкод, IMEI / S/N"><div class="pick" id="posPick" hidden></div></div><button class="btn" data-act="posCustom" style="align-self:flex-end">+ Услуга / товар вне каталога</button>
+        <div class="row-f"><div class="fld grow"><label for="posQ">Товар или сканер</label><input id="posQ" type="search" autocomplete="off" placeholder="Название, штрихкод или IMEI"><div class="pick" id="posPick" hidden></div></div><button class="btn" data-act="posCustom" style="align-self:flex-end">+ Услуга / товар вне каталога</button>
 </div>
-        <div class="plist ${App.ui.posListOpen?"open":""}" id="plist">
-          <button type="button" class="pl-trig" data-act="posListT" aria-expanded="${!!App.ui.posListOpen}"><span class="pl-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span><span class="pl-t">Выбрать из списка</span><span class="pl-n">${inStock.length} в наличии</span><svg class="pl-car" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
-          ${App.ui.posListOpen?`<div class="pl-dim" data-act="posListT" aria-hidden="true"></div><div class="pl-pop">
+        <div class="plist ${lo?"open":""} ${wide?"inline":""}" id="plist">
+          <button type="button" class="pl-trig" data-act="posListT" aria-expanded="${!!lo}" ${wide?"hidden":""}><span class="pl-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span><span class="pl-t">Выбрать из списка</span><span class="pl-n">${inStock.length} в наличии</span><svg class="pl-car" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+          ${lo?`${wide?"":'<div class="pl-dim" data-act="posListT" aria-hidden="true"></div>'}<div class="pl-pop">
             <div class="pl-head"><input type="search" id="plQ" placeholder="Фильтр по названию" autocomplete="off" data-nodirty aria-label="Фильтр списка">
               <div class="chips">${[["","Все"],...[...new Set(Object.keys(groups).map(g=>g.split(" / ")[0]))].map(g=>[g,g])].map(([k,l])=>`<button type="button" class="chip ${k?"":"on"}" data-plg="${esc(k)}">${esc(l)}</button>`).join("")}</div></div>
             <div class="pl-body">${inStock.length?Object.keys(groups).map(g=>`<div class="pl-grp" data-g="${esc(g)}"><div class="pl-gh">${esc(g)}<span>${groups[g].length}</span></div>${groups[g].map(p=>{const q=App.qtyIn(p,wh);return `<button type="button" class="pl-row" data-act="posPickL" data-id="${esc(p.id)}" data-s="${esc((p.name+" "+(p.brand||"")+" "+(p.sku||"")).toLowerCase())}">
@@ -118,7 +123,7 @@ VIEWS.pos={
         </div>
 
       </section>
-      <section class="card cartcard">
+      <section class="card cartcard ${P.cart.length?"":"is-empty"}">
         <div class="card-h"><h2>Чек</h2>${P.cart.length?'<button class="btn sm ghost danger" data-act="posClear">Очистить</button>':""}</div>
         <div class="clist">
         ${P.cart.length?P.cart.map((i,k)=>{const p=App.byId("products",i.productId);const below=p&&num(i.price)-num(i.disc)/Math.max(1,num(i.qty))<num(i.unitId?i.cost:p.cost);
@@ -147,19 +152,21 @@ VIEWS.pos={
         <button class="btn pri big" data-act="posPay" ${P.cart.length?"":"disabled"}>Оплата</button>
       </section>
     </div>
+    ${P.cart.length?`<div class="paybar"><span class="pb-n">${App.nw(nPos,"товар","товара","товаров")}</span><b>${money(t.total)}</b><button class="btn pri" data-act="posPay">Оплата</button></div>`:""}
     ${posToday()}
     ${sh?`<div class="shiftbottom">${shiftBar}<div class="sb-acts"><button class="btn" data-act="cashMove" data-id="in">Внесение</button>${App.can("cashout")?'<button class="btn" data-act="cashMove" data-id="out">Изъятие</button>':""}<button class="btn" data-act="xReport">X-отчёт</button><button class="btn" data-act="closeShift">Закрыть смену</button></div></div>`:""}`;
   },
   after(){
     const box=document.getElementById("plist");
-    if(box&&App.ui.posListOpen){let grp="";const q=document.getElementById("plQ");
+    if(box&&(App.ui.posListOpen||App.posWide())){let grp=App.ui.plGrp||"";const q=document.getElementById("plQ");if(App.ui.plQ)q.value=App.ui.plQ;
       const apply=()=>{const t=(q.value||"").trim().toLowerCase();let any=false;
         box.querySelectorAll(".pl-grp").forEach(g=>{let n=0;g.querySelectorAll(".pl-row").forEach(r=>{const ok=(!grp||g.dataset.g===grp||g.dataset.g.startsWith(grp+" / "))&&(!t||t.split(/\s+/).every(w=>r.dataset.s.includes(w)));r.hidden=!ok;if(ok)n++});g.hidden=!n;if(n)any=true});
         const e=box.querySelector(".pl-empty");if(e&&box.querySelector(".pl-grp"))e.hidden=any};
-      q.addEventListener("input",apply);
-      box.querySelectorAll("[data-plg]").forEach(c=>c.addEventListener("click",()=>{grp=c.dataset.plg;box.querySelectorAll("[data-plg]").forEach(x=>x.classList.toggle("on",x===c));apply()}));
-      q.addEventListener("keydown",e=>{if(e.key==="Escape"){App.ui.posListOpen=false;App.render()}});
-      if(!App.ui._plFocus){App.ui._plFocus=1;setTimeout(()=>q.focus(),0)}}
+      q.addEventListener("input",()=>{App.ui.plQ=q.value;apply()});
+      box.querySelectorAll("[data-plg]").forEach(c=>{c.classList.toggle("on",c.dataset.plg===grp);c.addEventListener("click",()=>{grp=App.ui.plGrp=c.dataset.plg;box.querySelectorAll("[data-plg]").forEach(x=>x.classList.toggle("on",x===c));apply()})});
+      if(grp||q.value)apply();
+      q.addEventListener("keydown",e=>{if(e.key==="Escape"&&!App.posWide()){App.ui.posListOpen=false;App.render()}});
+      if(!App.posWide()&&!App.ui._plFocus){App.ui._plFocus=1;setTimeout(()=>q.focus(),0)}}
     App.productPicker("posQ","posPick",{wh:posWh,inStock:false,onPick:(p,u)=>posAdd(p.id,u)});
     document.querySelectorAll("[data-pos]").forEach(el=>el.addEventListener("input",()=>{const f=el.dataset.pos;P[f]=["discPct","discSum","tiAmt"].includes(f)?num(el.value):el.value;
       if(f==="phone"){const c=App.findCustomerByPhone(P.phone);if(c){if(!P.name)P.name=c.name;if(!P.manualPct)P.discPct=num(c.discount)}}
@@ -191,7 +198,7 @@ function posAdd(pid,unit){
 }
 ACT.posAdd=id=>posAdd(id);
 ACT.posListT=()=>{App.ui.posListOpen=!App.ui.posListOpen;App.ui._plFocus=0;App.render()};
-ACT.posPickL=id=>{App.ui.posListOpen=false;App.render();posAdd(id)};
+ACT.posPickL=id=>{if(!App.posWide()){App.ui.posListOpen=false;App.render()}posAdd(id)};
 document.addEventListener("click",e=>{if(App.ui.posListOpen&&!e.target.closest("#plist")&&!e.target.closest(".scrim")){App.ui.posListOpen=false;App.render()}});
 /* произвольная позиция: услуга или товар, которого нет в справочнике (без списания со склада) */
 const PC={kind:"service"};
@@ -200,7 +207,7 @@ ACT.posCustom=()=>{
   App.openModal(App.head("Позиция вне каталога")+`
     <div class="chips" style="margin-bottom:12px"><button class="chip ${PC.kind==="service"?"on":""}" data-act="pcKind" data-id="service">Услуга</button><button class="chip ${PC.kind==="goods"?"on":""}" data-act="pcKind" data-id="goods">Товар</button></div>
     <div class="form">
-      ${App.fld("pcName","Название",App.inp("pcName","","text",PC.kind==="service"?"Например: наклейка плёнки, настройка телефона":"Например: чехол без штрихкода",'list="pcSvc" autocomplete="off"'),"full")}
+      ${App.fld("pcName","Название",App.inp("pcName","","text",PC.kind==="service"?"Например: наклейка плёнки":"Например: чехол без штрихкода",'list="pcSvc" autocomplete="off"'),"full")}
       <datalist id="pcSvc">${svc.map(x=>`<option value="${esc(x.name)}">${money(x.price)}</option>`).join("")}</datalist>
       ${App.fld("pcPrice","Цена, ₽",App.inp("pcPrice","","number","0"))}${App.fld("pcQty","Количество",App.inp("pcQty","1","number","1",'min="1"'))}
       ${cost?App.fld("pcCost","Себестоимость, ₽",App.inp("pcCost","","number","0")):""}${App.fld("pcWar","Гарантия, мес.",App.inp("pcWar","","number","0"))}
@@ -287,11 +294,25 @@ ACT.posConfirm=async(_,btn)=>{
       :await App.api.rpc(debt?"create_sale_debt":"create_sale",args,["sales","stock","stock_movements","cash_ops","products","audit_log","units","debts"]);
     if(bonus)App.toast("Списано бонусов: "+bonus);
     if(debt)App.toast("В долг: "+money(debt));
-    ACT.posClear();App.closeModal();App.toast("Продажа проведена");
+    const cashPaid=payments.filter(p=>p.method==="cash").reduce((a,p)=>a+p.amount,0),got=num(App.val("payGot"));
+    const change=cashPaid&&got>cashPaid?got-cashPaid:0;
+    ACT.posClear();App.closeModal();
     await App.reload(["sales","products","cashops","units","debts","bonusops","deals"]);
-    if(App.byId("sales",id))ACT.openSale(id);
+    if(App.byId("sales",id))App.saleDone(id,change);else App.toast("Продажа проведена");
   }catch(e){btn.disabled=false;btn.textContent="Провести продажу";App.toast(e.message||"Ошибка продажи")}
 };
+/* экран «Продано»: итог крупно, сдача, печать одним нажатием, «Следующий покупатель» */
+App.saleDone=function(id,change){
+  const s=App.byId("sales",id);if(!s)return;
+  const dev=(s.items||[]).some(i=>num(i.warranty)>0||i.serial);
+  App.openModal(`<div class="sdone"><div class="sd-ok" aria-hidden="true">✓</div><h2>Продано · ${esc(s.num)}</h2>
+    <div class="sd-sum">${money(s.total)}</div><div class="muted">${esc(App.paysText(s.payments))}</div>
+    ${change?`<div class="sd-change">Сдача <b>${money(change)}</b></div>`:""}
+    <div class="sd-print"><span class="muted">Печать:</span>${dev?`<button class="btn" data-act="printWarranty" data-id="${esc(id)}">Гарантийный талон</button>`:""}<button class="btn" data-act="printReceipt" data-id="${esc(id)}|80">Чек 80 мм</button><button class="btn" data-act="printReceipt" data-id="${esc(id)}|a4">Товарный чек A4</button></div>
+    <div class="acts"><button class="btn ghost" data-act="openSale" data-id="${esc(id)}">Подробнее</button><button class="btn pri big" data-act="saleNext" id="sdNext">Следующий покупатель</button></div></div>`);
+  setTimeout(()=>{const b=document.getElementById("sdNext");if(b)b.focus()},50);
+};
+ACT.saleNext=()=>{App.closeModal();window.scrollTo({top:0});if(!matchMedia("(max-width:700px)").matches)setTimeout(()=>{const q=document.getElementById("posQ");if(q)q.focus()},60)};
 App.saleText=function(s){
   const st=App.settings(),c=App.cust(s.customerId)||{};
   const lines=(s.items||[]).map(i=>`${i.name}${i.serial?" ("+App.codeLbl(i.productId)+" "+i.serial+")":""}\n   ${i.qty} × ${money(i.price)}${num(i.disc)?" − "+money(i.disc):""} = ${money(i.qty*i.price-num(i.disc))}${i.warranty?"  гарантия "+i.warranty+" мес.":""}`).join("\n");
@@ -318,10 +339,12 @@ ACT.openShiftOk=async(_,btn)=>{
     App.closeModal();App.toast("Смена "+d.num+" открыта");App.reload(["shifts"]);
   }catch(e){btn.disabled=false;App.toast(e.message)}
 };
+ACT.cmNoteQ=v=>{const i=document.getElementById("cmNote");if(i)i.value=v};
 ACT.cashMove=dir=>{
   const sh=App.openShift();if(!sh)return App.toast("Смена закрыта");
   if(dir==="out"&&!App.can("cashout"))return App.toast("Изъятие делает управляющий или владелец");
-  App.openModal(App.head(dir==="in"?"Внесение наличных":"Изъятие наличных")+`<div class="form">${App.fld("cmSum","Сумма, ₽",App.inp("cmSum","","number"))}${App.fld("cmNote","Основание",App.inp("cmNote","",dir==="in"?"Размен":"Инкассация, оплата курьеру…"))}</div>
+  App.openModal(App.head(dir==="in"?"Внесение наличных":"Изъятие наличных")+`<div class="form">${App.fld("cmSum","Сумма, ₽",App.inp("cmSum","","number"))}${App.fld("cmNote","Основание",App.inp("cmNote","","text",dir==="in"?"Размен":"Инкассация, оплата курьеру…"))}</div>
+  <div class="qk">${(dir==="in"?["Размен","Возврат из инкассации","Внёс владелец"]:["Инкассация","Оплата курьеру","Хозяйственные расходы"]).map(x=>`<button type="button" class="chip" data-act="cmNoteQ" data-id="${esc(x)}">${esc(x)}</button>`).join("")}</div>
   <div class="acts"><button class="btn" data-act="close">Отмена</button><button class="btn pri" data-act="cashMoveOk" data-id="${dir}">Провести</button></div>`);
 };
 ACT.cashMoveOk=async(dir,btn)=>{
@@ -394,7 +417,7 @@ VIEWS.sales={
     const u=App.ui,[from,to]=App.periodRange(u.salesPeriod);
     const q=u.salesQ.toLowerCase();
     const tabs=`<div class="tabs">${[["sales","Чеки"],["returns","Возвраты"],["shifts","Смены"],["cash","Кассовые операции"],...(App.evoOn&&App.evoOn()?[["evotor","Сверка с Эвотором"]]:[])].map(([k,l])=>`<button class="tab ${u.salesTab===k?"on":""}" data-act="salesTab" data-id="${k}">${l}</button>`).join("")}</div>`;
-    const filt=`<div class="row-f">${App.sel("salesPeriod",App.PERIODS,u.salesPeriod,'data-filter-sel="salesPeriod" aria-label="Период"')}${u.salesTab==="sales"?App.sel("salesPay",[["","Любая оплата"],...Object.entries(App.PAY)],u.salesPay,'data-filter-sel="salesPay" aria-label="Оплата"'):""}<input id="salesQ" type="search" placeholder="№, клиент, товар" value="${esc(u.salesQ)}" data-filter="salesQ" aria-label="Поиск"></div>`;
+    const filt=`<div class="row-f salesf">${App.sel("salesPeriod",App.PERIODS,u.salesPeriod,'data-filter-sel="salesPeriod" aria-label="Период"')}${u.salesTab==="sales"?App.sel("salesPay",[["","Любая оплата"],...Object.entries(App.PAY)],u.salesPay,'data-filter-sel="salesPay" aria-label="Оплата"'):""}<input id="salesQ" type="search" placeholder="№, клиент, товар" value="${esc(u.salesQ)}" data-filter="salesQ" aria-label="Поиск"></div>`;
     const inP0=d=>{const t=new Date(d);return t>=from&&t<to};
     const myPt=App.can("allPoints")?null:(App.point()||{}).id;
     const inP=(d,x)=>inP0(d)&&(!myPt||!x||x.pointId===myPt||(App.byId("sales",x.saleId)||{}).pointId===myPt);
@@ -404,7 +427,7 @@ VIEWS.sales={
       const sum=list.reduce((a,s)=>a+num(s.total),0);
       body=`<div class="tiles"><div class="tile"><span>Чеков</span><b>${list.length}</b></div><div class="tile"><span>Сумма</span><b>${money(sum)}</b></div><div class="tile"><span>Средний чек</span><b>${money(list.length?sum/list.length:0)}</b></div>${App.can("cost")?`<div class="tile"><span>Прибыль</span><b>${money(list.reduce((a,s)=>a+App.saleProfit(s),0))}</b></div>`:""}</div>
       <section class="card"><div class="tbl-wrap"><table class="stbl"><thead><tr><th>№</th><th>Дата</th><th>Клиент</th><th>Товары</th><th>Оплата</th><th>Продавец</th><th class="n">Сумма</th></tr></thead><tbody>
-      ${list.map(s=>{const c=App.cust(s.customerId);return `<tr class="rowlink" data-act="openSale" data-id="${esc(s.id)}"><td><b>${esc(s.num)}</b>${s.status==="returned"?' <span class="pill bad">возврат</span>':s.status==="partial"?' <span class="pill warn">частичный возврат</span>':""}</td><td>${App.dtt(s.createdAt)}</td><td>${esc(c?c.name:"—")}<span class="sub">${esc(c?c.phone:"")}</span></td><td>${esc((s.items||[]).map(i=>i.name+(i.qty>1?" ×"+i.qty:"")).join(", "))}${s.tradeIn?'<span class="sub">Trade-in: '+esc(s.tradeIn.device)+"</span>":""}</td><td>${esc(App.paysText(s.payments))}</td><td>${esc(App.nameOf(s.by))}</td><td class="n"><b>${money(s.total)}</b></td></tr>`}).join("")||'<tr><td colspan="7" class="empty">Нет продаж за период</td></tr>'}
+      ${list.map(s=>{const c=App.cust(s.customerId);return `<tr class="rowlink" data-act="openSale" data-id="${esc(s.id)}"><td><b>${esc(s.num)}</b>${s.status==="returned"?' <span class="pill bad">возврат</span>':s.status==="partial"?' <span class="pill warn">частичный возврат</span>':""}</td><td>${App.dtt(s.createdAt)}</td><td>${esc(c?c.name:"—")}<span class="sub">${esc(c?c.phone:"")}</span></td><td><span class="clamp2" title="${esc((s.items||[]).map(i=>i.name+(i.qty>1?" ×"+i.qty:"")).join(", "))}">${esc((s.items||[]).map(i=>i.name+(i.qty>1?" ×"+i.qty:"")).join(", "))}</span>${s.tradeIn?'<span class="sub">Trade-in: '+esc(s.tradeIn.device)+"</span>":""}</td><td>${(s.payments||[]).filter(p=>num(p.amount)).map(p=>`<span class="nwsp">${esc(App.payLabel(p.method)+" "+money(p.amount))}</span>`).join(" + ")}</td><td>${esc(App.nameOf(s.by))}</td><td class="n"><b>${money(s.total)}</b></td></tr>`}).join("")||'<tr><td colspan="7" class="empty">Нет продаж за период</td></tr>'}
       </tbody></table></div></section>`;
     }else if(u.salesTab==="evotor"&&App.evoView){
       body=App.evoView(from,to,myPt);

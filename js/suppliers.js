@@ -24,9 +24,9 @@ VIEWS.suppliers={
     const multi={};list.forEach(o=>{const k=offerKey(o);multi[k]=(multi[k]||0)+1});
     list.sort(u.spSort==="name"?(a,b)=>String(a.name).localeCompare(b.name):u.spSort==="supplier"?(a,b)=>supName(a.supplierId).localeCompare(supName(b.supplierId))||a.price-b.price:(a,b)=>(a.price||1e12)-(b.price||1e12));
     const shown=list.slice(0,300),cur=u.spSup?App.byId("suppliers",u.spSup):null;
-    return `<div class="cfilt"><input id="spQ" type="search" placeholder="Поиск по всем прайсам: модель, память, цвет, артикул" value="${esc(u.spQ)}" data-filter="spQ" aria-label="Поиск по прайсам">
-      ${App.sel("spSup",[["","Все поставщики ("+S.sprices.length+")"],...sups.map(s=>[s.id,s.name+" ("+cnt(s.id)+")"])],u.spSup,'data-filter-sel="spSup" aria-label="Поставщик"')}
-      ${App.sel("spSort",[["price","Сначала дешевле"],["name","По названию"],["supplier","По поставщику"]],u.spSort,'data-filter-sel="spSort" aria-label="Сортировка"')}</div>
+    return `<div class="cfilt"><input id="spQ" type="search" placeholder="Модель, память, цвет" value="${esc(u.spQ)}" data-filter="spQ" aria-label="Поиск по прайсам">
+      ${App.sel("spSup",[["","Все ("+S.sprices.length+")"],...sups.map(s=>[s.id,s.name+" ("+cnt(s.id)+")"])],u.spSup,'data-filter-sel="spSup" aria-label="Поставщик"')}
+      ${App.sel("spSort",[["price","Дешевле"],["name","По названию"],["supplier","По поставщику"]],u.spSort,'data-filter-sel="spSort" aria-label="Сортировка"')}</div>
     ${cur?`<div class="supbar"><span><b>${esc(cur.name)}</b>${[cur.contact,cur.phone].filter(Boolean).length?" · "+esc([cur.contact,cur.phone].filter(Boolean).join(" · ")):""} · ${cnt(cur.id)} позиций${cur.priceUpdatedAt?" · прайс от "+App.dt(cur.priceUpdatedAt):" · прайса нет"}${cur.note?" · "+esc(cur.note):""}</span>
       ${App.can("stock")?`<span class="row-f"><button class="btn sm" data-act="spImport" data-id="${esc(cur.id)}">Загрузить прайс</button><button class="btn sm ghost" data-act="supForm" data-id="${esc(cur.id)}">Изменить</button></span>`:""}</div>`:""}
     <section class="card crow-list">${shown.length?`<div class="sphead"><span>Товар · поставщик</span><span>Закупка</span></div>`:""}${shown.map(o=>{const k=offerKey(o),p=o.productId?App.byId("products",o.productId):null,isBest=multi[k]>1&&o.price>0&&o.price===best[k];

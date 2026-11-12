@@ -68,9 +68,15 @@ App.chooseUnit=function({productId,wh,exclude=[],title="Выберите экз�
     return App.toast("Нет экземпляров на складе «"+App.whName(wh)+"»"+(other.length?". Есть: "+[...new Set(other.map(u=>App.whName(u.whId)))].join(", "):""))}
   if(list.length===1)return onPick(list[0]);
   App.chooseUnit.cb=onPick;
-  App.openModal(App.head(esc(title))+`<p class="muted" style="margin-top:-4px">${esc(p.name)} · ${list.length} шт. на складе «${esc(App.whName(wh))}». Можно отсканировать IMEI.</p>
-    <div class="list-mini">${list.map(u=>`<button data-act="unitChosen" data-id="${esc(u.id)}"><span>${esc(App.unitCode(u))}<small>${esc([u.condition,u.batteryHealth!=null&&u.batteryHealth!==""?"АКБ "+u.batteryHealth+"%":"",(u.attrs||{}).repair==="Был"?"был ремонт":(u.attrs||{}).repair==="Не было"?"без ремонта":"",u.kit].filter(Boolean).join(" · "))}</small></span><b>${money(App.unitPrice(u,p))}</b></button>`).join("")}</div>`);
+  App.openModal(App.head(esc(title))+`<p class="muted" style="margin-top:-4px">${esc(p.name)} · ${list.length} шт. на складе «${esc(App.whName(wh))}»</p>
+    ${list.length>2?`<div class="unitq">${App.inp("unitQ","","search","Последние цифры IMEI / S/N",'inputmode="numeric" autocomplete="off" aria-label="Поиск экземпляра"')}${App.scan?'<button type="button" class="btn" data-act="unitScan">Скан</button>':""}</div>`:""}
+    <div class="list-mini" id="unitList">${list.map(u=>`<button data-act="unitChosen" data-id="${esc(u.id)}"><span>${esc(App.unitCode(u))}<small>${esc([u.condition,u.batteryHealth!=null&&u.batteryHealth!==""?"АКБ "+u.batteryHealth+"%":"",(u.attrs||{}).repair==="Был"?"был ремонт":(u.attrs||{}).repair==="Не было"?"без ремонта":"",u.kit].filter(Boolean).join(" · "))}</small></span><b>${money(App.unitPrice(u,p))}</b></button>`).join("")}</div>`);
 };
+App.unitFilter=()=>{const q=(App.val("unitQ")||"").replace(/\s/g,"").toLowerCase();const rows=[...document.querySelectorAll("#unitList [data-act=unitChosen]")];
+  rows.forEach(b=>{b.hidden=!!q&&!b.textContent.replace(/\s/g,"").toLowerCase().includes(q)});
+  const vis=rows.filter(b=>!b.hidden);if(q.length>=4&&vis.length===1)vis[0].click()};
+document.addEventListener("input",e=>{if(e.target&&e.target.id==="unitQ")App.unitFilter()});
+ACT.unitScan=()=>App.scan({title:"Наведите на IMEI или серийный номер",onCode:code=>{const i=document.getElementById("unitQ");if(i){i.value=String(code).slice(-15);App.unitFilter()}return false}});
 ACT.unitChosen=id=>{const u=App.byId("units",id),cb=App.chooseUnit.cb;App.closeModal();if(u&&cb)cb(u)};
 
 /* ---------- каталог Apple ---------- */

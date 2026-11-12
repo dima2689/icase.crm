@@ -34,7 +34,7 @@ VIEWS.repairs={
     const list=App.sortDesc(base.filter(r=>flt(u.repFilter,r)));
     const board=u.repView==="board"&&u.repFilter==="active";
     const cols=App.RSTAT.filter(s=>App.ACTIVE.includes(s[0]));
-    return `<div class="cfilt rep3"><input id="repQ" type="search" placeholder="№ квитанции, устройство, IMEI, клиент, телефон" value="${esc(u.repQ)}" data-filter="repQ" aria-label="Поиск ремонта">
+    return `<div class="cfilt rep3"><input id="repQ" type="search" placeholder="№, IMEI, клиент, телефон" value="${esc(u.repQ)}" data-filter="repQ" aria-label="Поиск ремонта">
         ${App.me.role==="seller"?"":App.sel("repMaster",[["","Все мастера"],...masters().map(m=>[m.id,m.fullName])],u.repMaster,'data-filter-sel="repMaster" aria-label="Мастер"')}
         <div class="seg"><button class="${u.repView==="board"?"on":""}" data-act="repView" data-id="board">Доска</button><button class="${u.repView==="list"?"on":""}" data-act="repView" data-id="list">Список</button></div></div>
       <div class="chips rchips">${FILTERS.map(([k,l])=>{const n=base.filter(r=>flt(k,r)).length;return `<button class="chip ${u.repFilter===k?"on":""} ${k==="late"&&n?"bad":""}" data-act="repFilter" data-id="${k}">${l} <b>${n}</b></button>`}).join("")}</div>
@@ -156,7 +156,7 @@ ACT.openRepair=id=>{
               <div class="row-f addrow">${App.sel("rsSvc",[["","Работа из прайса…"],...S.services.filter(s=>s.active!==false).map(s=>[s.id,s.name+" · "+money(s.price)])],"",'aria-label="Работа из прайса"')}
                 <input id="rsName" placeholder="или своя работа" aria-label="Название работы"><input id="rsPrice" type="number" inputmode="decimal" placeholder="Цена" aria-label="Цена" style="width:100px">
                 <button class="btn sm" data-act="repSvcAdd" data-id="${r.id}">Добавить</button></div>
-              ${canW?`<div class="fld addrow"><input id="rpQ" type="search" placeholder="Запчасть со склада сервиса: название, артикул, штрихкод" autocomplete="off" aria-label="Запчасть со склада"><div id="rpBox" class="pick" hidden></div></div>`:""}
+              ${canW?`<div class="fld addrow"><input id="rpQ" type="search" placeholder="Запчасть со склада сервиса" autocomplete="off" aria-label="Запчасть со склада"><div id="rpBox" class="pick" hidden></div></div>`:""}
               <button class="btn sm ghost" data-act="rqNew" data-id="${r.id}">Нет на складе — заказать запчасть</button>
             </div>`:""}
           </section>
@@ -191,7 +191,7 @@ ACT.openRepair=id=>{
         </aside>
       </div>
       <details class="rhist"><summary>История и оплаты</summary>
-        ${canEdit?`<div class="row-f addrow"><input id="reNote" placeholder="Заметка: позвонили клиенту, согласовал замену…" aria-label="Заметка в историю"><button class="btn sm" data-act="repNote" data-id="${r.id}">Добавить</button></div>`:""}
+        ${canEdit?`<div class="row-f addrow"><input id="reNote" placeholder="Заметка: позвонили клиенту, согласовал замену…" aria-label="Заметка в историю"><button class="btn sm" data-act="repNote" aria-label="Добавить заметку" data-id="${r.id}">Добавить</button></div>`:""}
         <div class="rhst">${histRows(r)}</div></details>
       <div class="acts racts">
         ${nb(r.id,"repReceipt","Квитанция")}${nb(r.id,"repLabel","Наклейка")}${r.status==="done"?nb(r.id,"repAct","Акт выдачи"):""}
@@ -254,25 +254,29 @@ ACT.repIssue=id=>{const r=App.byId("repairs",id),tot=App.repairTotal(r),paid=App
     <section class="rblk"><h3>Проверьте устройство вместе с клиентом</h3>${ck.intake&&App.checkSummary?`<p class="muted">При приёме: ${esc(App.checkSummary(ck.intake))}</p>`:""}
       ${App.repIssueCheckHtml?App.repIssueCheckHtml():""}</section>
     <section class="rblk"><h3>Оплата</h3>
-      <div class="form">${App.fld("riFinal","Итого за ремонт, ₽"+(["owner","manager"].includes(App.me.role)?"":' <small class="muted">скидку даёт управляющий</small>'),App.inp("riFinal",r.warrantyOf?0:tot,"number","",["owner","manager"].includes(App.me.role)||r.warrantyOf?"":"readonly"))}<div class="fld"><label>Уже оплачено</label><b class="big-n">${money(paid)}</b></div></div>
+      <div class="form">${(["owner","manager"].includes(App.me.role)||r.warrantyOf?App.fld("riFinal","Итого за ремонт, ₽",App.inp("riFinal",r.warrantyOf?0:tot,"number","")):`<div class="fld"><label>Итого за ремонт</label><b class="big-n">${money(tot)}</b><input type="hidden" id="riFinal" value="${tot}"><small class="muted">скидку даёт управляющий</small></div>`)}<div class="fld"><label>Уже оплачено</label><b class="big-n">${money(paid)}</b></div></div>
       <div class="total"><span>К оплате</span><b id="riDue">${money(Math.max(0,tot-paid))}</b></div>
-      <div class="paygrid">${Object.entries(App.PAY).map(([m,l])=>`<div class="fld"><label for="ri_${m}">${l}</label><div class="row-f">${App.inp("ri_"+m,"","number","0")}<button class="btn sm" data-act="riAll" data-id="${m}">Всё</button></div></div>`).join("")}</div></section>
+      ${tot-paid>0?`<div class="paym">${Object.entries(App.PAY).map(([m,l])=>`<button type="button" class="paybtn" data-act="riAll" data-id="${m}">${l}</button>`).join("")}</div>`:""}
+      <details class="paysplit" ${tot-paid>0?"":"hidden"}><summary>Разделить оплату</summary><div class="paygrid">${Object.entries(App.PAY).map(([m,l])=>`<div class="fld"><label for="ri_${m}">${l}</label><div class="row-f">${App.inp("ri_"+m,"","number","0")}<button class="btn sm" data-act="riAll" data-id="${m}" aria-label="Всё — ${l}">Всё</button></div></div>`).join("")}</div></details></section>
     <p class="muted">После выдачи начнётся гарантия ${num(r.warrantyDays)} дн. Откроется акт выдачи — клиент подписывает, что устройство получил и претензий нет.</p>
     <div class="acts"><button class="btn" data-act="openRepair" data-id="${id}">Назад</button><button class="btn pri" data-act="repIssueOk" data-id="${id}">Выдать и открыть акт</button></div>`,{wide:true});
-  const upd=()=>{const due=num(App.val("riFinal"))-paid,got=Object.keys(App.PAY).reduce((a,m)=>a+num(App.val("ri_"+m)),0);const el=$("#riDue");const rest=due-got;el.textContent=due<0?"вернуть клиенту "+money(-due):Math.abs(rest)<0.5?(due?"всё внесено":"доплаты нет"):rest>0?"не хватает "+money(rest):"внесено больше на "+money(-rest);el.className=Math.abs(due-got)<0.5||due<0?"ok":"bad"};
+  const upd=()=>{const due=num(App.val("riFinal"))-paid,got=Object.keys(App.PAY).reduce((a,m)=>a+num(App.val("ri_"+m)),0);const el=$("#riDue");const rest=due-got;
+    el.textContent=due<0?"вернуть клиенту "+money(-due):Math.abs(rest)<0.5?(due?"✓ "+money(due):"доплаты нет"):!got?money(due):rest>0?"не хватает "+money(rest):"внесено больше на "+money(-rest);el.className=Math.abs(due-got)<0.5||due<0?"ok":got?"bad":"";
+    document.querySelectorAll("#modal .paybtn").forEach(b=>b.classList.toggle("on",num(App.val("ri_"+b.dataset.id))>0))};
   document.querySelectorAll("#modal input").forEach(e=>e.addEventListener("input",upd));
   ACT.riAll=m=>{const due=Math.max(0,num(App.val("riFinal"))-paid);Object.keys(App.PAY).forEach(k=>{document.getElementById("ri_"+k).value=k===m?due:""});upd()};
-  if(tot-paid>0)ACT.riAll("cash");upd();
+  upd();
 };
 ACT.repIssueOk=(id,btn)=>run(btn,async()=>{const r=App.byId("repairs",id),fin=num(App.val("riFinal")),paid=App.repairPaid(r);
   let pays=Object.keys(App.PAY).map(m=>({method:m,amount:num(App.val("ri_"+m))})).filter(p=>p.amount);
   if(fin<paid)pays=[{method:"cash",amount:-(paid-fin)}]; // переплата — вернуть наличными
-  const got=pays.reduce((a,p)=>a+p.amount,0);if(fin>=paid&&Math.abs(fin-paid-got)>=.5)throw new Error("Сумма оплаты не сходится с остатком "+money(fin-paid));
+  const got=pays.reduce((a,p)=>a+p.amount,0);if(fin>paid&&!got)throw new Error("Выберите, как платит клиент: наличные, карта, QR или перевод");
+  if(fin>=paid&&Math.abs(fin-paid-got)>=.5)throw new Error("Сумма оплаты не сходится с остатком "+money(fin-paid));
   if(App.repIssueCheckSave)await App.repIssueCheckSave(id);
   await App.api.rpc("repair_issue",{p_id:id,p_final:fin,p_payments:pays});await App.reload(RL);App.toast("Выдан клиенту");ACT.openRepair(id);ACT.repAct(id)});
 ACT.repCancel=id=>{const r=App.byId("repairs",id),paid=App.repairPaid(r);
   App.openModal(App.head("Отказ от ремонта · "+esc(r.num))+`<div class="form">
-    ${App.fld("rcWhy","Причина",App.inp("rcWhy","","text","Клиент отказался от цены, ремонт невозможен…"),"full")}
+    ${App.fld("rcWhy","Причина",App.inp("rcWhy","","text","Например: дорого для клиента"),"full")}
     ${App.fld("rcFee","Плата за диагностику, ₽",App.inp("rcFee",0,"number"))}
     ${App.fld("rcM","Как вернуть / получить деньги",App.sel("rcM",Object.entries(App.PAY)))}</div>
     <p class="muted">Предоплата ${money(paid)}. Клиенту вернётся предоплата минус плата за диагностику. Запчасти вернутся на склад.</p>

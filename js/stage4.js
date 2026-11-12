@@ -37,7 +37,7 @@ const dPill=d=>{const s=DST[d.status]||[d.status,""];return `<span class="pill $
 let DL=null;
 ACT.dealNew=(arg)=>{const c=typeof arg==="string"&&arg?App.cust(arg):null;DL={kind:"buyout",productId:""};const pt=App.point()||{};
   App.openModal(App.head("Устройство от частного лица")+`
-    <div class="seg wide3" id="dlKind"><button class="on" data-act="dlKind" data-id="buyout">Выкуп — платим сразу</button><button data-act="dlKind" data-id="commission">Комиссия — платим после продажи</button></div>
+    <div class="seg wide3" id="dlKind"><button class="on" data-act="dlKind" data-id="buyout"><b>Выкуп</b><small>платим сразу</small></button><button data-act="dlKind" data-id="commission"><b>Комиссия</b><small>платим после продажи</small></button></div>
     <h3 class="sub-h">Продавец (клиент)</h3>
     <div class="form">${App.fld("dlPhone","Телефон",App.inp("dlPhone",c?c.phone:"","tel","+7 900 000-00-00"))}${App.fld("dlName","ФИО полностью",App.inp("dlName",c?c.name:"","text","Иванов Иван Иванович"))}
       ${App.fld("dlDoc","Паспорт: серия и номер",App.inp("dlDoc","","text","4510 123456"))}${App.fld("dlIss","Кем выдан",App.inp("dlIss",""))}
