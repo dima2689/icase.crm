@@ -27,7 +27,7 @@ VIEWS.clients={
     <section class="card crow-list">${rows.slice(0,300).map(({c,spent})=>{const ini=String(c.name||"").replace(/\([^)]*\)/g," ").split(/\s+/).map(w=>w.replace(/[^A-Za-zА-Яа-яЁё0-9]/g,"")).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase()||"?";
       return `<button type="button" class="crow" data-act="openClient" data-id="${esc(c.id)}"><span class="cav ${c.blacklisted?"bad":""}">${esc(ini)}</span>
         <span class="cnm"><b>${esc(c.name)}</b><small>${c.blacklisted?'<span class="pill bad">чёрный список</span> ':""}${esc(c.phone)}</small></span>
-        <span class="csum">${money(spent)}<small>покупки</small></span></button>`}).join("")||'<div class="empty">Клиенты не найдены</div>'}
+        <span class="csum" title="Сумма покупок">${money(spent)}</span></button>`}).join("")||'<div class="empty">Клиенты не найдены</div>'}
     </section>`;
   }
 };

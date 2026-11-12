@@ -237,25 +237,27 @@ function productForm(id){
     ${App.fld("pMem","Память",App.inp("pMem",p.memory,"text","256 ГБ",edit?"":"disabled"))}
     ${App.fld("pColor","Цвет",App.inp("pColor",p.color,"text","натуральный титан",edit?"":"disabled"))}
     ${App.fld("pBrand","Бренд",App.inp("pBrand",p.brand,"text","Apple",(edit?"":"disabled ")+'list="brandList"')+`<datalist id="brandList">${[...new Set(["Apple",...S.products.map(x=>x.brand).filter(Boolean)])].sort().map(b=>`<option value="${esc(b)}">`).join("")}</datalist>`)}
-    ${App.fld("pSku","Артикул",App.inp("pSku",p.sku,"text","",edit?"":"disabled"))}
     ${App.fld("pBar","Штрихкод",App.inp("pBar",p.barcode,"text","отсканируйте",edit?"":"disabled"))}
     <div class="fld full">${App.chk("pTrack","Поштучный учёт — каждый экземпляр отдельно (IMEI у телефонов, серийный номер у остальной техники)",p.trackSerial).replace("<input",edit?"<input":"<input disabled")}</div>
     ${p.trackSerial?"":App.fld("pSerial",(App.isPhone(p)?"IMEI":"Серийный номер")+" (если товар один)",App.inp("pSerial",p.serial,"text","",edit?"":"disabled"))}
     ${attrs.length?`<div class="fld full"><label>Параметры</label><div class="chips">${attrs.map(([k,v])=>`<span class="pill">${esc(k)}: ${esc(v)}</span>`).join("")}</div></div>`:""}
     ${cost?App.fld("pCost","Закупка, ₽",App.inp("pCost",p.cost||"","number","",price?"":"disabled")):""}
     ${App.fld("pPrice","Цена продажи, ₽",App.inp("pPrice",p.price||"","number","",price?"":"disabled"))}
-    ${App.fld("pOld","Старая цена, ₽ (для ценника со скидкой)",App.inp("pOld",p.oldPrice||"","number","пусто — без скидки",price?"":"disabled"))}
     <div class="fld full"><span class="hint" id="pMk"></span></div>
+    ${!id&&edit&&!p.trackSerial?App.fld("pQty","Начальный остаток (без поштучного учёта)",App.inp("pQty","","number","0"))+App.fld("pWh","На склад",App.sel("pWh",App.whs().map(w=>[w.id,w.name]),App.cashWh())):""}
+    <div class="fld full"><label>Где продаём</label><div class="chips">${App.chk("pSite","Сайт",p.onSite)}${App.chk("pOnAvito","Авито",p.onAvito)}</div></div>
+  </div>
+  <details class="more pmore" ${p.diagnostics||p.kit||p.note||num(p.oldPrice)||(p.batteryHealth!=null&&p.batteryHealth!=="")||num(p.avitoPrice)?"open":""}><summary>Дополнительно: артикул, гарантия, б/у, Авито, описание</summary><div class="form">
+    ${App.fld("pSku","Артикул",App.inp("pSku",p.sku,"text","",edit?"":"disabled"))}
+    ${App.fld("pOld","Старая цена, ₽ (для ценника со скидкой)",App.inp("pOld",p.oldPrice||"","number","пусто — без скидки",price?"":"disabled"))}
     ${App.fld("pMin","Минимальный остаток (всего)",App.inp("pMin",p.minQty||0,"number","",edit?"":"disabled"))}
     ${App.fld("pWarr","Гарантия, мес. (0 = по умолчанию)",App.inp("pWarr",p.warrantyMonths||"","number","",edit?"":"disabled"))}
     ${App.fld("pBatt","Ёмкость АКБ, %",App.inp("pBatt",p.batteryHealth==null?"":p.batteryHealth,"number","для б/у устройств",edit?"":"disabled"))}
     ${App.fld("pAvito","Цена на Авито, ₽",App.inp("pAvito",p.avitoPrice,"number","как розничная",price?"":"disabled"))}
     ${App.fld("pDiag","Результат диагностики",App.inp("pDiag",p.diagnostics,"text","Всё исправно, замен не было",edit?"":"disabled"),"full")}
     ${App.fld("pKit","Комплектация",App.inp("pKit",p.kit,"text","Коробка, кабель",edit?"":"disabled"),"full")}
-    ${!id&&edit&&!p.trackSerial?App.fld("pQty","Начальный остаток (без поштучного учёта)",App.inp("pQty","","number","0"))+App.fld("pWh","На склад",App.sel("pWh",App.whs().map(w=>[w.id,w.name]),App.cashWh())):""}
-    <div class="fld full"><label>Где продаём</label><div class="chips">${App.chk("pSite","Сайт",p.onSite)}${App.chk("pOnAvito","Авито",p.onAvito)}</div></div>
     ${App.fld("pNote","Описание / заметка",App.area("pNote",p.note||""),"full")}
-  </div>
+  </div></details>
   ${id&&p.trackSerial?`<section><div class="card-h"><h3 class="sub-h">Экземпляры (${App.unitsOf(id).length} в наличии)</h3><label class="chk"><input type="checkbox" data-act="unitAll" ${App.ui.unitAll?"checked":""}> показать проданные и списанные</label></div>
     <div class="tbl-wrap"><table><thead><tr><th>${App.isPhone(p)?"IMEI":"Серийный номер"}</th><th>Состояние</th><th class="n">АКБ</th><th class="n">Цена</th>${cost?'<th class="n">Закупка</th>':""}<th>Где</th></tr></thead><tbody>
     ${units.map(u=>`<tr class="rowlink" data-act="openUnit" data-id="${esc(u.id)}"><td><b>${esc(App.unitCode(u))}</b>${u.imei2?'<span class="sub">IMEI 2 '+esc(u.imei2)+"</span>":""}${u.imei&&u.serialNo?'<span class="sub">SN '+esc(u.serialNo)+"</span>":""}</td><td>${esc(u.condition||"")}<div class="chips usum">${App.usedChips(u.attrs)}</div></td>
@@ -327,7 +329,7 @@ VIEWS.docs={
       ${App.can("settings")&&cw?`<button class="btn" data-act="whForm" data-id="${esc(cw.id)}">Изменить</button>`:""}${App.can("settings")?'<button class="btn pri" data-act="whForm">+ Склад</button>':""}</div>
       ${cw?(()=>{const open=!!u.whOpenBox,ps=S.products.filter(p=>App.qtyIn(p,cw.id)>0),qn=ps.reduce((a,p)=>a+App.qtyIn(p,cw.id),0);
         return `<button type="button" class="fsh whsum" data-act="whBoxT" aria-expanded="${open}"><span class="ft">Остатки</span><span class="fsum">${qn} шт · ${ps.length} поз. · в рознице ${money(ps.reduce((a,p)=>a+App.qtyIn(p,cw.id)*num(p.price),0))}</span><span class="car"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform:rotate(${open?180:0}deg);transition:transform .15s"><path d="M6 9l6 6 6-6"/></svg></span><span class="totbtn">${open?"Свернуть":"Развернуть"}</span></button>${open?whBody(cw.id,{noActs:true}):""}`})():'<div class="empty">Складов пока нет — создайте первый.</div>'}</section>`;
-    return `${whBox}<div class="chips"><button class="chip ${!u.docType?"on":""}" data-act="docType" data-id="">Все<b>${S.docs.length}</b></button>${Object.entries(App.DOCT).map(([k,d])=>`<button class="chip ${u.docType===k?"on":""}" data-act="docType" data-id="${k}">${d.label}<b>${S.docs.filter(x=>x.type===k).length}</b></button>`).join("")}</div>
+    return `${whBox}<div class="chips"><button class="chip ${!u.docType?"on":""}" data-act="docType" data-id="">Все<b>${S.docs.length}</b></button>${Object.entries(App.DOCT).filter(([k])=>u.docType===k||S.docs.some(x=>x.type===k)).map(([k,d])=>`<button class="chip ${u.docType===k?"on":""}" data-act="docType" data-id="${k}">${d.label}<b>${S.docs.filter(x=>x.type===k).length}</b></button>`).join("")}</div>
     <div class="row-f"><input id="docQ" type="search" placeholder="№, поставщик, товар" value="${esc(u.docQ)}" data-filter="docQ" aria-label="Поиск документа" style="flex:1 1 260px">${App.sel("docStatus",[["","Любой статус"],["draft","Черновики"],["posted","Проведённые"],["cancelled","Отменённые"]],u.docStatus,'data-filter-sel="docStatus" aria-label="Статус"')}</div>
     <section class="card"><div class="tbl-wrap"><table><thead><tr><th>Документ</th><th>Дата</th><th>Склад</th><th>Основание</th><th class="n">Строк</th><th class="n">Кол-во</th>${App.can("cost")?'<th class="n">Сумма</th>':""}<th>Статус</th></tr></thead><tbody>
     ${list.map(d=>{const D=App.DOCT[d.type];const qty=(d.lines||[]).reduce((a,l)=>a+num(d.type==="inventory"?(num(l.counted)-num(l.expected)):l.qty),0);

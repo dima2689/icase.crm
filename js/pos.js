@@ -26,26 +26,23 @@ VIEWS.dashboard={
     ${sh&&!App.sameDay(sh.openedAt,now)?`<div class="banner warn">Смена ${esc(sh.num)} открыта ${App.dtt(sh.openedAt)} и не закрыта. <a href="#pos">Закрыть в кассе</a></div>`:""}
     <div class="tiles">
       <div class="tile"><span>Выручка сегодня</span><b>${money(t.rev)}</b><small>все точки · ${App.nw(t.count,"чек","чека","чеков")}${t.reps.length?" · "+App.nw(t.reps.length,"ремонт","ремонта","ремонтов"):""}</small></div>
-      <div class="tile"><span>Выручка за месяц</span><b>${money(m.rev)}</b><small>${showProfit?"валовая прибыль "+money(m.profit):"средний чек "+money(m.avg)}</small></div>
+      <div class="tile"><span>Выручка за месяц</span><b>${money(m.rev)}</b><small>${showProfit?"прибыль "+money(m.profit):"средний чек "+money(m.avg)}</small></div>
       <a class="tile click" href="#pos"><span>Касса</span><b>${sh?money(App.shiftTotals(sh).expectedCash):"закрыта"}</b><small>${sh?"наличных в смене "+esc(sh.num):"откройте смену"}</small></a>
-      ${hasRep?`<a class="tile click" href="#repairs"><span>Ремонт в работе</span><b>${act.length}</b><small>${ready.length||waitParts.length?[ready.length?"готово к выдаче: "+ready.length:"",waitParts.length?"ждут запчасть: "+waitParts.length:""].filter(Boolean).join(" · "):"все в процессе"}</small></a>
-      <button class="tile click ${late.length?"alert":""}" data-act="repFilter" data-id="late"><span>Просрочено</span><b>${late.length}</b><small>${late.length?[late.length-stored.length>0?"не готовы в срок: "+(late.length-stored.length):"",stored.length?"не забирают дольше "+App.settings().storageDays+" дн.: "+stored.length:""].filter(Boolean).join(" · "):"всё в срок"}</small></button>`:""}
-      ${App.tasksDue?`<a class="tile click ${App.tasksDue()?"alert":""}" href="#tasks"><span>Задачи на сегодня</span><b>${App.tasksDue()}</b><small>${S.waitlist.filter(w=>w.status==="ready").length?"из них звонков о поступлении: "+S.waitlist.filter(w=>w.status==="ready").length:"напоминания и звонки"}</small></a>`:""}
-      ${App.apprTile?App.apprTile():""}<button class="tile click ${low.length?"warn":""}" data-act="lowStock"><span>Заканчивается</span><b>${low.length}</b><small>товаров ниже минимума</small></button>
+      ${hasRep?`<a class="tile click" href="#repairs"><span>Ремонт в работе</span><b>${act.length}</b><small>${ready.length||waitParts.length?[ready.length?"готово "+ready.length:"",waitParts.length?"ждут запчасть "+waitParts.length:""].filter(Boolean).join(" · "):"все в процессе"}</small></a>
+      <button class="tile click ${late.length?"alert":""}" data-act="repFilter" data-id="late"><span>Просрочено</span><b>${late.length}</b><small>${late.length?[late.length-stored.length>0?"не готовы "+(late.length-stored.length):"",stored.length?"не забирают "+stored.length:""].filter(Boolean).join(" · "):"всё в срок"}</small></button>`:""}
+      ${App.tasksDue?`<a class="tile click ${App.tasksDue()?"alert":""}" href="#tasks"><span>Задачи на сегодня</span><b>${App.tasksDue()}</b><small>${S.waitlist.filter(w=>w.status==="ready").length?"звонков "+S.waitlist.filter(w=>w.status==="ready").length:"напоминания и звонки"}</small></a>`:""}
+      ${App.apprTile?App.apprTile():""}<button class="tile click ${low.length?"warn":""}" data-act="lowStock"><span>Заканчивается</span><b>${low.length}</b><small>ниже минимума</small></button>
     </div>
     <div class="grid g2">
-      <section class="card"><div class="card-h"><h2>Выручка за 14 дней</h2><span class="pill">продажи − возвраты + ремонт</span></div>${App.barChart(days,vals)}</section>
+      <section class="card"><div class="card-h"><h2>Выручка за 14 дней</h2></div>${App.barChart(days,vals)}</section>
       ${hasRep?`<section class="card"><div class="card-h"><h2>Ремонт</h2><a class="btn sm" href="#repairs">Все</a></div>
-        <div class="chips">${App.RSTAT.filter(s=>App.ACTIVE.includes(s[0])).map(s=>`<button class="chip" data-act="repFilter" data-id="${s[0]}">${esc(s[1])}<b>${act.filter(r=>r.status===s[0]).length}</b></button>`).join("")}</div>
         <h3 class="sub-h">Готовы к выдаче</h3>
         <div class="list-mini">${ready.length?ready.slice(0,5).map((App.repMini||(()=>''))).join(""):'<div class="empty sm">Нет</div>'}</div>
       </section>`:`<section class="card"><div class="card-h"><h2>Точки сегодня</h2></div><div class="list-mini">${App.myPoints().map(p=>{const s2=App.openShift(p.id);const r=App.periodStats(d0,tom,p.id);return `<div class="lrow"><span><b>${esc(p.name)}</b><small>${r.count} чеков${s2?" · наличных "+money(App.shiftTotals(s2).expectedCash):""}</small></span><span class="row-f"><b class="num">${money(r.rev)}</b><span class="pill ${s2?"ok":"mute"}">${s2?"смена открыта":"закрыта"}</span></span></div>`}).join("")||'<div class="empty sm">Точек нет. Добавьте их в настройках</div>'}</div></section>`}
     </div>
-    <div class="grid g3">
+    <div class="grid g2">
       <section class="card"><div class="card-h"><h2>Последние продажи</h2><a class="btn sm" href="#sales">Все</a></div>
         <div class="list-mini">${App.sortDesc(S.sales).slice(0,6).map(App.saleMini).join("")||'<div class="empty sm">Продаж нет</div>'}</div></section>
-      <section class="card"><div class="card-h"><h2>Заканчивается</h2><a class="btn sm" href="#stock">Товары</a></div>
-        <div class="list-mini">${low.slice(0,6).map(p=>`<button data-act="openProduct" data-id="${esc(p.id)}"><span>${esc(p.name)}<small>${esc(App.catName(p))} · мин. ${num(p.minQty)}</small></span><span class="pill bad">${App.qtyTotal(p)} шт</span></button>`).join("")||'<div class="empty sm">Всё в наличии</div>'}</div></section>
       <section class="card"><div class="card-h"><h2>Внимание</h2></div>
         <div class="list-mini">
           ${waitParts.map(r=>`<button data-act="openRepair" data-id="${esc(r.id)}"><span>${esc(r.num)} ждёт запчасть<small>${esc(r.device)}</small></span>${App.statusPill(r.status)}</button>`).join("")}
