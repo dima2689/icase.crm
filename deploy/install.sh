@@ -6,6 +6,7 @@
 # Аргумент — публичный SSH-ключ, с которым GitHub Actions будет выкладывать новые версии.
 # Повторный запуск безопасен.
 set -euo pipefail
+trap 'echo "install.sh: ошибка в строке $LINENO: $BASH_COMMAND" >&2' ERR
 HERE="$(cd "$(dirname "$0")" && pwd)"; . "$HERE/lib.sh"
 [ "$(id -u)" = 0 ] || die "запускайте от root"
 DEPLOY_PUBKEY="${1:-}"
@@ -65,7 +66,7 @@ if [ -n "$DEPLOY_PUBKEY" ]; then
 fi
 mkdir -p /opt/icase/bin; install -m 755 "$HERE/icase-release" /opt/icase/bin/icase-release
 echo 'deploy ALL=(root) NOPASSWD: /opt/icase/bin/icase-release' > /etc/sudoers.d/icase-deploy; chmod 440 /etc/sudoers.d/icase-deploy
-visudo -cq
+visudo -cqf /etc/sudoers.d/icase-deploy || { rm -f /etc/sudoers.d/icase-deploy; die "ошибка в правиле sudo для deploy"; }
 
 log "SSH: только ключи"
 if [ -s /root/.ssh/authorized_keys ] || [ -s /home/deploy/.ssh/authorized_keys ]; then
