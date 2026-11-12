@@ -1326,3 +1326,6 @@ button .ico{display:inline-block;vertical-align:-3px}
 .hb-t i{background:#B8C4D4}
 .hbars .hb:first-child .hb-t i{background:var(--olive)}
 .share i{background:#94A3B8}
+/* фирменная деталь: номера документов и коды — моноширинным, табличные цифры */
+:root{--f-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Roboto Mono","Liberation Mono",monospace}
+.idn{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:.9em;letter-spacing:0;white-space:nowrap}

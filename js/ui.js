@@ -288,13 +288,14 @@ window.addEventListener("hashchange",()=>{if(App.me.role)App.route()});
     if(hs.length<3)return;t.classList.add("rtbl");if(!t.tHead)hr.classList.add("rtbl-h");
     [...t.rows].forEach(tr=>{if(tr===hr)return;let i=0;[...tr.cells].forEach(td=>{if(!td.hasAttribute("data-label"))td.setAttribute("data-label",td.colSpan>1?"":(hs[i]||""));i+=td.colSpan||1;
       if(td.textContent.trim().length<=22&&!td.querySelector("input,select,textarea,.sub,small,br"))td.classList.add("nw")})})})};
-  // телефон не разрывается посередине строки: оборачиваем номера в неразрывный span
-  const PHG=/\+7 \d{3} \d{3}-\d{2}-\d{2}/g;
+  // телефон не разрывается посередине строки; номера документов (П-5783, Р-1004, ПЗ-1002) и коды (IMEI, штрихкод) —
+  // моноширинным шрифтом: фирменная деталь «кассового» характера CRM
+  const PHG=/\+7 \d{3} \d{3}-\d{2}-\d{2}|(?<![\wА-Яа-яЁё-])[А-ЯЁ]{1,3}-\d{1,7}(?![\wА-Яа-яЁё])|(?<![\d\w])\d{13,15}(?![\d\w])/g;
   App.noBreakPhones=root=>{const w=document.createTreeWalker(root||document.body,NodeFilter.SHOW_TEXT,{acceptNode:n=>{const p=n.parentElement;
-      if(!p||p.closest("script,style,textarea,input,select,option,.nwsp,svg"))return NodeFilter.FILTER_REJECT;PHG.lastIndex=0;return PHG.test(n.nodeValue)?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_SKIP}});
+      if(!p||p.closest("script,style,textarea,input,select,option,.nwsp,.idn,svg,[contenteditable]"))return NodeFilter.FILTER_REJECT;PHG.lastIndex=0;return PHG.test(n.nodeValue)?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_SKIP}});
     const list=[];while(w.nextNode())list.push(w.currentNode);
     list.forEach(n=>{const f=document.createDocumentFragment();let last=0;const t=n.nodeValue;PHG.lastIndex=0;let m;
-      while((m=PHG.exec(t))){if(m.index>last)f.appendChild(document.createTextNode(t.slice(last,m.index)));const sp=document.createElement("span");sp.className="nwsp";sp.textContent=m[0];f.appendChild(sp);last=m.index+m[0].length}
+      while((m=PHG.exec(t))){if(m.index>last)f.appendChild(document.createTextNode(t.slice(last,m.index)));const sp=document.createElement("span");sp.className=m[0][0]==="+"?"nwsp":"idn";sp.textContent=m[0];f.appendChild(sp);last=m.index+m[0].length}
       if(last<t.length)f.appendChild(document.createTextNode(t.slice(last)));n.parentNode.replaceChild(f,n)})};
   let q=0;new MutationObserver(()=>{if(q)return;q=requestAnimationFrame(()=>{q=0;App.stackTables(document);App.noBreakPhones(document)})}).observe(document.documentElement,{childList:true,subtree:true});
 })();
