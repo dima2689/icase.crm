@@ -85,6 +85,8 @@ log "файрвол: 22, 80, 443"
 ufw default deny incoming >/dev/null; ufw default allow outgoing >/dev/null
 ufw allow 22/tcp >/dev/null; ufw allow 80/tcp >/dev/null; ufw allow 443/tcp >/dev/null; ufw allow 443/udp >/dev/null
 ufw --force enable >/dev/null
+# ufw перезагружает iptables — Docker заново создаёт свои цепочки (иначе контейнеры не опубликуют порты)
+systemctl restart docker
 systemctl enable --now fail2ban >/dev/null
 echo 'APT::Periodic::Update-Package-Lists "1"; APT::Periodic::Unattended-Upgrade "1";' > /etc/apt/apt.conf.d/20auto-upgrades
 

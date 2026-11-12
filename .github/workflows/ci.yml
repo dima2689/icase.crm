@@ -104,7 +104,7 @@ jobs:
         run: tests/ci-run.sh install sudo bash deploy/install.sh "$(cat ~/.ssh/id_deploy.pub)"
       - name: S3 для бэкапов (MinIO)
         run: |
-          docker run -d --restart unless-stopped --name ci-s3 -p 127.0.0.1:9100:9000 -e MINIO_ROOT_USER=$S3_KEY -e MINIO_ROOT_PASSWORD=$S3_SECRET minio/minio server /data >/dev/null
+          tests/ci-run.sh s3 docker run -d --restart unless-stopped --name ci-s3 -p 127.0.0.1:9100:9000 -e MINIO_ROOT_USER=$S3_KEY -e MINIO_ROOT_PASSWORD=$S3_SECRET minio/minio server /data
           for _ in $(seq 30); do curl -fs http://127.0.0.1:9100/minio/health/live && break; sleep 1; done
           RCLONE_CONFIG_M_TYPE=s3 RCLONE_CONFIG_M_PROVIDER=Minio RCLONE_CONFIG_M_ENDPOINT=http://127.0.0.1:9100 RCLONE_CONFIG_M_ACCESS_KEY_ID=$S3_KEY RCLONE_CONFIG_M_SECRET_ACCESS_KEY=$S3_SECRET rclone mkdir m:icase-backups
       - name: Выкладка по SSH, как deploy.yml
