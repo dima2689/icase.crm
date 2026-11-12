@@ -25,6 +25,8 @@ jobs:
         run: |
           deno check supabase/functions/site-api/index.ts supabase/functions/site-sync/index.ts supabase/functions/staff-admin/index.ts supabase/functions/evotor/index.ts
           deno run supabase/functions/tests/staff_admin_test.ts
+      - name: Образец настроек читается bash
+        run: bash -euc 'set -a; . deploy/icase.env.example'
       - name: Секреты не попали в код
         run: python3 tests/secrets.py
 
