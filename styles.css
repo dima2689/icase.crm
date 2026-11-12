@@ -1262,3 +1262,28 @@ details.moreacts[open]>.ma-pop{display:flex}
   .app>.main{padding-bottom:calc(70px + env(safe-area-inset-bottom))}
   .toast{font-size:13px;padding:8px 14px}
 }
+/* ремонт: блок «Мои ремонты / мастера» — на ПК карточки, на телефоне одна строка компактных фильтров */
+.wl i{display:none}
+@media (max-width:700px){
+  .repbar{flex-wrap:nowrap;overflow-x:auto;gap:6px;margin:0 -12px 8px;padding:0 12px 2px;scrollbar-width:none}
+  .repbar::-webkit-scrollbar{display:none}
+  .repbar .workload{display:contents}
+  .wl{display:inline-flex;align-items:center;gap:6px;min-width:0;flex:none;padding:5px 6px 5px 11px;border-radius:999px;font-size:12.5px;white-space:nowrap;border-color:var(--line2)}
+  .wl b{font-weight:600}
+  .wl span,.wl em{display:none}
+  .wl i{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:99px;font-style:normal;font-size:11.5px;font-weight:700;background:#F1F5F9;color:#475569}
+  .wl i.wl-late{background:var(--bad-soft);color:var(--bad)}
+  .wl.warn b{color:var(--warn)}.wl.warn i{background:var(--warn-soft);color:var(--warn)}
+  .wl.on{background:var(--olive);border-color:var(--olive);box-shadow:none}
+  .wl.on b{color:#fff}.wl.on i{background:rgba(255,255,255,.22);color:#fff}
+}
+.wl .wl-s{display:none}
+@media (max-width:700px){
+  .wl .wl-f{display:none}.wl .wl-s{display:inline}
+  /* мастер выбирается строкой сверху — отдельный список мастеров не нужен */
+  .view:has(.workload) .rep3{grid-template-columns:1fr auto}
+  .view:has(.workload) .rep3>select{display:none}
+  .view:has(.workload) .rep3>input{grid-column:auto}
+}
+.rep3>.seg{width:auto;justify-self:end}
+@media (max-width:1000px){.rep3:not(:has(select))>input{grid-column:auto}}
