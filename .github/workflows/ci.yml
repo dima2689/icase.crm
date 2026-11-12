@@ -121,7 +121,7 @@ jobs:
           docker exec icase-caddy cat /data/caddy/pki/authorities/local/root.crt | sudo tee /usr/local/share/ca-certificates/icase-ci.crt >/dev/null && sudo update-ca-certificates >/dev/null
           curl -fsS https://crm.icase.localhost/ | grep -q iCase && echo "CRM по https открывается"
           curl -fsS https://crm.icase.localhost/js/config.js | grep -q 'https://api.icase.localhost' && echo "config.js → api"
-          c=$(curl -s -o /dev/null -w '%{http_code}' https://crm.icase.localhost/deploy/install.sh); [ "$c" = 404 ] && echo "служебные файлы скрыты" || { echo "::error::/deploy доступен ($c)"; exit 1; }
+          ! curl -fsS https://crm.icase.localhost/deploy/install.sh | grep -q apt-get && ! curl -fsS https://crm.icase.localhost/.git/config | grep -q '\[core\]' && echo "служебных файлов в CRM нет" || { echo "::error::служебные файлы доступны"; exit 1; }
           c=$(curl -s -o /dev/null -w '%{http_code}' https://api.icase.localhost/); [ "$c" = 404 ] && echo "Studio/служебное наружу закрыто" || { echo "::error::api / → $c"; exit 1; }
           c=$(curl -s -o /dev/null -w '%{http_code}' -m 5 http://127.0.0.1:8000/ || true); [ "$c" = 000 ] && echo "шлюз 8000 наружу не опубликован" || { echo "::error::порт 8000 открыт ($c)"; exit 1; }
       - name: Владелец, сквозные проверки
