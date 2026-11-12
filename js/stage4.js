@@ -148,7 +148,7 @@ const RULES=[[/эквайр|возмещ|по операциям с (банко�
 function classify(r){const s=App.settings(),norm=x=>String(x||"").toLowerCase().replace(/[«»"']/g,"").replace(/\s+/g," ").trim();
   if(s.inn&&r.inn===s.inn)return {skip:true,why:"Перевод между своими счетами"};
   for(const [re,dir,cat,why] of RULES){if((dir===(r.out?"out":"in"))&&re.test(r.purpose+" "+r.party)){if(cat==="skip")return {skip:true,why};const c=S.fincats.find(x=>x.kind==="out"&&x.name===cat);return {catId:c?c.id:"",why:cat}}}
-  if(r.out){const sup=S.suppliers.find(x=>(x.inn&&x.inn===r.inn)||norm(r.party).includes(norm(x.name).replace(/ \(демо\)/,"")));
+  if(r.out){const sup=S.suppliers.find(x=>(x.inn&&x.inn===r.inn)||norm(r.party).includes(norm(x.name)));
     if(sup){const d=S.debts.filter(x=>x.direction==="out"&&x.status==="open"&&x.supplierId===sup.id&&App.debtLeft(x)>=r.amount-0.5).sort((a,b)=>String(a.createdAt).localeCompare(b.createdAt))[0];
       const c=S.fincats.find(x=>x.name==="Закупка товара");return {catId:c?c.id:"",debtId:d?d.id:"",why:d?"Оплата долга "+d.num+" · "+sup.name:"Поставщик "+sup.name}}}
   else{const d=S.debts.filter(x=>x.direction==="in"&&x.status==="open"&&Math.abs(App.debtLeft(x)-r.amount)<1&&norm(r.party).includes(norm(x.counterparty).split(" ")[0]))[0];if(d)return {debtId:d.id,why:"Оплата долга "+d.num}}

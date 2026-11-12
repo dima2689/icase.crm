@@ -282,7 +282,7 @@ function log(){
 function data(){
   return `<section class="card"><div class="card-h"><h2>Данные</h2><span class="pill">база Supabase</span></div>
   <div class="tiles">${[["points","Точки"],["customers","Клиенты"],["products","Товары"],["sales","Продажи"],["docs","Документы"],["shifts","Смены"],["staff","Сотрудники"]].map(([c,l])=>`<div class="tile"><span>${l}</span><b>${S[c].length}</b></div>`).join("")}</div>
-  ${App.can("io")?'<div class="acts" style="justify-content:flex-start;margin-top:14px"><button class="btn" data-act="exportDlg">Экспорт</button><button class="btn" data-act="importDlg">Импорт товаров</button><button class="btn" data-act="importDlg" data-id="customers">Импорт клиентов</button><button class="btn" data-act="reloadAll">Перечитать всё из базы</button></div>':""}</section>`;
+  ${App.can("io")?'<div class="acts" style="justify-content:flex-start;margin-top:14px"><button class="btn" data-act="exportDlg">Экспорт</button><button class="btn" data-act="msDlg">Перенос из МоегоСклада</button><button class="btn" data-act="importDlg">Импорт товаров</button><button class="btn" data-act="importDlg" data-id="customers">Импорт клиентов</button><button class="btn" data-act="reloadAll">Перечитать всё из базы</button></div>':""}</section>`;
 }
 ACT.reloadAll=async()=>{await App.reload(App.COLS);App.toast("Данные обновлены")};
 })();

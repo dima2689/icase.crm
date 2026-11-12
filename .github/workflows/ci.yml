@@ -23,8 +23,9 @@ jobs:
         with: { deno-version: v2.x }
       - name: Edge-функции (типы и тесты без сети)
         run: |
-          deno check supabase/functions/site-api/index.ts supabase/functions/site-sync/index.ts supabase/functions/staff-admin/index.ts supabase/functions/evotor/index.ts
+          deno check supabase/functions/site-api/index.ts supabase/functions/site-sync/index.ts supabase/functions/staff-admin/index.ts supabase/functions/evotor/index.ts supabase/functions/moysklad/index.ts
           deno run supabase/functions/tests/staff_admin_test.ts
+          deno run supabase/functions/tests/moysklad_test.ts
       - name: Образец настроек читается bash
         run: bash -euc 'set -a; . deploy/icase.env.example'
       - name: Секреты не попали в код

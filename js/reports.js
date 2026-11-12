@@ -94,7 +94,7 @@ ACT.importDlg=kind=>{
   kind=kind==="customers"?"customers":"products";
   App.openModal(App.head("Импорт "+(kind==="products"?"товаров":"клиентов"))+`
   <p class="muted">Сохраните таблицу Excel как CSV (UTF-8) и выберите файл. Первая строка — названия колонок. ${kind==="products"?"Товары с тем же артикулом, штрихкодом или IMEI обновятся, новые будут созданы. Остатки придут документом прихода.":"Клиенты с уже существующим телефоном пропускаются."}</p>
-  <div class="tabs"><button class="tab ${kind==="products"?"on":""}" data-act="importDlg" data-id="products">Товары</button><button class="tab ${kind==="customers"?"on":""}" data-act="importDlg" data-id="customers">Клиенты</button></div>
+  <div class="tabs"><button class="tab ${kind==="products"?"on":""}" data-act="importDlg" data-id="products">Товары</button><button class="tab ${kind==="customers"?"on":""}" data-act="importDlg" data-id="customers">Клиенты</button><button class="tab" data-act="msDlg">Из МоегоСклада</button></div>
   <input type="file" id="impFile" accept=".csv,.txt,text/csv">
   <div id="impMap"></div>`,{wide:true});
   $("#impFile").addEventListener("change",async e=>{const f=e.target.files[0];if(!f)return;
