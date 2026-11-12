@@ -49,7 +49,7 @@ App.render = function(){
   drawNav();
   const V=App.VIEWS[App.ui.view];
   $("#title").textContent=App.TITLES[App.ui.view]||"";
-  $("#top-acts").innerHTML=V&&V.actions?V.actions():"";
+  $("#top-acts").innerHTML=V&&V.actions?V.actions():"";App.tidyActs($("#top-acts"));
   // один поиск на экране: где у раздела свой поиск, общий скрываем
   const gs=document.querySelector(".top .search");if(gs){gs.style.display=V&&V.ownSearch?"none":"";if(V&&V.ownSearch)$("#gresults").hidden=true}
   // сохраняем фокус и курсор в полях фильтров
@@ -282,3 +282,15 @@ window.addEventListener("hashchange",()=>{if(App.me.role)App.route()});
   let q=0;new MutationObserver(()=>{if(q)return;q=requestAnimationFrame(()=>{q=0;App.stackTables(document);App.noBreakPhones(document)})}).observe(document.documentElement,{childList:true,subtree:true});
 })();
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target&&e.target.matches&&e.target.matches("textarea.namearea"))e.preventDefault()});
+
+/* кнопки раздела без шума: видна главная (синяя) и одна-две частые, остальное — в «Ещё» */
+App.tidyActs=box=>{if(!box)return;const all=[...box.children].filter(e=>e.matches(".btn,a.btn"));
+  const keep=matchMedia("(max-width:700px)").matches?1:3;if(all.length<=keep+1)return;
+  const pri=all.filter(b=>b.classList.contains("pri"));
+  const util=b=>/Печать|Экспорт|Импорт|Выписк|Скачать|Ценники|каталог|Загрузить/i.test(b.textContent);
+  const rest=all.filter(b=>!b.classList.contains("pri")).sort((a,b)=>util(a)-util(b));
+  const vis=rest.slice(0,Math.max(0,keep-pri.length)),hid=rest.slice(vis.length);if(hid.length<2)return;
+  const d=document.createElement("details");d.className="moreacts";d.innerHTML='<summary class="btn" aria-label="Ещё действия">Ещё</summary><div class="ma-pop"></div>';
+  hid.forEach(b=>{b.classList.remove("pri","sm");d.querySelector(".ma-pop").appendChild(b)});
+  box.insertBefore(d,pri[0]||null)};
+document.addEventListener("click",e=>{document.querySelectorAll("details.moreacts[open]").forEach(d=>{if(!d.contains(e.target)||e.target.closest(".ma-pop .btn"))d.open=false})});

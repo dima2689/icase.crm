@@ -41,7 +41,7 @@ ACT.patTap=n=>{n=+n;if(PAT.includes(n))return;PAT.push(n);drawPat()};
 ACT.patClear=()=>{PAT=[];drawPat()};
 ACT.patOk=()=>{const i=$("#rPass");if(i&&PAT.length)i.value="Ключ: "+PAT.join("-");const box=$("#patBox");if(box)box.hidden=true};
 App.patSvg=s=>{const m=String(s||"").match(/Ключ:\s*([1-9](?:-[1-9])+)/);if(!m)return "";const pts=m[1].split("-").map(Number),xy=n=>[((n-1)%3)*30+15,Math.floor((n-1)/3)*30+15];
-  return `<svg viewBox="0 0 90 90" width="72" height="72" class="patsvg" aria-label="Графический ключ ${m[1]}">${[1,2,3,4,5,6,7,8,9].map(n=>{const [x,y]=xy(n);return `<circle cx="${x}" cy="${y}" r="4" fill="${pts.includes(n)?"#3B4828":"#ccc"}"/>`}).join("")}<polyline points="${pts.map(n=>xy(n).join(",")).join(" ")}" fill="none" stroke="#3B4828" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${xy(pts[0])[0]}" cy="${xy(pts[0])[1]}" r="7" fill="none" stroke="#3B4828" stroke-width="2"/></svg>`};
+  return `<svg viewBox="0 0 90 90" width="72" height="72" class="patsvg" aria-label="Графический ключ ${m[1]}">${[1,2,3,4,5,6,7,8,9].map(n=>{const [x,y]=xy(n);return `<circle cx="${x}" cy="${y}" r="4" fill="${pts.includes(n)?"#2563EB":"#ccc"}"/>`}).join("")}<polyline points="${pts.map(n=>xy(n).join(",")).join(" ")}" fill="none" stroke="#2563EB" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${xy(pts[0])[0]}" cy="${xy(pts[0])[1]}" r="7" fill="none" stroke="#2563EB" stroke-width="2"/></svg>`};
 
 /* ---------- фото ---------- */
 const BUCKET="repair-photos";
