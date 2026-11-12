@@ -162,7 +162,7 @@ VIEWS.analytics={
     const TB=[...TABS,...(App.AN_TABS||[]).map(x=>[x[0],x[1]])];
     return `<div class="tabs">${TB.map(([k,l])=>`<button class="tab ${t===k?"on":""}" data-act="anTab" data-id="${k}">${l}</button>`).join("")}</div>
       ${per||pt?`<div class="anbar">${per}${per&&u.anPer==="custom"?App.inp("anFrom",u.anFrom||"","date","",'data-filter-sel="anFrom" aria-label="С"')+App.inp("anTo",u.anTo||"","date","",'data-filter-sel="anTo" aria-label="По"'):""}${pt}${per?`<span class="muted">${perText()}</span>`:""}</div>`:""}
-      <div class="an" data-nodirty>${S.sales.length||(App.AN_TABS||[]).some(x=>x[0]===t)?({over,fc,prod,cat,cust,time,team,stock,...Object.fromEntries((App.AN_TABS||[]).map(x=>[x[0],x[2]]))}[t]||over)():`<section class="card"><div class="empty">Продаж пока нет — аналитика появится после первых продаж.</div></section>`}</div>`;
+      <div class="an" data-nodirty>${S.sales.length||(App.AN_TABS||[]).some(x=>x[0]===t)?({over,fc,prod,cat,cust,time,team,stock,...Object.fromEntries((App.AN_TABS||[]).map(x=>[x[0],x[2]]))}[t]||over)():`<section class="card"><div class="empty">Продаж пока нет — аналитика появится после первых продаж</div></section>`}</div>`;
   }
 };
 ACT.anTab=k=>{App.ui.anTab=k;App.render()};
@@ -220,7 +220,7 @@ function insights(c,p,f,t){
   if(tot)out.push(["info",`Повторные покупатели дают <b>${pct(repRev/tot)}</b> выручки. ${c.anon>.4?`У ${pct(c.anon)} чеков нет телефона покупателя — их невозможно вернуть рассылкой.`:""}`]);
   if(cost&&c.margin&&p.margin&&Math.abs(c.margin-p.margin)>.02)out.push([c.margin>p.margin?"good":"bad",`Маржа ${c.margin>p.margin?"выросла":"упала"}: ${pct(p.margin)} → ${pct(c.margin)}.`]);
   if(c.retRate>.05)out.push(["bad",`Возвраты ${pct(c.retRate,1)} выручки — выше обычного, проверьте товары с возвратами.`]);
-  return out.length?out:[["info","Пока мало данных для выводов."]];
+  return out.length?out:[["info","Пока мало данных для выводов"]];
 }
 
 const emptyPer=()=>`<section class="card"><div class="empty">За выбранный период${App.ui.anPoint?" на этой точке":""} продаж нет. Выберите другой период${App.ui.anPoint?" или точку":""}.</div></section>`;
@@ -269,7 +269,7 @@ function fc(){
           <div class="pl"><span>По прогнозу к концу месяца</span><b class="${F.monthEnd>=plan?"okc":"badc"}">${money(F.monthEnd)} · ${pct(F.monthEnd/plan)}</b></div>
           <div class="pl"><span>Нужно в день до конца месяца</span><b>${daysLeft>0?money(Math.max(0,plan-F.mtd)/daysLeft):"—"}</b></div>
           <div class="pl"><span>Сейчас в среднем в день</span><b>${money(F.lv)}</b></div>
-          <p class="muted">${F.monthEnd>=plan?"План выполняется по текущему темпу.":`Не хватает ≈ ${money(plan-F.monthEnd)}: это ≈ ${Math.ceil((plan-F.monthEnd)/Math.max(1,k90v.avg))} чеков по ${money(k90v.avg)}.`}</p>`:'<p class="muted">Укажите цель — покажу, сколько нужно продавать в день, чтобы её выполнить.</p>'}</section>
+          <p class="muted">${F.monthEnd>=plan?"План выполняется по текущему темпу":`Не хватает ≈ ${money(plan-F.monthEnd)}: это ≈ ${Math.ceil((plan-F.monthEnd)/Math.max(1,k90v.avg))} чеков по ${money(k90v.avg)}.`}</p>`:'<p class="muted">Укажите цель — покажу, сколько нужно продавать в день, чтобы её выполнить.</p>'}</section>
     </div>`;
 }
 let k90c={k:null,v:null};

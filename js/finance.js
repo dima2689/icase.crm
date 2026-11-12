@@ -53,7 +53,7 @@ App.finPnl=function(from,to){
 const TABS=[["sum","Сводка"],["ops","Операции"],["debts","Долги"],["plans","Платежи"],["report","Прибыль"],["pay","Зарплата"],["setup","Счета и статьи"]];
 VIEWS.finance={
   ownSearch:true,
-  actions:()=>`<button class="btn" data-act="printView">Печать</button><button class="btn" data-act="finOp" data-id="in">+ Приход</button><button class="btn" data-act="finOp" data-id="out">− Расход</button><button class="btn pri" data-act="finOp" data-id="transfer">⇄ Перевод</button>`,
+  actions:()=>`<button class="btn" data-act="printView">Печать</button><button class="btn" data-act="finOp" data-id="in">+ Приход</button><button class="btn" data-act="finOp" data-id="out">− Расход</button><button class="btn pri" data-act="finOp" data-id="transfer">Перевод</button>`,
   render(){
     if(!S.finaccounts.length)return `<section class="card"><div class="empty"><p>Раздел ещё не настроен.</p><button class="btn pri" data-act="finSetup">Создать счета и статьи</button>
       <p class="muted">Появятся касса для каждой точки, расчётный счёт (сюда идёт безнал с касс), сейф и обычные статьи расходов. Всё можно поменять.</p></div></section>`;
@@ -107,7 +107,7 @@ function opText(o){const c=cat(o.catId),d=o.debtId?S.debts.find(x=>x.id===o.debt
 function opsList(list){
   if(!list.length)return `<div class="empty">Операций пока нет</div>`;
   return `<div class="flist">${list.map(o=>`<button class="frow ${live(o)?"":"off"}" data-act="finOpOpen" data-id="${o.id}">
-    <span class="fic op ${o.kind}">${o.kind==="in"?"+":o.kind==="out"?"−":"⇄"}</span>
+    <span class="fic op ${o.kind}">${o.kind==="in"?"+":o.kind==="out"?"−":App.ico("swap","sm")}</span>
     <span class="cnm"><b>${opText(o)}</b><small>${dshort(o.date)} · ${esc(o.num)}${o.kind!=="transfer"?" · "+esc(acc(o.accountId).name):""}${o.note?" · "+esc(o.note):""}${live(o)?"":" · отменена"}</small></span>
     <span class="csum ${o.kind==="in"?"okc":o.kind==="out"?"badc":""}">${o.kind==="in"?"+":o.kind==="out"?"−":""}${money(o.amount)}</span></button>`).join("")}</div>`;
 }
@@ -137,7 +137,7 @@ ACT.finOp=(kind,_,pre)=>{
   const cats=S.fincats.filter(c=>c.active&&c.kind===(k==="in"?"in":"out")).sort((a,b)=>a.sort-b.sort);
   const d=pre.debt;
   App.openModal(App.head(d?(d.direction==="in"?"Получить оплату долга":"Оплатить долг"):pre.plan?"Оплатить: "+esc(pre.plan.name):{in:"Приход денег",out:"Расход денег",transfer:"Перевод между счетами"}[k])+`
-    ${d||pre.plan?"":`<div class="seg wide3">${[["in","+ Приход"],["out","− Расход"],["transfer","⇄ Перевод"]].map(([v,l])=>`<button class="${v===k?"on":""}" data-act="finOp" data-id="${v}">${l}</button>`).join("")}</div>`}
+    ${d||pre.plan?"":`<div class="seg wide3">${[["in","+ Приход"],["out","− Расход"],["transfer","Перевод"]].map(([v,l])=>`<button class="${v===k?"on":""}" data-act="finOp" data-id="${v}">${l}</button>`).join("")}</div>`}
     ${d?`<div class="fbox"><b>${esc(d.counterparty)}</b> · ${esc(d.num)}<br><small>Остаток долга ${money(App.debtLeft(d))} из ${money(d.amount)}${d.note?" · "+esc(d.note):""}</small></div>`:""}
     <div class="form">
       ${App.fld("foAmt","Сумма, ₽",App.inp("foAmt",d?App.debtLeft(d):pre.plan?pre.plan.amount:pre.amount||"","number","0",'min="0" autofocus'))}
@@ -206,7 +206,7 @@ function debts(){
     ${top.length>1?`<div class="chips cps">${top.map(([n,s])=>`<button class="chip" data-act="debtCp" data-id="${esc(n)}">${esc(n)} · <b>${money(s)}</b></button>`).join("")}</div>`:""}
     <div class="cfilt fin2"><input id="debtQ" type="search" placeholder="${u.debtDir==="in"?"Кто должен":"Кому должны"}, номер, комментарий" value="${esc(u.debtQ)}" data-filter="debtQ" aria-label="Поиск">
       ${App.sel("debtSt",[["open","Не погашены"],["closed","Погашены"],["cancelled","Отменённые"],["all","Все"]],u.debtSt,'data-filter-sel="debtSt" aria-label="Статус"')}</div>
-    <section class="card">${list.length?`<div class="flist">${list.map(debtRow).join("")}</div>`:`<div class="empty">${u.debtSt==="open"?(u.debtDir==="in"?"Вам никто не должен.":"Вы никому не должны."):"Ничего не найдено"}</div>`}</section>
+    <section class="card">${list.length?`<div class="flist">${list.map(debtRow).join("")}</div>`:`<div class="empty">${u.debtSt==="open"?(u.debtDir==="in"?"Вам никто не должен":"Вы никому не должны"):"Ничего не найдено"}</div>`}</section>
     <p class="muted">${u.debtDir==="in"?"Долги клиентов появляются сами, когда на кассе часть чека оплачена «В долг». Займы, долги сотрудников и прочее записывайте кнопкой выше.":"Долг поставщику появляется сам при проведении приёмки с указанным поставщиком, если при приёмке не выбрано «Оплачено сразу». Займы и прочее записывайте кнопкой выше."}</p>`;
 }
 ACT.debtDir=v=>{App.ui.debtDir=v;App.render()};
@@ -257,7 +257,7 @@ ACT.debtCreate=(dir,btn)=>run(btn,async()=>{const V=App.val,cp=V("dnCp").trim(),
 function planRow(p){const due=p.nextDate<=today();
   return `<div class="frow static"><span class="fic op ${p.kind}">${p.kind==="in"?"+":"−"}</span>
     <span class="cnm"><b>${esc(p.name)}</b><small><span class="${due?"badc":""}">${due?"пора платить · ":""}${dshort(p.nextDate)}</span> · ${PERIOD[p.period]}${p.accountId?" · "+esc(acc(p.accountId).name):""}</small></span>
-    <span class="frow-acts"><span class="csum">${money(p.amount)}</span><button class="btn sm ${due?"pri":""}" data-act="planPay" data-id="${p.id}">${p.kind==="in"?"Получено":"Оплатить"}</button><button class="btn sm ghost" data-act="finPlan" data-id="${p.id}" aria-label="Изменить">✎</button></span></div>`}
+    <span class="frow-acts"><span class="csum">${money(p.amount)}</span><button class="btn sm ${due?"pri":""}" data-act="planPay" data-id="${p.id}">${p.kind==="in"?"Получено":"Оплатить"}</button><button class="btn sm ghost" data-act="finPlan" data-id="${p.id}" aria-label="Изменить">${App.ico("pencil","sm")}</button></span></div>`}
 function plans(){
   const act=S.finplans.filter(p=>p.active).sort((a,b)=>a.nextDate.localeCompare(b.nextDate)),off=S.finplans.filter(p=>!p.active);
   const month=act.filter(p=>p.kind==="out").reduce((s,p)=>s+num(p.amount)*({week:4.33,month:1,quarter:1/3,year:1/12,once:0})[p.period],0);

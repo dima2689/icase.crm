@@ -33,7 +33,7 @@ VIEWS.suppliers={
         return `<button type="button" class="crow sprow" data-act="spOpen" data-id="${o.id}">
           <span class="cnm"><b>${esc(o.name)}${isBest?' <span class="pill ok">лучшая цена</span>':""}${multi[k]>1&&!isBest?` <span class="pill mute">есть дешевле на ${money(o.price-best[k])}</span>`:""}</b>
           <small><span class="spsup">${esc(supName(o.supplierId))}</span>${o.sku?" · арт. "+esc(o.sku):""}${o.brand?" · "+esc(o.brand):""}${o.stock?" · "+esc(o.stock):""}</small>
-          ${p?`<small class="ok">в CRM: розница ${money(p.price)}${num(p.price)&&o.price?" · наценка "+money(num(p.price)-o.price):""} · у нас ${App.qtyTotal(p)} шт</small>`:""}</span>
+          ${p?`<small class="muted">в CRM: розница ${money(p.price)}${num(p.price)&&o.price?" · наценка "+money(num(p.price)-o.price):""} · у нас ${App.qtyTotal(p)} шт</small>`:""}</span>
           <span class="csum">${o.price?money(o.price):"—"}</span></button>`}).join("")||`<div class="empty">${S.sprices.length?"Ничего не найдено. Попробуйте короче: «15 pro 256» или артикул.":S.suppliers.length?"Прайсов пока нет — нажмите «Загрузить прайс».":"Поставщиков пока нет — добавьте первого и загрузите его прайс."}</div>`}
       ${list.length>shown.length?`<div class="empty">Показаны первые ${shown.length} из ${list.length}. Уточните поиск или выберите поставщика.</div>`:""}</section>`;
   }

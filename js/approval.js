@@ -57,7 +57,7 @@ ACT.prodMergeGo=(_,btn)=>run(btn,async()=>{if(!MG||!MG.to)return;const a=App.byI
 
 /* сводка и раздел «Товары»: что ждёт решения */
 App.apprTile=()=>{const n=App.apprCount();if(!n)return "";const c=S.products.filter(p=>p.approval==="pending_create").length;
-  return `<button class="tile click warn" data-act="apprList"><span>Товары ждут решения</span><b>${n}</b><small>${c?"новых "+c:""}${c&&n-c?" · ":""}${n-c?"удалить "+(n-c):""}</small></button>`};
+  return `<button class="tile click" data-act="apprList"><span>Товары ждут решения</span><b>${n}</b><small>${c?"новых "+c:""}${c&&n-c?" · ":""}${n-c?"удалить "+(n-c):""}</small></button>`};
 ACT.apprList=()=>{App.ui.sf.appr=true;App.ui.sf.arch=false;if(App.ui.view!=="stock")location.hash="stock";else App.render()};
 ACT.apprAll=()=>{App.ui.sf.appr=false;App.render()};
 const sv=App.VIEWS.stock;if(sv){const r0=sv.render.bind(sv);sv.render=function(){const n=App.apprCount(),f=App.ui.sf||{};

@@ -66,14 +66,14 @@ function lineHtml(l,i,{cost,price}){
     <div class="rhead"><div><b>${esc(p.name)}</b><span class="sub">${esc([App.catName(p),p.condition,p.barcode?"ШК "+p.barcode:"",p.sku?"арт. "+p.sku:""].filter(Boolean).join(" · "))}</span></div>
       <div class="rq">${ser?`<span class="pill info">${App.codeLbl(p)}</span> <b>${q}</b> шт`:`<button class="btn sm" data-act="rcvQty" data-id="${i}|-1" aria-label="Меньше">−</button><input type="number" min="1" value="${q}" data-rl="${i}|qty" aria-label="Количество"><button class="btn sm" data-act="rcvQty" data-id="${i}|1" aria-label="Больше">+</button>`}</div>
       <div class="rprices">${prices}</div>
-      <button class="btn sm ghost danger" data-act="rcvDel" data-id="${i}" aria-label="Убрать">✕</button></div>
+      <button class="btn sm ghost danger" data-act="rcvDel" data-id="${i}" aria-label="Убрать">${App.ico("x","sm")}</button></div>
     ${ser?`<div class="runits"><input class="uscan" data-rscan="${i}" placeholder="Сканируйте ${App.codeName(p)} и Enter" autocomplete="off" aria-label="${App.codeName(p)}">
       ${(l.units||[]).length?`<table class="units"><thead><tr><th>${App.codeLbl(p)}</th><th>Состояние</th><th>АКБ, %</th>${price?"<th>Цена экз., ₽</th>":""}<th></th></tr></thead><tbody>
       ${l.units.map((u,j)=>`<tr><td><b>${esc(codeOf(u))}</b>${u.warn?`<span class="sub warn">${esc(u.warn)}</span>`:""}${u.condition&&u.condition!=="Новый"||u.attrs?`<div class="chips usum">${App.usedChips(u.attrs)}<button class="btn sm" data-act="rcvUsed" data-id="${i}|${j}">Параметры б/у</button></div>`:""}</td>
         <td><select data-ru="${i}|${j}|condition" aria-label="Состояние">${App.CONDS.map(c=>`<option${(u.condition||p.condition)===c?" selected":""}>${c}</option>`).join("")}</select></td>
         <td><input type="number" min="0" max="100" value="${esc(u.battery_health||"")}" data-ru="${i}|${j}|battery_health" aria-label="АКБ" style="width:70px"></td>
         ${price?`<td><input type="number" min="0" value="${esc(u.price||"")}" data-ru="${i}|${j}|price" placeholder="${num(l.price)||num(p.price)||""}" aria-label="Цена экземпляра" style="width:100px"></td>`:""}
-        <td><button class="btn sm ghost" data-act="rcvUnitDel" data-id="${i}|${j}" aria-label="Убрать">✕</button></td></tr>`).join("")}</tbody></table>`:'<span class="muted">Отсканируйте каждое устройство</span>'}</div>`:""}
+        <td><button class="btn sm ghost" data-act="rcvUnitDel" data-id="${i}|${j}" aria-label="Убрать">${App.ico("x","sm")}</button></td></tr>`).join("")}</tbody></table>`:'<span class="muted">Отсканируйте каждое устройство</span>'}</div>`:""}
   </div>`;
 }
 

@@ -73,7 +73,7 @@ App.finConfigCard=function(){const c=App.finCfg(),ed=App.can("settings");const d
     <h3 class="sub-h">ПСН: патенты и лимит дохода</h3>
     <div class="form">${App.fld("fcLim","Лимит дохода за год, ₽",App.inp("fcLim",c.psn.limit,"number","60000000",dis))}</div>
     <div class="tbl-wrap"><table><thead><tr><th>Точка</th><th>С</th><th>По</th><th class="n">Стоимость</th><th></th></tr></thead><tbody>
-      ${c.psn.patents.map((p,i)=>`<tr><td>${App.sel("pt_p"+i,[["","Все точки"],...points().map(x=>[x.id,x.name])],p.pointId||"",dis)}</td><td>${App.inp("pt_f"+i,p.from||"","date","",dis)}</td><td>${App.inp("pt_t"+i,p.to||"","date","",dis)}</td><td class="n">${App.inp("pt_c"+i,p.cost||"","number","0",dis)}</td><td>${ed?`<button class="btn sm ghost" data-act="psnDel" data-id="${i}" aria-label="Убрать">✕</button>`:""}</td></tr>`).join("")||'<tr><td colspan="5" class="muted">Патентов нет</td></tr>'}
+      ${c.psn.patents.map((p,i)=>`<tr><td>${App.sel("pt_p"+i,[["","Все точки"],...points().map(x=>[x.id,x.name])],p.pointId||"",dis)}</td><td>${App.inp("pt_f"+i,p.from||"","date","",dis)}</td><td>${App.inp("pt_t"+i,p.to||"","date","",dis)}</td><td class="n">${App.inp("pt_c"+i,p.cost||"","number","0",dis)}</td><td>${ed?`<button class="btn sm ghost" data-act="psnDel" data-id="${i}" aria-label="Убрать">${App.ico("x","sm")}</button>`:""}</td></tr>`).join("")||'<tr><td colspan="5" class="muted">Патентов нет</td></tr>'}
     </tbody></table></div>
     <p class="muted">Стоимость патента распределяется по дням его действия и попадает в прибыль точки. За 30 дней до окончания CRM напомнит продлить.</p>
     ${ed?`<div class="acts"><button class="btn" data-act="psnAdd">+ Патент</button><button class="btn pri" data-act="finCfgSave">Сохранить</button></div>`:""}</section>`};

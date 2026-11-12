@@ -52,7 +52,7 @@ function draw(){
         return `<tr><td>${esc(p.name||"—")}${o&&cost&&Math.abs(o.price-num(l.cost))>=1?`<small class="muted"> · в прайсе ${money(o.price)}</small>`:""}</td><td class="n">${App.qtyTotal(p)}</td>
         <td class="n"><input class="poq" data-i="${i}" data-k="qty" type="number" inputmode="numeric" min="1" value="${l.qty}" aria-label="Количество"></td>
         ${cost?`<td class="n"><input class="poq" data-i="${i}" data-k="cost" type="number" inputmode="decimal" value="${l.cost}" aria-label="Цена"></td><td class="n">${money(num(l.qty)*num(l.cost))}</td>`:""}
-        <td><button class="btn sm ghost" data-act="poDel" data-id="${i}" aria-label="Убрать">✕</button></td></tr>`}).join("")||`<tr><td colspan="6" class="muted">Добавьте товары поиском выше</td></tr>`}
+        <td><button class="btn sm ghost" data-act="poDel" data-id="${i}" aria-label="Убрать">${App.ico("x","sm")}</button></td></tr>`}).join("")||`<tr><td colspan="6" class="muted">Добавьте товары поиском выше</td></tr>`}
     </tbody></table></div>
     ${cost&&F.lines.length?`<div class="total"><span>Итого</span><b>${money(tot)}</b></div>`:""}
     <div class="acts">${F.id?`<button class="btn danger" data-act="poDelete">Удалить</button>`:""}<button class="btn" data-act="poSave" data-id="draft">Сохранить черновик</button><button class="btn pri" data-act="poSave" data-id="sent">Отправлен поставщику</button></div>`;

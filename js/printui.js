@@ -60,7 +60,7 @@ function tags(){
     <p class="szhint">Можно отметить товары галочками в разделе «Товары» и нажать «Ценники».</p></div>
     ${items.length?`<div class="tsec"><div class="tbl-wrap"><table class="tagtbl"><thead><tr><th>Товар</th><th class="n">Цена</th><th class="n">Остаток</th><th class="n">Копий</th><th></th></tr></thead><tbody>
       ${items.map(({q,p},i)=>`<tr><td><b>${esc(p.name)}</b><span class="sub">${esc([p.memory,p.color,p.condition].filter(Boolean).join(" · "))}</span>${p.trackSerial?`<label class="unitmode"><input type="checkbox" data-act="tagUnitMode" data-id="${i}" ${q.perUnit!==false?"checked":""}> по экземплярам: ${unitsForTags(p).length} шт.<small>свои IMEI, АКБ и цена</small></label>`:""}</td><td class="n">${money(p.price)}</td><td class="n">${qtyHere(p)}</td>
-        <td class="n"><input type="number" min="0" max="200" value="${num(q.copies)}" data-tagcopy="${i}" aria-label="Копий" style="width:70px"></td><td class="n"><button class="btn sm ghost" data-act="tagDel" data-id="${i}" aria-label="Убрать">✕</button></td></tr>`).join("")}
+        <td class="n"><input type="number" min="0" max="200" value="${num(q.copies)}" data-tagcopy="${i}" aria-label="Копий" style="width:70px"></td><td class="n"><button class="btn sm ghost" data-act="tagDel" data-id="${i}" aria-label="Убрать">${App.ico("x","sm")}</button></td></tr>`).join("")}
       </tbody></table></div>
       <div class="chips tgap"><button class="btn sm" data-act="tagByStock">Копий по остатку на точке</button><button class="btn sm" data-act="tagOnes">По одному</button><button class="btn sm danger" data-act="tagClear">Очистить</button></div></div>`
       :'<div class="tsec"><div class="empty">Список пуст</div></div>'}
@@ -112,7 +112,7 @@ function tagtpl(){
     </div></div>
     <div class="tsec"><h3 class="sub">Размер</h3>
       <div class="sizebox"><label class="szf"><span>Ширина</span><input id="tc_w" type="number" step="0.5" min="${LIM.min}" max="${LIM.max}" value="${num(t.w)}" data-tcfg="w"></label>
-        <button class="btn sm ghost szswap" data-act="tagSwap" title="Повернуть: поменять ширину и высоту" aria-label="Поменять ширину и высоту">⇄</button>
+        <button class="btn sm ghost szswap" data-act="tagSwap" title="Повернуть: поменять ширину и высоту" aria-label="Поменять ширину и высоту">${App.ico("swap","sm")}</button>
         <label class="szf"><span>Высота</span><input id="tc_h" type="number" step="0.5" min="${LIM.min}" max="${LIM.max}" value="${num(t.h)}" data-tcfg="h"></label>
         <span class="szmm">мм</span>
         ${t.media==="sheet"?`<label class="szf szgap"><span>Промежуток</span><input id="tc_gap" type="number" min="0" max="10" step="0.5" value="${t.gap==null?1:num(t.gap)}" data-tcfg="gap"></label><span class="szmm">мм</span>`:""}</div>

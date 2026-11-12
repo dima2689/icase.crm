@@ -81,7 +81,7 @@ App.redrawModal = function(html,after){
   if(f){const el=document.getElementById(f);if(el)el.focus()}
   m.parentElement.scrollTop=sc;if(after)after();
 };
-App.head = (t,extra="")=>`<div class="m-h"><h2>${t}</h2>${extra}<button class="btn ghost" data-act="close" aria-label="Закрыть">✕</button></div>`;
+App.head = (t,extra="")=>`<div class="m-h"><h2>${t}</h2>${extra}<button class="btn ghost" data-act="close" aria-label="Закрыть">${App.ico("x","sm")}</button></div>`;
 /* линейные иконки: один набор, одна толщина линии; цвет — от текста */
 App.ICO={receipt:'<path d="M5 3v18l2.5-1.5L10 21l2-1.5 2 1.5 2.5-1.5L19 21V3l-2.5 1.5L14 3l-2 1.5L10 3 7.5 4.5z"/><path d="M9 9h6M9 13h6"/>',
   bank:'<path d="M3 21h18M5 21V10M19 21V10M9 21V10M15 21V10M2 10l10-6 10 6z"/>',
@@ -93,6 +93,10 @@ App.ICO={receipt:'<path d="M5 3v18l2.5-1.5L10 21l2-1.5 2 1.5 2.5-1.5L19 21V3l-2.
   cart:'<circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/><path d="M2 3h3l2.7 12.4a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.6L21 8H6"/>',
   printer:'<path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="7"/>',
   eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  x:'<path d="M18 6 6 18M6 6l12 12"/>',
+  pencil:'<path d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z"/>',
+  swap:'<path d="M16 3l4 4-4 4M20 7H4M8 21l-4-4 4-4M4 17h16"/>',
+  menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',
   alert:'<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>'};
 App.ico=(k,cls="")=>`<svg class="ico ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${App.ICO[k]||""}</svg>`;
 App.fld = (id,label,input,cls="")=>`<div class="fld ${cls}"><label for="${id}">${label}</label>${input}</div>`;

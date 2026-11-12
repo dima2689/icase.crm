@@ -83,7 +83,7 @@ App.scan=async(opts={})=>{
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){App.toast("Камера недоступна в этом браузере");return}
   const box=document.createElement("div");box.className="camscrim";box.innerHTML=`<div class="cam">
     <video playsinline muted autoplay></video><div class="camframe"><i></i></div>
-    <div class="camtop"><b>${esc(opts.title||"Наведите на штрихкод, IMEI или QR")}</b><button class="btn ghost" data-cam="close" aria-label="Закрыть">✕</button></div>
+    <div class="camtop"><b>${esc(opts.title||"Наведите на штрихкод, IMEI или QR")}</b><button class="btn ghost" data-cam="close" aria-label="Закрыть">${App.ico("x","sm")}</button></div>
     <div class="camlast" hidden></div>
     <div class="camtype" hidden><input type="text" inputmode="text" autocomplete="off" placeholder="Код, IMEI или серийный номер" aria-label="Код вручную"><button class="btn pri" data-cam="ok">OK</button></div>
     <div class="cambot"><button class="btn" data-cam="torch" hidden>Фонарик</button><button class="btn" data-cam="flip">Сменить камеру</button><button class="btn" data-cam="type">Ввести вручную</button></div></div>`;

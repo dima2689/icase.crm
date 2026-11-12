@@ -24,13 +24,13 @@ VIEWS.dashboard={
     return `
     ${reqs.length?`<div class="banner info">Новые сотрудники ждут назначения роли: ${reqs.length}. <a href="#settings" data-act="settingsTab" data-id="staff">Назначить</a></div>`:""}
     ${sh&&!App.sameDay(sh.openedAt,now)?`<div class="banner warn">Смена ${esc(sh.num)} открыта ${App.dtt(sh.openedAt)} и не закрыта. <a href="#pos">Закрыть в кассе</a></div>`:""}
-    <div class="tiles">
+    <div class="tiles dash">
       <div class="tile"><span>Выручка сегодня</span><b>${money(t.rev)}</b><small>все точки · ${App.nw(t.count,"чек","чека","чеков")}${t.reps.length?" · "+App.nw(t.reps.length,"ремонт","ремонта","ремонтов"):""}</small></div>
       <div class="tile"><span>Выручка за месяц</span><b>${money(m.rev)}</b><small>${showProfit?"прибыль "+money(m.profit):"средний чек "+money(m.avg)}</small></div>
       <a class="tile click" href="#pos"><span>Касса</span><b>${sh?money(App.shiftTotals(sh).expectedCash):"закрыта"}</b><small>${sh?"наличных в смене "+esc(sh.num):"откройте смену"}</small></a>
       ${hasRep?`<a class="tile click" href="#repairs"><span>Ремонт в работе</span><b>${act.length}</b><small>${ready.length||waitParts.length?[ready.length?"готово "+ready.length:"",waitParts.length?"ждут запчасть "+waitParts.length:""].filter(Boolean).join(" · "):"все в процессе"}</small></a>
       <button class="tile click ${late.length?"alert":""}" data-act="repFilter" data-id="late"><span>Просрочено</span><b>${late.length}</b><small>${late.length?[late.length-stored.length>0?"не готовы "+(late.length-stored.length):"",stored.length?"не забирают "+stored.length:""].filter(Boolean).join(" · "):"всё в срок"}</small></button>`:""}
-      ${App.tasksDue?`<a class="tile click ${App.tasksDue()?"alert":""}" href="#tasks"><span>Задачи на сегодня</span><b>${App.tasksDue()}</b><small>${S.waitlist.filter(w=>w.status==="ready").length?"звонков "+S.waitlist.filter(w=>w.status==="ready").length:"напоминания и звонки"}</small></a>`:""}
+      ${App.tasksDue?`<a class="tile click" href="#tasks"><span>Задачи на сегодня</span><b>${App.tasksDue()}</b><small>${S.waitlist.filter(w=>w.status==="ready").length?"звонков "+S.waitlist.filter(w=>w.status==="ready").length:"напоминания и звонки"}</small></a>`:""}
       ${App.apprTile?App.apprTile():""}<button class="tile click ${low.length?"warn":""}" data-act="lowStock"><span>Заканчивается</span><b>${low.length}</b><small>ниже минимума</small></button>
     </div>
     <div class="grid g2">
@@ -97,7 +97,7 @@ VIEWS.pos={
     const sh=App.openShift(),wh=posWh(),t=posTotals(),c=App.findCustomerByPhone(P.phone);
     const st=App.settings();
     if(!App.point())return '<div class="card empty">Нет торговых точек. Владелец добавляет их в «Настройки → Точки и склады».</div>';
-    const shiftBar=sh?`<div class="shiftbar ok"><b>Смена ${esc(sh.num)}</b> открыта ${App.dtt(sh.openedAt)} · ${esc(App.nameOf(sh.openedBy))} · наличных в кассе ≈ <b>${money(App.shiftTotals(sh).expectedCash)}</b>${!App.sameDay(sh.openedAt,new Date())?' <span class="pill warn">открыта не сегодня, закройте её</span>':""}</div>`
+    const shiftBar=sh?`<div class="shiftbar ok"><i class="dot ok" aria-hidden="true"></i><b>Смена ${esc(sh.num)}</b> открыта ${App.dtt(sh.openedAt)} · ${esc(App.nameOf(sh.openedBy))} · наличных в кассе ≈ <b>${money(App.shiftTotals(sh).expectedCash)}</b>${!App.sameDay(sh.openedAt,new Date())?' <span class="pill warn">открыта не сегодня, закройте её</span>':""}</div>`
       :`<div class="shiftbar ${st.requireShift?"bad":""}"><b>Смена закрыта.</b> ${st.requireShift?"Продажи и наличные операции недоступны, пока смена не открыта.":"Продажи без смены разрешены настройками, но наличные операции требуют смены."} <button class="btn sm pri" data-act="openShiftDlg">Открыть смену</button></div>`;
     const inStock=S.products.filter(p=>!p.archived&&App.qtyIn(p,wh)>0).sort((a,b)=>App.catName(a).localeCompare(App.catName(b))||String(a.name).localeCompare(b.name));
     const groups={};inStock.forEach(p=>{const k=App.catName(p);(groups[k]=groups[k]||[]).push(p)});
@@ -125,7 +125,7 @@ VIEWS.pos={
         <div class="clist">
         ${P.cart.length?P.cart.map((i,k)=>{const p=App.byId("products",i.productId);const below=p&&num(i.price)-num(i.disc)/Math.max(1,num(i.qty))<num(i.unitId?i.cost:p.cost);
           return `<div class="cline"><div class="cl-top"><div class="cl-name"><b>${esc(i.name)}${i.productId?"":` <span class="pill ${i.kind==="goods"?"":"info"}">${i.kind==="goods"?"вне каталога":"услуга"}</span>`}</b>${i.serial?'<span class="sub">'+App.codeLbl(i.productId)+" "+esc(i.serial)+(i.battery!=null&&i.battery!==""?" · АКБ "+i.battery+"%":"")+"</span>":""}${below?'<span class="sub bad">ниже закупки</span>':""}</div>
-            <button class="btn sm ghost danger" data-act="posDel" data-id="${k}" aria-label="Убрать">✕</button></div>
+            <button class="btn sm ghost danger" data-act="posDel" data-id="${k}" aria-label="Убрать">${App.ico("x","sm")}</button></div>
             <div class="cl-row"><div class="cl-q">${i.serial?'<span class="muted">1 шт</span>':`<button type="button" class="btn sm" data-act="posQty" data-id="${k}|-1" aria-label="Меньше">−</button><input type="number" min="1" value="${num(i.qty)}" data-cart="${k}" data-f="qty" id="cq${k}" aria-label="Количество"><button type="button" class="btn sm" data-act="posQty" data-id="${k}|1" aria-label="Больше">+</button>`}</div>
             ${App.can("price")?`<label>Цена<input type="number" min="0" value="${num(i.price)}" data-cart="${k}" data-f="price" id="cp${k}"></label>`:`<div class="cl-pr"><span>Цена</span><b>${money(i.price)}</b></div>`}
             <label>Скидка<input type="number" min="0" value="${num(i.disc)||""}" data-cart="${k}" data-f="disc" id="cd${k}" placeholder="0"></label>
