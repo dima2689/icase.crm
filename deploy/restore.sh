@@ -24,7 +24,9 @@ log "копия: $(grep created "$D/manifest.txt")"; grep '^rows\.' "$D/manifest
 if [ $FRESH = 1 ]; then
   if [ $YES = 0 ]; then read -r -p "Удалить ТЕКУЩУЮ базу и файлы на этом сервере и восстановить копию? Напишите ДА: " a; [ "$a" = "ДА" ] || die "отменено"; fi
   log "сброс стека"
-  dc down -v --remove-orphans || true
+  dc down --remove-orphans || true
+  # тома Supabase удаляем, сертификаты Caddy оставляем (иначе Let's Encrypt выпускает заново, а у него лимиты)
+  docker volume ls -q --filter "label=com.docker.compose.project=$(basename "$SB_DIR")" | grep -v caddy | xargs -r docker volume rm >/dev/null || true
   # файлы принадлежат пользователям контейнеров: без root удаляем через sudo
   rm -rf "$SB_DIR/volumes/db/data" "$SB_DIR/volumes/storage" 2>/dev/null || sudo -n rm -rf "$SB_DIR/volumes/db/data" "$SB_DIR/volumes/storage"
   cp "$D/supabase.env" "$SB_DIR/.env"; chmod 600 "$SB_DIR/.env"
