@@ -156,4 +156,4 @@ jobs:
         run: |
           docker ps -a --format '{{.Names}}\t{{.Status}}'
           sudo journalctl -u icase-backup --no-pager | tail -30 || true
-          tests/ci-run.sh logs sh -c 'docker logs icase-caddy 2>&1 | tail -40; cd /opt/icase/supabase && sudo docker compose logs --tail 25 db auth functions 2>&1 | tail -80; exit 1' || true
+          tests/ci-run.sh logs sh -c 'docker logs supabase-pooler 2>&1 | tail -40; docker logs icase-caddy 2>&1 | tail -5; cd /opt/icase/supabase && sudo docker compose logs --tail 25 db auth functions 2>&1 | tail -80; exit 1' || true
