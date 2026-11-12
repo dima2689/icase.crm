@@ -20,9 +20,11 @@ chmod 600 "$ICASE_ENV"; load_env
 log "пакеты"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq ca-certificates curl git jq gnupg rclone rsync python3 openssl ufw fail2ban unattended-upgrades \
-  docker.io docker-compose-v2 >/dev/null
-docker compose version | grep -Eq 'v2\.(2[4-9]|[3-9][0-9])' || die "нужен docker compose ≥ 2.24 ($(docker compose version))"
+apt-get install -y -qq ca-certificates curl git jq gnupg rclone rsync python3 openssl ufw fail2ban unattended-upgrades >/dev/null
+# Docker: если уже установлен (у некоторых провайдеров в образе), не трогаем
+if ! docker compose version >/dev/null 2>&1; then apt-get install -y -qq docker.io docker-compose-v2 >/dev/null; fi
+cv=$(docker compose version --short 2>/dev/null | sed 's/^v//')
+python3 -c "import sys;v=[int(x) for x in sys.argv[1].split('.')[:2]];sys.exit(0 if v>=[2,24] else 1)" "${cv:-0.0}" || die "нужен docker compose ≥ 2.24 (сейчас ${cv:-нет})"
 
 log "Docker: зеркала реестра и ротация логов"
 mkdir -p /etc/docker
@@ -62,7 +64,7 @@ KbdInteractiveAuthentication no
 PermitRootLogin prohibit-password
 MaxAuthTries 4
 SSHD
-  systemctl reload ssh 2>/dev/null || systemctl reload sshd
+  systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null || warn "не удалось перезапустить sshd — проверьте вручную"
 else
   warn "нет ни одного SSH-ключа — вход по паролю оставлен. Добавьте ключ в /root/.ssh/authorized_keys и запустите снова"
 fi

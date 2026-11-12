@@ -10,7 +10,7 @@ case "${1:-}" in
   --rollback)
     cur=$(cat /opt/icase/CURRENT 2>/dev/null || true)
     prev=$(find "$REL" -mindepth 1 -maxdepth 1 -type d ! -name "$cur" -printf "%T@ %f\n" | sort -rn | head -1 | cut -d" " -f2); [ -n "$prev" ] || { echo "нет предыдущей версии"; exit 1; }
-    echo "откат: $cur → $prev"; cd "$REL/$prev"; ICASE_VERSION="$prev" exec deploy/deploy.sh;;
+    echo "откат: $cur → $prev"; ln -sfn "$REL/$prev" /opt/icase/app; cd "$REL/$prev"; ICASE_VERSION="$prev" exec deploy/deploy.sh;;
 esac
 V="${1:?версия}"; [[ "$V" =~ ^[0-9A-Za-z._-]{4,64}$ ]] || { echo "недопустимая версия"; exit 2; }
 T="$IN/$V.tar.gz"; [ -f "$T" ] || { echo "нет $T"; exit 2; }

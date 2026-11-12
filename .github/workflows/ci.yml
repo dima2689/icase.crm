@@ -72,3 +72,86 @@ jobs:
         run: |
           docker ps -a --format '{{.Names}}\t{{.Status}}'
           cd "$SB_DIR" && "$GITHUB_WORKSPACE/tests/ci-run.sh" logs sh -c 'docker compose logs --tail 30 db auth rest storage functions 2>&1 | tail -110; exit 1' || true
+
+  server:
+    name: Как на сервере — install.sh, выкладка по SSH, HTTPS, S3, откат
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      S3_KEY: ci-s3-user
+      S3_SECRET: ci-s3-secret-123
+      OWNER_EMAIL: owner@ci.icase.test
+      OWNER_PASSWORD: Ci-Owner-Pass-123
+    steps:
+      - uses: actions/checkout@v4
+      - name: Чистая машина — sshd, ключ deploy, /etc/icase/icase.env
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq openssh-server >/dev/null && sudo systemctl start ssh
+          mkdir -p ~/.ssh && ssh-keygen -q -t ed25519 -N '' -C github-actions -f ~/.ssh/id_deploy
+          python3 - <<'PY' > /tmp/icase.env
+          import re,os
+          s=open('deploy/icase.env.example').read()
+          v={'CRM_DOMAIN':'crm.icase.localhost','API_DOMAIN':'api.icase.localhost','ACME_EMAIL':'ci@icase.test',
+             'S3_ENDPOINT':'http://127.0.0.1:9100','S3_REGION':'us-east-1','S3_BUCKET':'icase-backups',
+             'S3_ACCESS_KEY':os.environ['S3_KEY'],'S3_SECRET_KEY':os.environ['S3_SECRET'],'BACKUP_PASSPHRASE':'ci-server-passphrase'}
+          for k,x in v.items(): s=re.sub(r'(?m)^%s=.*$'%k, '%s=%s'%(k,x), s)
+          print(s+'\nHC_INSECURE=1   # тестовый стенд: локальный сертификат Caddy\n')
+          PY
+          sudo install -d -m 700 /etc/icase && sudo install -m 600 /tmp/icase.env /etc/icase/icase.env
+      - name: install.sh (как на новом VPS)
+        run: tests/ci-run.sh install sudo bash deploy/install.sh "$(cat ~/.ssh/id_deploy.pub)"
+      - name: S3 для бэкапов (MinIO)
+        run: |
+          docker run -d --restart unless-stopped --name ci-s3 -p 127.0.0.1:9100:9000 -e MINIO_ROOT_USER=$S3_KEY -e MINIO_ROOT_PASSWORD=$S3_SECRET minio/minio server /data >/dev/null
+          for _ in $(seq 30); do curl -fs http://127.0.0.1:9100/minio/health/live && break; sleep 1; done
+          RCLONE_CONFIG_M_TYPE=s3 RCLONE_CONFIG_M_PROVIDER=Minio RCLONE_CONFIG_M_ENDPOINT=http://127.0.0.1:9100 RCLONE_CONFIG_M_ACCESS_KEY_ID=$S3_KEY RCLONE_CONFIG_M_SECRET_ACCESS_KEY=$S3_SECRET rclone mkdir m:icase-backups
+      - name: Выкладка по SSH, как deploy.yml
+        run: |
+          ssh-keyscan -t ed25519 localhost > ~/.ssh/known_hosts 2>/dev/null
+          V1="ci1-${GITHUB_SHA::7}"; echo "V1=$V1" >> "$GITHUB_ENV"
+          git archive --format=tar.gz -o "/tmp/$V1.tar.gz" HEAD -- index.html styles.css sw.js manifest*.webmanifest icons js db deploy supabase
+          scp -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes "/tmp/$V1.tar.gz" "deploy@localhost:incoming/$V1.tar.gz"
+          tests/ci-run.sh release ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes deploy@localhost "sudo /opt/icase/bin/icase-release $V1"
+          ! ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes deploy@localhost "sudo id" 2>/dev/null || { echo "::error::deploy может больше, чем icase-release"; exit 1; }
+      - name: HTTPS через Caddy (сертификат проверяется)
+        run: |
+          for _ in $(seq 30); do docker exec icase-caddy test -f /data/caddy/pki/authorities/local/root.crt && break; sleep 1; done
+          docker exec icase-caddy cat /data/caddy/pki/authorities/local/root.crt | sudo tee /usr/local/share/ca-certificates/icase-ci.crt >/dev/null && sudo update-ca-certificates >/dev/null
+          curl -fsS https://crm.icase.localhost/ | grep -q iCase && echo "CRM по https открывается"
+          curl -fsS https://crm.icase.localhost/js/config.js | grep -q 'https://api.icase.localhost' && echo "config.js → api"
+          c=$(curl -s -o /dev/null -w '%{http_code}' https://crm.icase.localhost/deploy/install.sh); [ "$c" = 404 ] && echo "служебные файлы скрыты" || { echo "::error::/deploy доступен ($c)"; exit 1; }
+          c=$(curl -s -o /dev/null -w '%{http_code}' https://api.icase.localhost/); [ "$c" = 404 ] && echo "Studio/служебное наружу закрыто" || { echo "::error::api / → $c"; exit 1; }
+          c=$(curl -s -o /dev/null -w '%{http_code}' -m 5 http://127.0.0.1:8000/ || true); [ "$c" = 000 ] && echo "шлюз 8000 наружу не опубликован" || { echo "::error::порт 8000 открыт ($c)"; exit 1; }
+      - name: Владелец, сквозные проверки
+        run: |
+          tests/ci-run.sh owner sudo env OWNER_PASSWORD="$OWNER_PASSWORD" /opt/icase/app/deploy/create-owner.sh "$OWNER_EMAIL" "Владелец CI"
+          API=https://api.icase.localhost ANON=$(sudo grep -m1 '^ANON_KEY=' /opt/icase/supabase/.env | cut -d= -f2-) EMAIL=$OWNER_EMAIL PASS=$OWNER_PASSWORD tests/ci-run.sh smoke tests/smoke.sh
+      - name: Ночной бэкап (systemd) → S3
+        run: |
+          tests/ci-run.sh backup sudo systemctl start icase-backup.service
+          sudo systemctl list-timers 'icase-*' --all --no-pager
+          f=$(sudo bash -c '. /etc/icase/icase.env; RCLONE_CONFIG_M_TYPE=s3 RCLONE_CONFIG_M_PROVIDER=Minio RCLONE_CONFIG_M_ENDPOINT=$S3_ENDPOINT RCLONE_CONFIG_M_ACCESS_KEY_ID=$S3_ACCESS_KEY RCLONE_CONFIG_M_SECRET_ACCESS_KEY=$S3_SECRET_KEY rclone lsf m:$S3_BUCKET/daily' | tail -1)
+          [ -n "$f" ] && echo "в S3: daily/$f" && echo "S3F=daily/$f" >> "$GITHUB_ENV" || { echo "::error::бэкапа нет в S3"; exit 1; }
+          tests/ci-run.sh health sudo /opt/icase/app/deploy/healthcheck.sh
+      - name: Сервер потерян → восстановление из S3
+        run: |
+          tests/ci-run.sh restore sudo /opt/icase/app/deploy/restore.sh "s3:$S3F" --fresh --yes
+          tests/ci-run.sh health2 sudo /opt/icase/app/deploy/healthcheck.sh
+          API=https://api.icase.localhost ANON=$(sudo grep -m1 '^ANON_KEY=' /opt/icase/supabase/.env | cut -d= -f2-) EMAIL=$OWNER_EMAIL PASS=$OWNER_PASSWORD tests/ci-run.sh smoke2 tests/smoke.sh
+      - name: Новая версия и откат
+        run: |
+          V2="ci2-${GITHUB_SHA::7}"
+          git archive --format=tar.gz -o "/tmp/$V2.tar.gz" HEAD -- index.html styles.css sw.js manifest*.webmanifest icons js db deploy supabase
+          scp -i ~/.ssh/id_deploy "/tmp/$V2.tar.gz" "deploy@localhost:incoming/$V2.tar.gz"
+          S="ssh -i $HOME/.ssh/id_deploy deploy@localhost"
+          tests/ci-run.sh release2 $S "sudo /opt/icase/bin/icase-release $V2"
+          [ "$(cat /opt/icase/CURRENT)" = "$V2" ] || { echo "::error::CURRENT≠$V2"; exit 1; }
+          tests/ci-run.sh rollback $S "sudo /opt/icase/bin/icase-release --rollback"
+          [ "$(cat /opt/icase/CURRENT)" = "$V1" ] && echo "откат на $V1" || { echo "::error::после отката CURRENT=$(cat /opt/icase/CURRENT)"; exit 1; }
+          curl -fsS https://crm.icase.localhost/js/config.js | grep -q "$V1" && echo "CRM снова $V1"
+      - name: Логи при ошибке
+        if: failure()
+        run: |
+          docker ps -a --format '{{.Names}}\t{{.Status}}'
+          sudo journalctl -u icase-backup --no-pager | tail -30 || true
+          tests/ci-run.sh logs sh -c 'docker logs icase-caddy 2>&1 | tail -40; cd /opt/icase/supabase && sudo docker compose logs --tail 25 db auth functions 2>&1 | tail -80; exit 1' || true

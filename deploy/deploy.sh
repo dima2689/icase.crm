@@ -57,6 +57,8 @@ if [ $CI_MODE = 0 ]; then
   cp "$HERE/Caddyfile" "$SB_DIR/icase/Caddyfile"
   docker exec icase-caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1 || dc restart caddy
   echo "$VER" > /opt/icase/CURRENT
+  # первая выкладка: до неё база была пустой и бэкапа нет — делаем сразу, не дожидаясь ночи
+  ls "${BACKUP_DIR:-/var/backups/icase}"/*.gpg >/dev/null 2>&1 || "$HERE/backup.sh" --local --tag "first-$VER"
 fi
 
 log "проверка"
