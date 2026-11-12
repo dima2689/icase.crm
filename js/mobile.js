@@ -143,9 +143,9 @@ function drawTabs(){let bar=document.getElementById("tabbar");const app=document
   const items=(App.wsTabs?App.wsTabs():TABS).filter(([k])=>k.startsWith("__")||App.navAllowed(k));
   const due=App.tasksDue?App.tasksDue():0,reps=S.repairs.filter(r=>App.ACTIVE&&App.ACTIVE.includes(r.status)).length;
   const html=items.map(([k,l])=>{const badge=k==="tasks"&&due?`<em>${due}</em>`:k==="repairs"&&reps?`<em>${reps}</em>`:"";
-    if(k==="__scan")return `<button type="button" class="tb scan" data-act="camScan"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON(k)}</svg></span>${l}</button>`;
-    if(k==="__more")return `<button type="button" class="tb" data-act="menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">${ICON(k)}</svg>${l}</button>`;
-    return `<a class="tb${v===k?" on":""}" href="#${k}"${v===k?' aria-current="page"':""}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON(k)}</svg>${l}${badge}</a>`}).join("");
+    if(k==="__scan")return `<button type="button" class="tb scan" data-act="camScan"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON(k)}</svg></span>${l}</button>`;
+    if(k==="__more")return `<button type="button" class="tb" data-act="menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">${ICON(k)}</svg>${l}</button>`;
+    return `<a class="tb${v===k?" on":""}" href="#${k}"${v===k?' aria-current="page"':""}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON(k)}</svg>${l}${badge}</a>`}).join("");
   if(bar.innerHTML!==html)bar.innerHTML=html}
 const r0=App.render;App.render=function(){const out=r0.apply(this,arguments);drawTabs();return out};
 

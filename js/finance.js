@@ -94,7 +94,7 @@ function sum(){
       ${opsList(S.finops.slice().sort(byNew).slice(0,8))}</section>`;
 }
 const drawerNote=a=>{const sh=S.shifts.find(s=>s.pointId===a.pointId&&s.status==="open");return sh?"смена "+sh.num+" открыта":"по закрытию смены"};
-const icon=k=>({drawer:"🧾",bank:"🏦",cash:"💵",card:"💳",other:"•"})[k]||"•";
+const icon=k=>App.ico(({drawer:"receipt",bank:"bank",cash:"cash",card:"card"})[k]||"wallet");
 const plural=(n,a,b,c)=>{const x=n%10,y=n%100;return x===1&&y!==11?a:x>=2&&x<=4&&(y<12||y>14)?b:c};
 const byNew=(a,b)=>String(b.date+b.createdAt).localeCompare(a.date+a.createdAt);
 ACT.finDebts=dir=>{App.ui.finTab="debts";App.ui.debtDir=dir;App.ui.debtSt="open";App.render()};

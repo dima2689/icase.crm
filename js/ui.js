@@ -28,10 +28,10 @@ App.navAllowed = v=>{const n=App.NAV.find(x=>x[0]===v);return n&&App.VIEWS[v]&&(
 function drawNav(){
   const counts={tasks:App.tasksDue?App.tasksDue():0,orders:S.siteorders.filter(o=>o.status==="new").length,repairs:S.repairs.filter(r=>App.ACTIVE.includes(r.status)).length,preorders:App.pzArrived?App.pzArrived().length:0,stock:S.products.filter(App.isLow).length+(App.apprCount?App.apprCount():0)};
   const items=App.NAV.filter(n=>App.navAllowed(n[0]));
-  $("#navlist").innerHTML=items.map(([v,l,ic])=>`<a class="nav ${App.ui.view===v?"on":""}" href="#${v}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">${ic}</svg><span>${l}</span>${counts[v]?`<span class="cnt">${counts[v]}</span>`:""}</a>`).join("");
+  $("#navlist").innerHTML=items.map(([v,l,ic])=>`<a class="nav ${App.ui.view===v?"on":""}" href="#${v}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">${ic}</svg><span>${l}</span>${counts[v]?`<span class="cnt">${counts[v]}</span>`:""}</a>`).join("");
   const sh=App.openShift(),pts=App.myPoints(),cur=App.point();
   const ini=String(App.me.name||"?").trim().split(/\s+/).slice(0,2).map(w=>w[0]).join("").toUpperCase()||"?";
-  const ico=d=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  const ico=d=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
   $("#who").innerHTML=(App.wsSwitch?App.wsSwitch():"")+`<div class="whocard">
     <div class="whotop"><button type="button" class="whobtn" data-act="profile" title="Мой профиль"><span class="ava" aria-hidden="true">${esc(ini)}</span><span class="whonm"><b>${esc(App.me.name)}</b><small>${esc((App.ROLES[App.me.role]||"")!==App.me.name?App.ROLES[App.me.role]||"":"Мой профиль")}</small></span></button>
       <button type="button" class="iconbtn" data-act="logout" title="Выйти" aria-label="Выйти">${ico('<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l-5-5 5-5M5 12h11"/>')}</button></div>
@@ -82,6 +82,19 @@ App.redrawModal = function(html,after){
   m.parentElement.scrollTop=sc;if(after)after();
 };
 App.head = (t,extra="")=>`<div class="m-h"><h2>${t}</h2>${extra}<button class="btn ghost" data-act="close" aria-label="Закрыть">✕</button></div>`;
+/* линейные иконки: один набор, одна толщина линии; цвет — от текста */
+App.ICO={receipt:'<path d="M5 3v18l2.5-1.5L10 21l2-1.5 2 1.5 2.5-1.5L19 21V3l-2.5 1.5L14 3l-2 1.5L10 3 7.5 4.5z"/><path d="M9 9h6M9 13h6"/>',
+  bank:'<path d="M3 21h18M5 21V10M19 21V10M9 21V10M15 21V10M2 10l10-6 10 6z"/>',
+  cash:'<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
+  card:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
+  wallet:'<path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3"/><path d="M21 11h-5a2 2 0 0 0 0 4h5z"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  file:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>',
+  cart:'<circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/><path d="M2 3h3l2.7 12.4a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.6L21 8H6"/>',
+  printer:'<path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="7"/>',
+  eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  alert:'<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>'};
+App.ico=(k,cls="")=>`<svg class="ico ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${App.ICO[k]||""}</svg>`;
 App.fld = (id,label,input,cls="")=>`<div class="fld ${cls}"><label for="${id}">${label}</label>${input}</div>`;
 App.inp = (id,v="",type="text",ph="",attrs="")=>`<input id="${id}" type="${type}" value="${esc(v)}" placeholder="${esc(ph)}"${type==="number"?' inputmode="decimal" step="any"':""} ${attrs}>`;
 App.sel = (id,opts,v="",attrs="")=>`<select id="${id}" ${attrs}>${opts.map(o=>{const [val,lab]=Array.isArray(o)?o:[o,o];return `<option value="${esc(val)}"${String(val)===String(v)?" selected":""}>${esc(lab)}</option>`}).join("")}</select>`;
@@ -149,7 +162,7 @@ App.showApp=()=>{$("#login").hidden=true;$(".app").hidden=false};
 App.showLogin=function(mode,opt){
   opt=opt||{};$(".app").hidden=true;const L=$("#login");L.hidden=false;
   const reg=mode==="register",np=mode==="newpass",fg=mode==="forgot";
-  const eye='<button type="button" class="btn ghost sm pwtoggle" data-pw aria-label="Показать пароль">👁</button>';
+  const eye='<button type="button" class="btn ghost sm pwtoggle" data-pw aria-label="Показать пароль">'+App.ico("eye")+'</button>';
   const pw=(id,label,ac)=>`<div class="fld"><label for="${id}">${label}</label><div class="pwbox">${App.inp(id,"","password","",`autocomplete="${ac}" ${ac==="new-password"?'minlength="8"':""} required`)}${eye}</div></div>`;
   L.innerHTML=`<form class="login-card" id="loginForm"><div class="brand"><b>iCase</b><span>CRM</span></div>
     <h1>${np?(opt.forced?"Смените временный пароль":"Новый пароль"):fg?"Восстановление доступа":reg?"Регистрация сотрудника":"Вход"}</h1>

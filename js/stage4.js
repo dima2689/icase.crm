@@ -76,7 +76,7 @@ ACT.dealSave=(_,btn)=>run(btn,async()=>{const V=App.val;
 ACT.dealsList=()=>{const list=S.deals.slice().sort((a,b)=>String(b.createdAt).localeCompare(a.createdAt));
   const pay=S.deals.filter(d=>d.status==="sold"),onc=S.deals.filter(d=>d.kind==="commission"&&d.status==="open");
   App.openModal(App.head("Выкуп и комиссия")+`<div class="tiles"><div class="tile"><span>На комиссии сейчас</span><b>${onc.length}</b><small>выплатим при продаже ${money(onc.reduce((a,d)=>a+d.amount,0))}</small></div><div class="tile"><span>Продано — надо выплатить</span><b class="${pay.length?"badc":""}">${money(pay.reduce((a,d)=>a+d.amount,0))}</b><small>${pay.length} клиентам</small></div></div>
-    <div class="flist">${list.map(d=>{const c=App.cust(d.customerId)||{};return `<button class="frow" data-act="dealOpen" data-id="${d.id}"><span class="fic">${d.kind==="buyout"?"💵":"🤝"}</span>
+    <div class="flist">${list.map(d=>{const c=App.cust(d.customerId)||{};return `<button class="frow" data-act="dealOpen" data-id="${d.id}"><span class="fic">${App.ico(d.kind==="buyout"?"cash":"file")}</span>
       <span class="cnm"><b>${esc(d.num)} · ${esc(d.device)} ${dPill(d)}</b><small>${d.kind==="buyout"?"выкуп":"комиссия"} · ${esc(c.name||"")} · ${App.dt(d.createdAt)}${d.imei?" · "+esc(d.imei):""}</small></span><span class="csum">${money(d.amount)}</span></button>`}).join("")||'<div class="empty">Сделок пока нет</div>'}</div>
     <div class="acts"><button class="btn pri" data-act="dealNew">+ Выкуп или комиссия</button></div>`,{wide:true})};
 ACT.dealOpen=id=>{const d=S.deals.find(x=>x.id===id);if(!d)return;const c=App.cust(d.customerId)||{},u=d.unitId?App.byId("units",d.unitId):null,sale=d.saleId?App.byId("sales",d.saleId):null,debt=d.debtId?S.debts.find(x=>x.id===d.debtId):null;

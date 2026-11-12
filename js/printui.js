@@ -69,9 +69,9 @@ function tags(){
     <div class="tsec">${App.sel("tagTplSel",App.tagTemplates().map(t=>[t.id,t.name+(t.builtin?"":" · свой")]),App.ui.tagTpl,'data-filter-sel="tagTpl" aria-label="Шаблон ценника"')}
     <div class="prevbox tgap"><iframe id="tagPrev" title="Предпросмотр ценников"></iframe></div>
     <div class="printbar"><span class="muted">${total?`${total} ${plural(total)} · ${esc(App.tagTemplate(App.ui.tagTpl).name)}`:"Добавьте товары слева"}</span>
-      <button class="btn pri" data-act="tagPrint" id="tagPrintBtn" ${total?"":"disabled"}>🖨 Печать${total?" · "+total+" шт.":""}</button></div></div>
+      <button class="btn pri" data-act="tagPrint" id="tagPrintBtn" ${total?"":"disabled"}>Печать${total?" · "+total+" шт.":""}</button></div></div>
   </section></div>
-  ${total?`<div class="printfab"><button class="btn pri" data-act="tagPrint">🖨 Печать · ${total} шт.</button></div>`:""}`;
+  ${total?`<div class="printfab"><button class="btn pri" data-act="tagPrint">Печать · ${total} шт.</button></div>`:""}`;
 }
 
 /* ---------- конструктор ценников: холст с блоками ---------- */
@@ -298,7 +298,7 @@ ACT.docSave=(_,btn)=>run(btn,async()=>{const d=Object.assign({},docDraft());cons
 /* ---------- живые изменения без перерисовки ---------- */
 document.addEventListener("input",e=>{const t=e.target;
   if(t.dataset.tagcopy!=null){const q=App.ui.tagQueue[+t.dataset.tagcopy];if(q){q.copies=Math.max(0,Math.min(200,num(t.value)));saveQueue();
-    const total=printList().reduce((a,x)=>a+num(x.copies),0);document.querySelectorAll('[data-act="tagPrint"]').forEach(b=>{b.textContent="🖨 Печать"+(total?" · "+total+" шт.":"");b.disabled=!total})}return}
+    const total=printList().reduce((a,x)=>a+num(x.copies),0);document.querySelectorAll('[data-act="tagPrint"]').forEach(b=>{b.textContent="Печать"+(total?" · "+total+" шт.":"");b.disabled=!total})}return}
   if(t.dataset.tcfg){const d=tagDraft(),k=t.dataset.tcfg,v=t.type==="checkbox"?t.checked:(t.type==="number"?num(t.value):t.value);
     const okSize=x=>num(x)>=LIM.min&&num(x)<=LIM.max;
     if((k==="w"||k==="h")&&okSize(v)){const last=okSize(d["_"+k])?num(d["_"+k]):okSize(d[k])?num(d[k]):num(v),r=num(v)/last;d["_"+k]=num(v);

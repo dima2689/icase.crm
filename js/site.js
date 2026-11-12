@@ -22,7 +22,7 @@ VIEWS.orders={
     <div class="chips">${[["open","В работе"],["done","Проведённые"],["cancelled","Отменённые"],["all","Все"]].map(([k,l])=>`<button class="chip ${u.soSt===k?"on":""}" data-act="soSt" data-id="${k}">${l}<b>${cnt(k)}</b></button>`).join("")}</div>
     <div class="row-f"><input id="soQ" type="search" placeholder="№ заказа, имя, телефон, товар" value="${esc(u.soQ)}" data-filter="soQ" aria-label="Поиск заказа" style="flex:1 1 260px"></div>
     <section class="card crow-list">${list.map(o=>`<button type="button" class="crow sorow" data-act="openSO" data-id="${esc(o.id)}">
-        <span class="cav ${o.status==="new"?"":"mute"}">${o.problems?"!":"🛒"}</span>
+        <span class="cav ${o.status==="new"?"":"mute"}">${o.problems?App.ico("alert"):App.ico("cart")}</span>
         <span class="cnm"><b>${esc(o.num)} · ${esc(o.name||"Без имени")}</b><span class="cpills">${soSt(o)}${o.paid?' <span class="pill ok">оплачен</span>':""}</span><small>${App.dtt(o.createdAt)} · ${esc((o.items||[]).map(i=>i.name+(i.qty>1?" ×"+i.qty:"")).join(", "))}</small>${o.problems?`<small class="bad">${esc(o.problems)}</small>`:""}</span>
         <span class="csum">${money(o.total)}</span></button>`).join("")||'<div class="empty">Заказов нет. Они появятся здесь, когда покупатель оформит заказ на сайте.</div>'}</section>`;
   }

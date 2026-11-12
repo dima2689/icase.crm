@@ -28,7 +28,7 @@ App.evoTab=function(){const own=App.me.role==="owner";
     ${STORES?`<h3 class="sub-h">Магазины в Эвоторе</h3><div class="tbl-wrap"><table><thead><tr><th>Магазин Эвотора</th><th>ID</th><th>Точка CRM</th></tr></thead><tbody>${STORES.map(s=>`<tr><td>${esc(s.name||"")}<small class="muted" style="display:block">${esc(s.address||"")}</small></td><td><code>${esc(s.id)}</code></td>
       <td>${App.sel("evPt_"+s.id,[["","— не связывать —"],...pts.map(p=>[p.id,p.name])],(pts.find(p=>p.evotorStoreId===s.id)||{}).id||"",'data-evstore="'+esc(s.id)+'"')}</td></tr>`).join("")}</tbody></table></div>`:""}
     <h3 class="sub-h">Точки и магазины Эвотора</h3>
-    <div class="flist">${pts.map(p=>`<div class="frow"><span class="fic">🧾</span><span class="cnm"><b>${esc(p.name)}</b><small>${p.evotorStoreId?"Эвотор: "+esc(p.evotorStoreId):"магазин Эвотора не указан"}</small></span>
+    <div class="flist">${pts.map(p=>`<div class="frow"><span class="fic">${App.ico("receipt")}</span><span class="cnm"><b>${esc(p.name)}</b><small>${p.evotorStoreId?"Эвотор: "+esc(p.evotorStoreId):"магазин Эвотора не указан"}</small></span>
       <span class="csum">${S.evotor.filter(r=>r.pointId===p.id).length} чеков</span></div>`).join("")}</div>
     ${ST.has_token?`<div class="acts" style="justify-content:flex-start;flex-wrap:wrap"><button class="btn" data-act="evPush">Выгрузить товары и цены на кассы</button><button class="btn" data-act="evPull">Загрузить чеки за 7 дней</button></div>
       <p class="muted">Чеки загружаются сами каждые 10 минут. Последний чек: ${ST.last?App.dtt(ST.last):"ещё не было"}${ST.new?` · не сверено: <b>${ST.new}</b> — «Продажи → Сверка с Эвотором»`:""}.</p>`:""}
