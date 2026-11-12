@@ -28,15 +28,26 @@ python3 -c "import sys;v=[int(x) for x in sys.argv[1].split('.')[:2]];sys.exit(0
 
 log "Docker: зеркала реестра и ротация логов"
 mkdir -p /etc/docker
-cat > /etc/docker/daemon.json <<JSON
-{
-  "registry-mirrors": ${DOCKER_MIRRORS:-["https://mirror.gcr.io", "https://dockerhub.timeweb.cloud"]},
-  "log-driver": "json-file",
-  "log-opts": { "max-size": "20m", "max-file": "5" },
-  "live-restore": true
-}
-JSON
-systemctl enable --now docker >/dev/null; systemctl restart docker
+# дополняем существующий daemon.json (у провайдера/в образе могут быть свои настройки), а не затираем
+[ -f /etc/docker/daemon.json ] && cp /etc/docker/daemon.json /etc/docker/daemon.json.icase-bak
+python3 - "${DOCKER_MIRRORS:-}" <<'PY'
+import json,os,sys
+p='/etc/docker/daemon.json'
+try: d=json.load(open(p))
+except Exception: d={}
+m=json.loads(sys.argv[1]) if sys.argv[1] else ["https://mirror.gcr.io","https://dockerhub.timeweb.cloud"]
+d.setdefault('registry-mirrors',m)
+if 'log-driver' not in d: d['log-driver']='json-file'; d['log-opts']={"max-size":"20m","max-file":"5"}
+d.setdefault('live-restore',True)
+json.dump(d,open(p,'w'),indent=2)
+PY
+systemctl enable docker >/dev/null 2>&1 || true
+if ! systemctl restart docker; then
+  journalctl -u docker --no-pager -n 15 || true
+  warn "Docker не принял настройки — возвращаю прежние"
+  if [ -f /etc/docker/daemon.json.icase-bak ]; then mv /etc/docker/daemon.json.icase-bak /etc/docker/daemon.json; else rm -f /etc/docker/daemon.json; fi
+  systemctl restart docker || die "Docker не запускается"
+fi
 
 log "файл подкачки"
 if ! swapon --show | grep -q .; then
