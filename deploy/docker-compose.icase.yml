@@ -36,7 +36,8 @@ services:
       ACME_EMAIL: ${ACME_EMAIL}
     volumes:
       - ./icase/Caddyfile:/etc/caddy/Caddyfile:ro
-      - /srv/icase/crm:/srv/crm:ro
+      # папку выше, а не саму crm: при выкладке crm подменяется целиком, и монтирование самой папки осталось бы на старой версии
+      - /srv/icase:/srv/icase:ro
       - caddy_data:/data
       - caddy_config:/config
     logging:
