@@ -65,7 +65,7 @@ async function call(f: Fetch, token: string, url: string) {
 
 /** Одна страница (до 1000 строк) — уже в виде строк для CRM. */
 export async function page(f: Fetch, token: string, kind: string, offset = 0) {
-  const k = KINDS[kind]; if (!k) throw new Error("Неизвестный раздел: " + kind);
+  const k = Object.hasOwn(KINDS, kind) ? KINDS[kind] : null; if (!k) throw new Error("Неизвестный раздел: " + kind);
   const off = Math.max(0, Math.floor(Number(offset) || 0));
   const b = await call(f, token, `${API}${k.path}?limit=${PAGE}&offset=${off}`);
   const rows = (b?.rows || []).map(k.map);
@@ -80,7 +80,7 @@ export async function check(f: Fetch, token: string) {
   const out: Record<string, number> = {};
   for (const k of ["store", "folder", "product", "variant", "counterparty"]) out[k] = await count(k);
   let priceTypes: string[] = [];
-  try { priceTypes = ((await call(f, token, `${API}/context/companysettings/pricetype`)) || []).map((p: any) => p.name).filter(Boolean); } catch { /* нет прав — возьмём из товаров */ }
+  try { priceTypes = ((await call(f, token, `${API}/context/companysettings/pricetype`)) || []).map((p: any) => p.name).filter(Boolean); } catch { /* нет прав на настройки — в CRM будет «Цена продажи» или первая цена товара */ }
   const stores = (await page(f, token, "store")).rows;
   return { user: me?.fullName || me?.name || "", counts: out, priceTypes, stores };
 }

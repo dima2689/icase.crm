@@ -36,4 +36,5 @@ const s = (await page(fake as any, "tok", "stock")).rows[0];
 ok(s.id === "V1" && s.type === "variant" && s.by.S1 === 3 && !("S2" in s.by), "остатки по складам, нули отброшены");
 ok(idOf(B + "/entity/product/abc?expand=1") === "abc", "id из ссылки");
 try { await page(fake as any, "tok", "../../security"); ok(false, "чужой путь"); } catch { ok(true, "читать можно только разрешённые разделы"); }
+try { await page(fake as any, "tok", "constructor"); ok(false, "constructor"); } catch { ok(true, "служебные имена не проходят"); }
 ok(seen.every((u) => u.startsWith(B + "/")), "запросы только в api.moysklad.ru");
