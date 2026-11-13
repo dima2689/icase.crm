@@ -8,7 +8,7 @@ const rub=v=>(Math.round(num(v)*100)/100).toLocaleString("ru-RU",{minimumFractio
 const qn=v=>num(v).toLocaleString("ru-RU");
 const D=iso=>iso?App.dt(iso):"";
 const CSS=`@page{size:A4;margin:12mm 12mm 14mm}*{box-sizing:border-box}body{margin:0;font:10pt/1.4 Arial,Helvetica,sans-serif;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.hd{display:flex;justify-content:space-between;gap:16px;border-bottom:2px solid #111;padding-bottom:7px;margin-bottom:10px}.hd .sh{font:700 16pt Arial}.hd .rq{font-size:8pt;color:#555;max-width:360px}
+.hd{display:flex;justify-content:space-between;gap:16px;border-bottom:2px solid #111;padding-bottom:7px;margin-bottom:10px}.hd .sh{font:700 16pt Arial}.sh .logo-svg{display:block;height:.9em;width:auto}.hd .rq{font-size:8pt;color:#555;max-width:360px}
 .hd .r{text-align:right}.hd .r b{display:block;font-size:12.5pt}.hd .r span{font-size:9pt;color:#333}
 .meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 18px;margin:8px 0 10px}.meta div{display:flex;gap:6px;border-bottom:1px dotted #ccc;padding:2px 0}.meta span{color:#666;flex:0 0 auto}.meta b{font-weight:600}
 table.t{width:100%;border-collapse:collapse;margin:6px 0}table.t th,table.t td{border:1px solid #999;padding:4px 6px;vertical-align:top;text-align:left}table.t th{background:#f0f0f0;font-size:8.5pt}
@@ -21,7 +21,7 @@ h3{font-size:10.5pt;margin:12px 0 4px}.note{font-size:8.8pt;margin:6px 0;color:#
 /* шапка магазина и документа */
 function head(title,numTxt,date,pointId){const st=App.settings(),pt=pointId?App.byId("points",pointId):null;
   const rq=[st.legalName,st.inn?"ИНН "+st.inn:"",st.ogrnip?"ОГРНИП "+st.ogrnip:"",[st.city,pt&&pt.address||st.address].filter(Boolean).join(", "),pt&&pt.phone||st.phone].filter(Boolean).join(" · ");
-  return `<div class="hd"><div><div class="sh">${esc(st.shopName||"iCase")}</div><div class="rq">${esc(rq)}</div></div><div class="r"><b>${esc(title)}</b><span>${numTxt?"№ "+esc(numTxt)+" ":""}${date?"от "+esc(date):""}</span></div></div>`}
+  return `<div class="hd"><div><div class="sh">${App.logo("",esc(st.shopName||"iCase"))}</div><div class="rq">${esc(rq)}</div></div><div class="r"><b>${esc(title)}</b><span>${numTxt?"№ "+esc(numTxt)+" ":""}${date?"от "+esc(date):""}</span></div></div>`}
 const meta=rows=>`<div class="meta">${rows.filter(r=>r&&r[1]!==""&&r[1]!=null).map(([k,v])=>`<div><span>${esc(k)}:</span><b>${esc(v)}</b></div>`).join("")}</div>`;
 /* таблица: cols=[[заголовок,"n"?]], rows=[[...ячейки (строки уже экранированы через cell)]] */
 const cell=v=>v&&typeof v==="object"&&"html" in v?v.html:esc(v==null?"":v);

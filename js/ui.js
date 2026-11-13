@@ -168,7 +168,7 @@ App.showLogin=function(mode,opt){
   const reg=mode==="register",np=mode==="newpass",fg=mode==="forgot";
   const eye='<button type="button" class="btn ghost sm pwtoggle" data-pw aria-label="Показать пароль">'+App.ico("eye")+'</button>';
   const pw=(id,label,ac)=>`<div class="fld"><label for="${id}">${label}</label><div class="pwbox">${App.inp(id,"","password","",`autocomplete="${ac}" ${ac==="new-password"?'minlength="8"':""} required`)}${eye}</div></div>`;
-  L.innerHTML=`<form class="login-card" id="loginForm"><div class="brand"><b>iCase</b><span>CRM</span></div>
+  L.innerHTML=`<form class="login-card" id="loginForm"><div class="brand">${App.logo()}<span>CRM</span></div>
     <h1>${np?(opt.forced?"Смените временный пароль":"Новый пароль"):fg?"Восстановление доступа":reg?"Регистрация сотрудника":"Вход"}</h1>
     ${np?`<p class="muted">${opt.forced?"Владелец задал вам временный пароль. Придумайте свой — не короче 8 символов.":"Придумайте новый пароль — не короче 8 символов."}</p>`:""}
     ${fg?'<p class="muted">Введите email, с которым входите в CRM. Пришлём ссылку — по ней вы зададите новый пароль.</p>':""}
@@ -189,9 +189,9 @@ App.showLogin=function(mode,opt){
       if((np||reg)&&App.val("lgPass")!==App.val("lgPass2"))throw new Error("Пароли не совпадают");
       if((np||reg)&&App.val("lgPass").length<8)throw new Error("Пароль — минимум 8 символов");
       if(np){await App.auth.setPassword(App.val("lgPass"));history.replaceState(null,"",location.pathname);location.reload();return}
-      if(fg){const em=App.val("lgEmail");await App.auth.reset(em);ev.target.innerHTML='<div class="brand"><b>iCase</b><span>CRM</span></div><h1>Проверьте почту</h1><p>Если '+App.esc(em)+' зарегистрирован в CRM, на него пришла ссылка для смены пароля. Откройте её на этом устройстве.</p><p class="muted small">Нет письма? Проверьте «Спам» или попросите владельца прислать ссылку для входа.</p><div class="acts"><button class="btn" type="button" onclick="App.showLogin()">Ко входу</button></div>';return}
+      if(fg){const em=App.val("lgEmail");await App.auth.reset(em);ev.target.innerHTML='<div class="brand">'+App.logo()+'<span>CRM</span></div><h1>Проверьте почту</h1><p>Если '+App.esc(em)+' зарегистрирован в CRM, на него пришла ссылка для смены пароля. Откройте её на этом устройстве.</p><p class="muted small">Нет письма? Проверьте «Спам» или попросите владельца прислать ссылку для входа.</p><div class="acts"><button class="btn" type="button" onclick="App.showLogin()">Ко входу</button></div>';return}
       if(reg){const d=await App.auth.signUp(App.val("lgEmail"),App.val("lgPass"),App.val("lgName"));
-        if(!d.session){L.querySelector("form").innerHTML='<div class="brand"><b>iCase</b><span>CRM</span></div><h1>Почти готово</h1><p>Мы отправили письмо на '+App.esc(App.val("lgEmail")||"ваш email")+'. Откройте ссылку из письма, затем войдите — владелец увидит вашу заявку.</p><div class="acts"><button class="btn" type="button" onclick="App.showLogin()">Ко входу</button></div>';return}
+        if(!d.session){L.querySelector("form").innerHTML='<div class="brand">'+App.logo()+'<span>CRM</span></div><h1>Почти готово</h1><p>Мы отправили письмо на '+App.esc(App.val("lgEmail")||"ваш email")+'. Откройте ссылку из письма, затем войдите — владелец увидит вашу заявку.</p><div class="acts"><button class="btn" type="button" onclick="App.showLogin()">Ко входу</button></div>';return}
         await App.enter(d.session.user);return}
       await App.auth.signIn(App.val("lgEmail"),App.val("lgPass"));const {data}=await App.sb.auth.getSession();await App.enter(data.session.user);
     }catch(x){e.textContent=x.message||String(x);b.disabled=false}};
@@ -203,7 +203,7 @@ App.showLogin=function(mode,opt){
 };
 App.showPending=function(noOwner,disabled){
   $(".app").hidden=true;const L=$("#login");L.hidden=false;
-  L.innerHTML=`<div class="login-card"><div class="brand"><b>iCase</b><span>CRM</span></div>
+  L.innerHTML=`<div class="login-card"><div class="brand">${App.logo()}<span>CRM</span></div>
     ${disabled?`<h1>Доступ отключён</h1><p>Владелец отключил ваш доступ к CRM. Если это ошибка, свяжитесь с ним.</p>`:
     noOwner?`<h1>Первый вход</h1><p>В CRM ещё нет сотрудников. Станьте владельцем: вы сможете добавить точки, склады и назначить роли остальным.</p>
       ${App.fld("ownName","Ваше имя",App.inp("ownName",App.me.name===App.me.email?"":App.me.name,"text"))}<div class="hint bad" id="ownErr"></div><button class="btn pri big" id="ownBtn">Я владелец iCase</button>`:

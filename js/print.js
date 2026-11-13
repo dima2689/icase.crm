@@ -69,11 +69,12 @@ function parts(s,cfg){
   const chips=i=>cfg.chips?[i.memory,i.color,i.cond].filter(Boolean).map(x=>`<span class="chip">${esc(x)}</span>`).join("")+(i.warranty?`<span class="chip d">гарантия ${i.warranty} мес.</span>`:""):"";
   return {D,st,c,qrs,legal,reqLine,contact,chips,
     title:esc(cfg.title||"Товарный чек"),num:esc(s.num),dt:date(s.createdAt)+", "+time(s.createdAt),
-    logo:esc(st.shopName||"iCase"),point:cfg.showPoint&&D.pointName?esc(D.pointName):"",
+    logo:App.logo("",esc(st.shopName||"iCase")),point:cfg.showPoint&&D.pointName?esc(D.pointName):"",
     ti:cfg.tradein&&s.tradeIn?s.tradeIn:null};
 }
 const scaleCss=cfg=>`html{font-size:${Math.max(80,Math.min(125,num(cfg.scale)||100))}%}`;
-const wrap=(title,css,body)=>`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>${title}</title><style>${css}</style></head><body>${body}</body></html>`;
+const LOGO_CSS=".logo-svg{display:inline-block;height:.9em;width:auto;vertical-align:middle;fill:currentColor}";
+const wrap=(title,css,body)=>`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>${title}</title><style>${css}${LOGO_CSS}</style></head><body>${body}</body></html>`;
 
 /* ---------- 1. Фирменный ---------- */
 const CSS_BRAND=`@page{size:A4;margin:0}*{box-sizing:border-box}html,body{margin:0}
@@ -391,7 +392,7 @@ function blockHtml(k,b,p,t,o){
   const padX=b.bg?Math.min(1.2,b.w*.06):0,iw=b.w-2*padX;
   if(k==="logo"){
     if(t.logo)inner=`<img src="${t.logo}" alt="" style="max-width:100%;max-height:100%;object-fit:contain;display:block;${t.logoBw?"filter:grayscale(1) contrast(1.4);":""}">`;
-    else{const s=esc(App.settings().shopName||"iCase");fs=Math.min(fs,b.h/1.1,iw/(s.length*.6));inner=s}
+    else inner=App.logo("",esc(App.settings().shopName||"iCase")).replace("<svg ",'<svg style="width:100%;height:100%;display:block" preserveAspectRatio="xMidYMid meet" ');
   }else if(k==="qr"){const u=App.tagQrUrl(p,t);if(u)inner=App.qrSvg(u).replace("<svg",`<svg style="width:100%;height:100%;display:block"`);else empty=true}
   else if(k==="barcode"){const code=p.barcode||p.sku||p.serial||"";if(code)inner=barcodeSvg(code,`height:100%;width:auto;max-width:100%;display:block`);else empty=true}
   else if(k==="pills"){

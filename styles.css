@@ -1329,3 +1329,9 @@ button .ico{display:inline-block;vertical-align:-3px}
 /* фирменная деталь: номера документов и коды — моноширинным, табличные цифры */
 :root{--f-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Roboto Mono","Liberation Mono",monospace}
 .idn{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:.9em;letter-spacing:0;white-space:nowrap}
+/* логотип */
+:root{--brand:#00205C}
+.brand{align-items:center}
+.brand .logo-svg{height:19px;width:auto;color:var(--brand);display:block}
+.login-card .brand .logo-svg{height:26px}
+.brand span{line-height:1}
