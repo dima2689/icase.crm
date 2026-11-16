@@ -120,7 +120,7 @@ App.siteTab=()=>{
     :'<p class="muted">Ключи подключения задаёт владелец.</p>'}
   </section>`}
 
-  <section class="card"><div class="card-h"><h2>Состояние обмена</h2><div class="row-f">${ed?`<button class="btn sm" data-act="siteResync">${custom?"Уведомить сайт обо всём":"Выгрузить всё заново"}</button><button class="btn sm pri" data-act="siteNow">${custom?"Отправить сейчас":"Выгрузить сейчас"}</button>`:""}</div></div>
+  <section class="card"><div class="card-h"><h2>Состояние обмена</h2><div class="row-f">${ed?`${custom?"":'<button class="btn sm" data-act="siteLink">Связать с товарами сайта</button>'}<button class="btn sm" data-act="siteResync">${custom?"Уведомить сайт обо всём":"Выгрузить всё заново"}</button><button class="btn sm pri" data-act="siteNow">${custom?"Отправить сейчас":"Выгрузить сейчас"}</button>`:""}</div></div>
     ${st&&st.error?`<div class="banner err">${esc(st.error)}</div>`:""}
     <div class="tiles"><div class="tile"><span>${custom?"Последнее уведомление":"Последняя выгрузка"}</span><b class="mid">${s.siteLastSync?App.dtt(s.siteLastSync):"ещё не было"}</b>${s.siteLastError?`<small class="bad">${esc(s.siteLastError)}</small>`:'<small>без ошибок</small>'}</div>
       <div class="tile"><span>Товаров «на сайте»</span><b>${st?num(st.on_site):"…"}</b><small>${custom?"отдаются по API":"связано с сайтом: "+(st?num(st.linked):"…")}</small></div>
@@ -191,6 +191,8 @@ ACT.siteKitInfo=()=>App.toast("Файлы для Next.js лежат в репо�
 ACT.siteKeyShow=(_,btn)=>run(btn,async()=>{App.ui.siteKey=await App.api.rpc("site_api_key",{p_regenerate:false});App.render()});
 ACT.siteKeyNew=(_,btn)=>{if(!App.confirm2(btn,"Нажмите ещё раз: старый ключ перестанет работать, его нужно будет заменить в веб-хуках сайта"))return;
   run(btn,async()=>{App.ui.siteKey=await App.api.rpc("site_api_key",{p_regenerate:true});App.render();App.toast("Создан новый ключ")})};
+ACT.siteLink=(_,btn)=>run(btn,async()=>{const r=await App.api.invoke("site-sync",{link:true});await App.reload(["products"]);App.ui.siteStatus=null;
+  App.textModal("Связь с товарами сайта",`Проверено товаров CRM: ${r.checked}\nСвязано по ссылке МоегоСклада: ${r.by_ms}\nСвязано по артикулу: ${r.by_sku}\nНе найдено на сайте: ${r.not_found}\n\nНа сайте ничего не изменилось. Цены и наличие связанных товаров обновятся при следующей выгрузке.`)});
 ACT.siteResync=(_,btn)=>run(btn,async()=>{const n=await App.api.rpc("site_resync",{});App.ui.siteStatus=null;App.toast("В очередь поставлено товаров: "+n);App.render()});
 ACT.siteNow=(_,btn)=>run(btn,async()=>{const r=await App.api.invoke("site-sync");App.ui.siteStatus=null;await App.reload(["settings"]);
   App.toast(r&&r.skipped?"Выгрузка выключена или не заданы ключи":r&&r.error?r.error:"Готово: обновлено "+num(r&&r.updated)+", создано "+num(r&&r.created)+(num(r&&r.failed)?", ошибок "+num(r.failed):""));App.render()});

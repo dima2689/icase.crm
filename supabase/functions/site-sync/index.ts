@@ -1,7 +1,7 @@
 // Edge-функция site-sync: запускается по расписанию (pg_cron, заголовок x-cron-token)
 // или вручную из CRM владельцем/управляющим (кнопка «Выгрузить сейчас»).
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { postHook, preview, syncRun, testConnection, wooClient } from "./sync.ts";
+import { linkExisting, postHook, preview, syncRun, testConnection, wooClient } from "./sync.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info, x-cron-token" };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
@@ -32,6 +32,15 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { body = {}; }
   try {
     if (body && body.preview) return json(await preview(rpc, String(body.preview)));
+    if (body && body.link) {
+      const cfg = await rpc("site_config");
+      if (!cfg.url || !cfg.woo_key || !cfg.woo_secret) return json({ error: "Не заданы адрес сайта или ключи WooCommerce" }, 400);
+      const { data: rows, error } = await db.from("products").select("id,sku").is("woo_id", null).not("sku", "is", null).eq("is_archived", false);
+      if (error) throw new Error(error.message);
+      const r = await linkExisting(wooClient(cfg.url, cfg.woo_key, cfg.woo_secret), rows || []);
+      for (const l of r.links) await rpc("site_set_woo", { p_kind: "product", p_id: l.id, p_woo: l.woo });
+      return json({ ok: true, ...r.stat });
+    }
     if (body && body.test) {
       const cfg = await rpc("site_config");
       if ((cfg.mode || "custom") === "custom") {

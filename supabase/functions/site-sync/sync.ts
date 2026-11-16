@@ -265,3 +265,31 @@ export async function testConnection(woo: Woo) {
   try { attrs = await woo("GET", "products/attributes?per_page=100"); } catch { /* права только на товары */ }
   return { ok: true, sample: products && products[0] ? products[0].name : null, global_attributes: (attrs || []).map((a) => a.name) };
 }
+
+/** Связать товары CRM с уже существующими товарами WooCommerce — только запоминает woo_id, на сайте ничего не меняет.
+ *  1) артикул вида «msi-woo:…:product:5305» (так МойСклад хранит связь со своим модулем WooCommerce) → товар сайта 5305;
+ *  2) иначе — поиск по артикулу (SKU) сайта. */
+export async function linkExisting(woo: Woo, rows: { id: string; sku: string }[]) {
+  const stat = { checked: rows.length, by_ms: 0, by_sku: 0, not_found: 0 };
+  const links: { id: string; woo: number }[] = [];
+  const msi = new Map<number, string>(), bySku = new Map<string, string>();
+  for (const r of rows) {
+    const m = /^msi-woo:[^:]+:product:(\d+)$/.exec(r.sku || "");
+    if (m) msi.set(Number(m[1]), r.id); else if (r.sku) bySku.set(r.sku, r.id);
+  }
+  const ids = [...msi.keys()];
+  for (let i = 0; i < ids.length; i += 100) {
+    const part = ids.slice(i, i + 100);
+    const found: any[] = await woo("GET", `products?include=${part.join(",")}&per_page=100&status=any`);
+    const ok = new Set((found || []).map((p: any) => Number(p.id)));
+    for (const id of part) if (ok.has(id)) { links.push({ id: msi.get(id)!, woo: id }); stat.by_ms++; } else stat.not_found++;
+  }
+  const skus = [...bySku.keys()];
+  for (let i = 0; i < skus.length; i += 50) {
+    const part = skus.slice(i, i + 50);
+    const found: any[] = await woo("GET", `products?sku=${encodeURIComponent(part.join(","))}&per_page=100&status=any`);
+    const got = new Map((found || []).filter((p: any) => p.sku).map((p: any) => [String(p.sku), Number(p.id)]));
+    for (const s of part) { const w = got.get(s); if (w) { links.push({ id: bySku.get(s)!, woo: w }); stat.by_sku++; } else stat.not_found++; }
+  }
+  return { stat, links };
+}
