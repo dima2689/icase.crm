@@ -99,7 +99,7 @@ jobs:
           if ! systemctl is-active --quiet icase-bot; then cp -a "$BK/.env" "$B/.env"; systemctl restart icase-bot; echo "бот не запустился — настройки возвращены"; exit 1; fi
           echo "  ошибок в журнале после запуска: $(journalctl -u icase-bot --since "$since" --no-pager -o cat | grep -c ' ERROR ' || true)"
           if [ "$STAGE" = crm-on ]; then
-            DB=$(cd "$B" && grep -E '^DB_PATH=' .env | cut -d= -f2-); DB=${DB:-data/icase.db}
+            DB=$(cd "$B" && grep -E '^DB_PATH=' .env | cut -d= -f2- || true); DB=${DB:-data/icase.db}
             src=$(cd "$B" && python3 -c "import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); r=c.execute(\"select value from kv where key='catalog_source'\").fetchone(); print(r[0] if r else '')" "$DB" 2>/dev/null || true)
             n=$(cd "$B" && python3 -c "import sqlite3,sys,json; c=sqlite3.connect(sys.argv[1]); print(sum(1 for (d,) in c.execute('select data from ms_items where active=1') if json.loads(d).get('source')=='crm'))" "$DB" 2>/dev/null || echo '?')
             echo "  источник каталога: ${src:-нет данных}; товаров из CRM: $n"
