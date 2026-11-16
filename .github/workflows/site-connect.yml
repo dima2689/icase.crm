@@ -1,0 +1,49 @@
+# Связь сайта айкейс.рф (проект icase-review на сервере) с CRM.
+#   stage=inspect — только чтение: как установлен сайт (версия, образы, файлы настроек — только имена переменных).
+# Секреты и персональные данные в журнал не выводятся.
+name: Site connect
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: "inspect"
+        required: true
+        default: inspect
+permissions:
+  contents: read
+concurrency: { group: server, cancel-in-progress: false }
+jobs:
+  site:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      H: ${{ secrets.DEPLOY_HOST }}
+      STAGE: ${{ inputs.stage }}
+    steps:
+      - name: SSH
+        env: { K: "${{ secrets.DEPLOY_SSH_KEY }}" }
+        run: |
+          case "$STAGE" in inspect) ;; *) echo "stage: inspect"; exit 1;; esac
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$K" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e '/^$/d' > ~/.ssh/id_deploy; chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -T 20 -t ed25519 "$H" 2>/dev/null > ~/.ssh/known_hosts
+      - name: Осмотр сайта
+        if: inputs.stage == 'inspect'
+        run: |
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes root@"$H" 'bash -s' <<'SH'
+          set -u
+          mask() { sed -E 's/[A-Za-z0-9+\/_=-]{24,}/<…>/g'; }
+          echo "== /opt/icase-review"; ls -la /opt/icase-review 2>&1 | mask
+          for d in /opt/icase-review/*/; do [ -d "$d/.git" ] && { echo "-- git $d"; git -C "$d" log -1 --format='%H %cs %s' 2>&1; git -C "$d" status --short 2>&1 | head -5; }; done
+          echo "== /etc/icase-review (имена файлов)"; ls -la /etc/icase-review 2>&1
+          for f in /etc/icase-review/*.env; do [ -f "$f" ] && { echo "-- $f"; sed -nE 's/^([A-Z0-9_]+)=(.*)$/\1 \2/p' "$f" | awk '{print $1, (length($2)<=2 ? "(пусто)" : "(задано)")}'; }; done
+          echo "== operator"; ls -la /var/lib/icase-review/operator 2>&1 | tail -15
+          for f in /etc/icase-review/*.json /var/lib/icase-review/operator/*.json; do [ -f "$f" ] && { echo "-- $f"; python3 -c "import json,sys;d=json.load(open(sys.argv[1]));print({k:(v if isinstance(v,(str,int,bool,list)) and 'pass' not in k.lower() and 'secret' not in k.lower() and 'key' not in k.lower() else '…') for k,v in d.items()} if isinstance(d,dict) else type(d))" "$f" 2>&1 | mask | cut -c1-600; }; done
+          echo "== releases"; ls -la /srv/icase-review/public-releases 2>&1 | tail -10
+          find / -maxdepth 6 -name release.json -path '*icase*' 2>/dev/null | head
+          echo "== docker"; docker compose ls 2>&1; docker ps --format '{{.Names}} {{.Image}} {{.Status}}' 2>&1
+          docker images --format '{{.Repository}}:{{.Tag}} {{.ID}} {{.CreatedSince}} {{.Size}}' 2>&1 | head -20
+          echo "== docker hub"; timeout 10 curl -sI https://registry-1.docker.io/v2/ 2>&1 | head -1 || echo нет
+          echo "== bun на хосте"; command -v bun node 2>&1
+          echo "== диск"; df -h / | tail -1; free -m | sed -n 2p
+          SH
