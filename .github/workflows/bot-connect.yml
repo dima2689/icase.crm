@@ -1,0 +1,83 @@
+# Связь бота Telegram (/opt/icase-bot) с CRM.
+#   stage=key   — показать открытый ключ сервера для шифрования обновления бота (создаётся один раз в /root/.icase-bot-update.pem)
+#   stage=apply — поставить обновление бота из ветки bot-update-enc (зашифровано ключом сервера), создать ключ бота в CRM,
+#                 записать CRM_API_URL и CRM_BOT_KEY в /opt/icase-bot/.env и перезапустить бота.
+#                 Перед заменой проверяется, что файлы бота на сервере не менялись (иначе — стоп); при сбое всё возвращается.
+# Секреты не покидают сервер: ключ бота создаётся и записывается прямо там.
+name: Bot connect
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: "key или apply"
+        required: true
+        default: key
+permissions:
+  contents: read
+concurrency: { group: server, cancel-in-progress: false }
+jobs:
+  bot:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      H: ${{ secrets.DEPLOY_HOST }}
+      STAGE: ${{ inputs.stage }}
+    steps:
+      - name: SSH
+        env: { K: "${{ secrets.DEPLOY_SSH_KEY }}" }
+        run: |
+          case "$STAGE" in key|apply) ;; *) echo "stage: key или apply"; exit 1;; esac
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$K" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e '/^$/d' > ~/.ssh/id_deploy; chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -T 20 -t ed25519 "$H" 2>/dev/null > ~/.ssh/known_hosts
+      - name: Ключ сервера для обновлений бота
+        if: inputs.stage == 'key'
+        run: |
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes root@"$H" 'bash -s' <<'SH'
+          set -e
+          K=/root/.icase-bot-update.pem
+          [ -f "$K" ] || { umask 077; openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out "$K" 2>/dev/null; }
+          echo "открытый ключ (base64):"; openssl pkey -in "$K" -pubout | base64 -w0; echo
+          SH
+      - uses: actions/checkout@v4
+        if: inputs.stage == 'apply'
+        with: { ref: bot-update-enc, path: upd }
+      - name: Обновление бота и связь с CRM
+        if: inputs.stage == 'apply'
+        run: |
+          scp -i ~/.ssh/id_deploy -o BatchMode=yes upd/update.tgz.enc upd/pass.enc root@"$H":/root/
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes root@"$H" 'bash -s' <<'SH'
+          set -euo pipefail
+          B=/opt/icase-bot; T=$(mktemp -d); trap 'rm -rf "$T" /root/update.tgz.enc /root/pass.enc' EXIT
+          openssl pkeyutl -decrypt -inkey /root/.icase-bot-update.pem -pkeyopt rsa_padding_mode:oaep -in /root/pass.enc -out "$T/pass"
+          openssl enc -d -aes-256-cbc -pbkdf2 -in /root/update.tgz.enc -pass file:"$T/pass" | tar xz -C "$T"
+          echo "== проверка: файлы бота на сервере те же, на которых сделано обновление"
+          ( cd "$B" && sha256sum -c "$T/base.sha256" ) || { echo "Файлы бота на сервере изменились — обновление не ставлю"; exit 1; }
+          echo "== ключ бота в CRM"
+          KEY=$(printf '%s\n' "begin;" "select set_config('request.jwt.claims','{\"role\":\"service_role\"}',true);" \
+                "select set_config('request.jwt.claim.role','service_role',true);" "select 'KEY:'||public.bot_api_key();" "commit;" \
+                | docker exec -i supabase-db psql -U postgres -d postgres -qAt -v ON_ERROR_STOP=1 | sed -n 's/^KEY://p')
+          [ ${#KEY} -ge 40 ] || { echo "ключ не получен"; exit 1; }
+          . /etc/icase/icase.env
+          echo "== копия файлов бота и настроек"
+          BK="/var/backups/icase-bot/$(date +%Y%m%d-%H%M%S)"; mkdir -p "$BK"; chmod 700 /var/backups/icase-bot
+          (cd "$B" && cp -a --parents $(cd "$T/files" && find . -type f) .env "$BK"/ 2>/dev/null || true)
+          cp -a "$B/.env" "$BK/.env"; ls "$BK" | sed 's/^/  /'
+          rollback() { echo "!! откат"; (cd "$BK" && find . -type f -name '*.py' -exec cp -a {} "$B/{}" \;); cp -a "$BK/.env" "$B/.env"; [ -f "$T/files/app/crm_api.py" ] && [ ! -f "$BK/app/crm_api.py" ] && rm -f "$B/app/crm_api.py"; systemctl restart icase-bot; exit 1; }
+          echo "== новые файлы"; (cd "$T/files" && find . -type f | sed 's/^/  /'; cp -a . "$B"/)
+          chown -R --reference="$B" "$B/app" 2>/dev/null || true
+          PY=$(systemctl show -p ExecStart --value icase-bot | sed -E 's/.*path=([^ ;]+).*/\1/')
+          (cd "$B" && "$PY" -m py_compile app/*.py) || rollback
+          echo "== настройки .env (только имена)"
+          sed -i -E '/^(CRM_API_URL|CRM_BOT_KEY)=/d' "$B/.env"
+          printf 'CRM_API_URL=%s\nCRM_BOT_KEY=%s\n' "https://${API_DOMAIN}/functions/v1/bot-api" "$KEY" >> "$B/.env"
+          grep -oE '^[A-Z_]+=' "$B/.env" | tr '\n' ' '; echo
+          echo "== проверка ключа"; c=$(curl -s -o /dev/null -w '%{http_code}' -H "X-Bot-Key: $KEY" "https://${API_DOMAIN}/functions/v1/bot-api/ping"); echo "  bot-api/ping → $c"
+          [ "$c" = 200 ] || rollback
+          since=$(date '+%Y-%m-%d %H:%M:%S'); systemctl restart icase-bot; sleep 12
+          systemctl is-active --quiet icase-bot || { journalctl -u icase-bot --since "$since" -n 30 --no-pager -o cat | grep -E '^[A-Za-z]+(Error|Exception)|File "/opt' | cut -c1-200; rollback; }
+          journalctl -u icase-bot --since "$since" --no-pager -o cat | grep -E 'связь с CRM' | cut -c1-200
+          echo "  ошибок в журнале после запуска: $(journalctl -u icase-bot --since "$since" --no-pager -o cat | grep -c ' ERROR ' || true)"
+          journalctl -u icase-bot --since "$since" --no-pager -o cat | grep -q 'связь с CRM включена' || { echo "бот не включил связь с CRM"; rollback; }
+          echo "Готово: бот работает и связан с CRM. Копия прежних файлов: $BK"
+          SH

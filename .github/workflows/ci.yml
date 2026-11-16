@@ -23,10 +23,11 @@ jobs:
         with: { deno-version: v2.x }
       - name: Edge-функции (типы и тесты без сети)
         run: |
-          deno check supabase/functions/site-api/index.ts supabase/functions/site-sync/index.ts supabase/functions/staff-admin/index.ts supabase/functions/evotor/index.ts supabase/functions/moysklad/index.ts
+          deno check supabase/functions/site-api/index.ts supabase/functions/site-sync/index.ts supabase/functions/staff-admin/index.ts supabase/functions/evotor/index.ts supabase/functions/moysklad/index.ts supabase/functions/bot-api/index.ts
           deno run supabase/functions/tests/staff_admin_test.ts
           deno run supabase/functions/tests/moysklad_test.ts
           deno run supabase/functions/tests/site_link_test.ts
+          deno run supabase/functions/tests/bot_api_test.ts
       - name: Caddyfile (свой HTTPS и режим за Caddy сервера)
         run: |
           for s in https http; do
