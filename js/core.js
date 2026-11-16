@@ -125,8 +125,12 @@ App.findByCode = code=>{const c=String(code||"").trim().toLowerCase();if(!c)retu
 App.searchProducts = (q,{wh=null,inStock=false,limit=10}={})=>{
   const s=String(q||"").trim().toLowerCase();if(!s)return [];
   const words=s.split(/\s+/);
+  /* выше — где слова запроса стоят в начале слов названия: «17 pro max» → сначала iPhone 17 Pro Max, а не стекло Remax */
+  const esc=w=>w.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+  const score=p=>{const n=String(p.name||"").toLowerCase();return words.reduce((a,w)=>a+(new RegExp("(^|[^a-zа-яё0-9])"+esc(w)).test(n)?2:n.includes(w)?1:0),0)};
   return S.products.filter(p=>!p.archived&&(!inStock||(wh?App.qtyIn(p,wh):App.qtyTotal(p))>0)&&
-    words.every(w=>[p.name,p.sku,p.barcode,p.serial,p.brand,App.catName(p),App.unitCodes?App.unitCodes(p.id):""].join(" ").toLowerCase().includes(w))).slice(0,limit);
+    words.every(w=>[p.name,p.sku,p.barcode,p.serial,p.brand,App.catName(p),App.unitCodes?App.unitCodes(p.id):""].join(" ").toLowerCase().includes(w)))
+    .map((p,i)=>({p,i,s:score(p)})).sort((a,b)=>b.s-a.s||String(a.p.name).length-String(b.p.name).length||a.i-b.i).slice(0,limit).map(x=>x.p);
 };
 
 /* ---------- клиенты ---------- */
