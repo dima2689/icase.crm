@@ -30,12 +30,12 @@ VIEWS.repairs={
   actions:()=>App.can("repair")?'<button class="btn pri" data-act="newRepair">+ Принять в ремонт</button>':"",
   render(){
     const u=App.ui,q=u.repQ.trim().toLowerCase(),pt=App.can("allPoints")?null:(App.point()||{}).id;
-    const base=S.repairs.filter(r=>(!pt||r.pointId===pt)&&(!u.repMaster||(u.repMaster==="__none"?!r.masterId:r.masterId===u.repMaster))&&(!q||[r.num,r.device,r.imei,r.problem,(App.cust(r.customerId)||{}).name,(App.cust(r.customerId)||{}).phone].join(" ").toLowerCase().includes(q)));
+    const base=S.repairs.filter(r=>(!pt||r.pointId===pt)&&(!u.repMaster||(u.repMaster==="__none"?!r.masterId:u.repMaster==="__minefree"?!r.masterId||r.masterId===App.me.id:r.masterId===u.repMaster))&&(!q||[r.num,r.device,r.imei,r.problem,(App.cust(r.customerId)||{}).name,(App.cust(r.customerId)||{}).phone].join(" ").toLowerCase().includes(q)));
     const list=App.sortDesc(base.filter(r=>flt(u.repFilter,r)));
     const board=u.repView==="board"&&u.repFilter==="active";
     const cols=App.RSTAT.filter(s=>App.ACTIVE.includes(s[0]));
     return `<div class="cfilt rep3"><input id="repQ" type="search" placeholder="№, IMEI, клиент, телефон" value="${esc(u.repQ)}" data-filter="repQ" aria-label="Поиск ремонта">
-        ${App.me.role==="seller"?"":App.sel("repMaster",[["","Все мастера"],...masters().map(m=>[m.id,m.fullName])],u.repMaster,'data-filter-sel="repMaster" aria-label="Мастер"')}
+        ${App.me.role==="seller"?"":App.sel("repMaster",[["","Все мастера"],...(App.can("repairWork")?[["__minefree","Мои и без мастера"]]:[]),...masters().map(m=>[m.id,m.fullName])],u.repMaster,'data-filter-sel="repMaster" aria-label="Мастер"')}
         <div class="seg"><button class="${u.repView==="board"?"on":""}" data-act="repView" data-id="board">Доска</button><button class="${u.repView==="list"?"on":""}" data-act="repView" data-id="list">Список</button></div></div>
       <div class="chips rchips">${FILTERS.map(([k,l])=>{const n=base.filter(r=>flt(k,r)).length;if(!n&&u.repFilter!==k&&!["active","all"].includes(k))return "";return `<button class="chip ${u.repFilter===k?"on":""} ${k==="late"&&n?"bad":""}" data-act="repFilter" data-id="${k}">${l} <b>${n}</b></button>`}).join("")}</div>
       ${board?`<div class="rboard">${cols.map(([s,l])=>{const rs=list.filter(r=>r.status===s);return `<div class="rcol"><div class="rcol-h">${esc(l)} <b>${rs.length}</b></div>${rs.map(card).join("")||'<div class="rcol-e">—</div>'}</div>`}).join("")}</div>`
@@ -157,7 +157,7 @@ ACT.openRepair=id=>{
                 <input id="rsName" placeholder="или своя работа" aria-label="Название работы"><input id="rsPrice" type="number" inputmode="decimal" placeholder="Цена" aria-label="Цена" style="width:100px">
                 <button class="btn sm" data-act="repSvcAdd" data-id="${r.id}">Добавить</button></div>
               ${canW?`<div class="fld addrow"><input id="rpQ" type="search" placeholder="Запчасть со склада сервиса" autocomplete="off" aria-label="Запчасть со склада"><div id="rpBox" class="pick" hidden></div></div>`:""}
-              <button class="btn sm ghost" data-act="rqNew" data-id="${r.id}">Нет на складе — заказать запчасть</button>
+              ${r.status==="work"?"":`<button class="btn sm ghost" data-act="rqNew" data-id="${r.id}">Нет на складе — заказать запчасть</button>`}
             </div>`:""}
           </section>
         </div>

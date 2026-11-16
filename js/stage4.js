@@ -68,6 +68,7 @@ ACT.dealSave=(_,btn)=>run(btn,async()=>{const V=App.val;
   if(!V("dlDoc"))throw new Error("Укажите серию и номер паспорта");if(!V("dlDev"))throw new Error("Укажите устройство");if(!V("dlCode"))throw new Error("Укажите IMEI или серийный номер");
   const code=V("dlCode").replace(/\s+/g,"");if(/^\d+$/.test(code)&&!/^\d{15}$/.test(code))throw new Error("IMEI — это 15 цифр");
   if(!App.battOk(V("dlBatt")))throw new Error("Ёмкость АКБ — число от 0 до 100 %");
+  if(DL.kind==="buyout"&&V("dlPay")==="cash"){const m=App.drawerShort(num(V("dlAmt")));if(m)throw new Error(m)}
   const cid=await App.api.customer(V("dlPhone"),V("dlName"),"Магазин");
   const p={kind:DL.kind,customer_id:cid,wh_id:V("dlWh"),product_id:DL.productId||null,device:V("dlDev"),[/^\d{15}$/.test(code)?"imei":"serial_no"]:code.toUpperCase(),condition:V("dlCond"),battery_health:V("dlBatt")||null,kit:V("dlKit")||null,
     amount:num(V("dlAmt")),price:V("dlPrice")?num(V("dlPrice")):null,term_days:DL.kind==="commission"?num(V("dlTerm"))||30:null,pay_method:DL.kind==="buyout"?V("dlPay"):null,note:V("dlNote")||null,

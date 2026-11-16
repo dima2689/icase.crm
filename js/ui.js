@@ -103,6 +103,9 @@ App.ICO={receipt:'<path d="M5 3v18l2.5-1.5L10 21l2-1.5 2 1.5 2.5-1.5L19 21V3l-2.
   alert:'<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>'};
 App.ico=(k,cls="")=>`<svg class="ico ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${App.ICO[k]||""}</svg>`;
 App.fld = (id,label,input,cls="")=>`<div class="fld ${cls}"><label for="${id}">${label}</label>${input}</div>`;
+/* выдача наличных из кассы: в ящике должно хватать денег. Возвращает текст ошибки или "" */
+App.drawerShort=(amount,pointId)=>{const sh=App.openShift(pointId);if(!sh)return "Наличные выдаются только при открытой смене";const have=App.shiftTotals(sh).expectedCash;
+  return num(amount)>have+0.004?"В кассе только "+App.money(have)+" наличными — выберите другой способ или сделайте внесение":""};
 /* подсказка у полей предоплаты: деньги принимаются только при открытой смене */
 App.shiftNote = ()=>App.point()&&!App.openShift()?`<small class="muted">Смена закрыта: без предоплаты сохранится, с предоплатой — после открытия смены</small>`:"";
 App.inp = (id,v="",type="text",ph="",attrs="")=>`<input id="${id}" type="${type}" value="${esc(v)}" placeholder="${esc(ph)}"${type==="number"?' inputmode="decimal" step="any"':""} ${attrs}>`;

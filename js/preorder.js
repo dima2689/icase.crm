@@ -123,6 +123,7 @@ ACT.pzCancel=id=>{const o=App.byId("preorders",id),paid=App.pzPaid(o),mgr=App.is
     ${paid>0&&!mgr?'<p class="muted">Удержать часть предоплаты может только управляющий.</p>':""}${o.unitId?'<p class="muted">Бронь снимется — экземпляр перейдёт следующему в очереди или вернётся в продажу.</p>':""}
     <div class="acts"><button class="btn" data-act="pzOpen" data-id="${esc(id)}">Назад</button><button class="btn danger" data-act="pzCancelGo" data-id="${esc(id)}">Отменить предзаказ</button></div>`)};
 ACT.pzCancelGo=(id,btn)=>run(btn,async()=>{if(!App.confirm2(btn,"Отменить? Нажмите ещё раз"))return;const o=App.byId("preorders",id),paid=App.pzPaid(o);
+  if(paid>0&&App.val("pcM")==="cash"){const m=App.drawerShort(num(App.val("pcR")),o.pointId);if(m)throw new Error(m)}
   await App.api.rpc("preorder_cancel",{p_id:id,p_refund:paid>0?num(App.val("pcR")):0,p_method:paid>0?App.val("pcM"):"cash",p_reason:App.val("pcW")});
   await App.reload(RL);App.toast("Предзаказ отменён");ACT.pzOpen(id)});
 

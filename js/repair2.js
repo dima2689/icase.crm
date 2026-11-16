@@ -172,11 +172,11 @@ App.repWorkload=()=>{if(!["owner","manager"].includes(App.me.role))return "";con
 ACT.repMasterPick=id=>{App.ui.repMaster=App.ui.repMaster===id?"":id;App.render()};
 let mineInit=false;
 const rv=VIEWS.repairs;if(rv){const r0=rv.render.bind(rv);rv.render=function(){
-  if(!mineInit){mineInit=true;if(App.me.role==="master")App.ui.repMaster=App.me.id}
-  const mine=App.can("repairWork");const n=S.repairs.filter(r=>r.masterId===App.me.id&&App.ACTIVE.includes(r.status)).length;
-  const bar=mine||App.repWorkload()?`<div class="repbar">${mine?`<button type="button" class="wl ${App.ui.repMaster===App.me.id?"on":""}" data-act="repMine"><b class="wl-f">Мои ремонты</b><b class="wl-s">Мои</b><span>${n?n+" в работе":"нет активных"}</span><i class="wl-n">${n}</i></button>`:""}${App.repWorkload()}</div>`:"";
+  if(!mineInit){mineInit=true;if(App.me.role==="master")App.ui.repMaster="__minefree"}
+  const mine=App.can("repairWork");const n=S.repairs.filter(r=>r.masterId===App.me.id&&App.ACTIVE.includes(r.status)).length;const free=S.repairs.filter(r=>!r.masterId&&App.ACTIVE.includes(r.status)&&(!App.point()||r.pointId===App.point().id)).length;
+  const bar=mine||App.repWorkload()?`<div class="repbar">${mine?`<button type="button" class="wl ${App.ui.repMaster===App.me.id||App.ui.repMaster==="__minefree"?"on":""}" data-act="repMine"><b class="wl-f">Мои ремонты</b><b class="wl-s">Мои</b><span>${n?n+" в работе":"нет активных"}${free?" · "+free+" без мастера":""}</span><i class="wl-n">${n+free}</i></button>`:""}${App.repWorkload()}</div>`:"";
   return bar+r0()}}
-ACT.repMine=()=>{App.ui.repMaster=App.ui.repMaster===App.me.id?"":App.me.id;App.render()};
+ACT.repMine=()=>{const on=App.ui.repMaster===App.me.id||App.ui.repMaster==="__minefree";App.ui.repMaster=on?"":"__minefree";App.render()};
 
 /* ---------- устройства клиента ---------- */
 App.clientDevices=cid=>{const out=new Map(),add=(key,o)=>{const k=key||o.name;if(!k)return;const x=out.get(k);if(!x||String(o.at)>String(x.at))out.set(k,Object.assign({},x||{},o,{events:((x&&x.events)||0)+1}))};

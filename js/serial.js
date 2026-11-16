@@ -51,6 +51,7 @@ ACT.openUnit=id=>{
 };
 ACT.saveUnit=async(id,btn)=>{
   const V=App.val,n=v=>v===""?null:num(v);
+  if(!App.battOk(V("uBatt")))return App.toast("Ёмкость АКБ — число от 0 до 100 %");
   const data={imei:V("uImei")||null,imei2:V("uImei2")||null,serial_no:V("uSn")?V("uSn").toUpperCase():null,condition:V("uCond")||null,battery_health:n(V("uBatt")),kit:V("uKit")||null,diagnostics:V("uDiag")||null,note:V("uNote")||null};
   if(document.getElementById("uSite"))data.on_site=App.checked("uSite");
   if(!data.imei&&!data.serial_no)return App.toast(document.getElementById("uImei")?"Нужен IMEI или серийный номер":"Нужен серийный номер");
