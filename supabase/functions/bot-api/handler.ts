@@ -6,6 +6,12 @@
 //   GET  /bot-api/events?limit=        — новые события (ремонты, предзаказы) для сообщений сотрудникам
 //   POST /bot-api/events/done {ids}    — события отправлены
 //   POST /bot-api/tradein {id, model, …} — заявка на оценку trade-in → задача в CRM
+//   Режим CRM_MODE в боте (каталог, продажи, клиенты, правка карточек — из CRM):
+//   GET  /bot-api/catalog              — все товары с остатками и категории
+//   GET  /bot-api/product?id=          — карточка для редактора; POST /bot-api/product {id, expect, fields{name,description,price}, actor}
+//   GET  /bot-api/sales?kind=sale|return&from=&to=&offset=; GET /bot-api/finance?from=&to=
+//   GET  /bot-api/customers?q=&offset=; GET /bot-api/customer?id=; GET /bot-api/customer-history?id=&kind=&offset=
+//   POST /bot-api/customer {id?, updated?, name, phone, email, actor}
 export type Rpc = (fn: string, args?: Record<string, unknown>) => Promise<any>;
 
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { "Content-Type": "application/json; charset=utf-8" } });
@@ -15,6 +21,11 @@ export function safeEq(a: string, b: string) {
   let r = 0; for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return r === 0;
 }
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const str = (v: unknown, n: number) => (v === undefined || v === null ? "" : String(v)).slice(0, n);
+const off = (v: string | null) => Math.min(Math.max(Number.parseInt(v || "0", 10) || 0, 0), 50000);
 
 export async function handle(req: Request, rpc: Rpc): Promise<Response> {
   const url = new URL(req.url);
@@ -53,6 +64,46 @@ export async function handle(req: Request, rpc: Rpc): Promise<Response> {
     }
     if (!pick.id || !pick.model) return json({ error: "Нужны id и model" }, 400);
     return json(await rpc("bot_tradein", { p: pick }));
+  }
+  if (req.method === "GET" && route === "catalog") return json(await rpc("bot_catalog"));
+  if (route === "product") {
+    if (req.method === "GET") {
+      const id = P.get("id") || "";
+      if (!UUID.test(id)) return json({ error: "Некорректный товар" }, 400);
+      const r = await rpc("bot_product", { p_id: id });
+      return r ? json(r) : json({ error: "Товар не найден" }, 404);
+    }
+    if (req.method === "POST") {
+      const b = await body();
+      if (!UUID.test(String(b.id || ""))) return json({ error: "Некорректный товар" }, 400);
+      const f = b.fields || {}, fields: Record<string, string> = {};
+      for (const k of ["name", "description", "price"]) if (f[k] !== undefined && f[k] !== null) fields[k] = str(f[k], k === "description" ? 4096 : 255);
+      return json(await rpc("bot_product_update", { p_id: b.id, p_expect: str(b.expect, 64), p_fields: fields, p_actor: str(b.actor, 100) }));
+    }
+  }
+  if (req.method === "GET" && (route === "sales" || route === "finance")) {
+    const from = P.get("from") || "", to = P.get("to") || "";
+    if ((from && !DAY.test(from)) || (to && !DAY.test(to))) return json({ error: "Дата в формате ГГГГ-ММ-ДД" }, 400);
+    if (route === "finance") {
+      if (!from || !to) return json({ error: "Нужны from и to" }, 400);
+      return json(await rpc("bot_finance", { p_from: from, p_to: to }));
+    }
+    return json(await rpc("bot_sales", { p_kind: P.get("kind") === "return" ? "return" : "sale", p_from: from || null, p_to: to || null, p_offset: off(P.get("offset")) }));
+  }
+  if (req.method === "GET" && route === "customers") return json(await rpc("bot_customers", { p_q: str(P.get("q"), 255), p_offset: off(P.get("offset")) }));
+  if (req.method === "GET" && (route === "customer" || route === "customer-history")) {
+    const id = P.get("id") || "";
+    if (!UUID.test(id)) return json({ error: "Некорректный идентификатор клиента" }, 400);
+    if (route === "customer-history") return json(await rpc("bot_customer_history", { p_id: id, p_kind: P.get("kind") === "return" ? "return" : "sale", p_offset: off(P.get("offset")) }));
+    const r = await rpc("bot_customer", { p_id: id });
+    return r ? json(r) : json({ error: "Клиент не найден" }, 404);
+  }
+  if (req.method === "POST" && route === "customer") {
+    const b = await body();
+    if (b.id && !UUID.test(String(b.id))) return json({ error: "Некорректный идентификатор клиента" }, 400);
+    const p: Record<string, string> = {};
+    for (const k of ["id", "updated", "name", "phone", "email"]) if (b[k]) p[k] = str(b[k], 255);
+    return json(await rpc("bot_customer_save", { p, p_actor: str(b.actor, 100) }));
   }
   return json({ error: "Нет такого запроса" }, 404);
 }

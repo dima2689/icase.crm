@@ -7,6 +7,7 @@ const rpc = async (fn: string, a: Record<string, unknown> = {}) => {
   calls.push([fn, a]);
   if (fn === "bot_api_secret") return "k".repeat(48);
   if (fn === "bot_events_done") return (a.p_ids as number[]).length;
+  if (fn === "bot_product" || fn === "bot_customer") return { id: a.p_id };
   return { fn };
 };
 const K = { "x-bot-key": "k".repeat(48) };
@@ -26,4 +27,15 @@ await r("tradein", { method: "POST", headers: K, body: JSON.stringify({ id: 5, m
 const p = calls.at(-1)![1].p;
 ok(p.id === "5" && p.amount === "21000" && !("phone" in p) && !("extra" in p), "trade-in: только разрешённые поля, без телефона");
 ok((await r("nope", { headers: K })).status === 404, "неизвестный маршрут — 404");
+await r("catalog", { headers: K }); ok(calls.at(-1)![0] === "bot_catalog", "каталог");
+ok((await r("product?id=1", { headers: K })).status === 400, "карточка: плохой id — 400");
+const U = "11111111-2222-3333-4444-555555555555";
+await r("product", { method: "POST", headers: K, body: JSON.stringify({ id: U, expect: "t", fields: { price: 990, cost: 1, name: "X" }, actor: "Дима" }) });
+ok(calls.at(-1)![0] === "bot_product_update" && !("cost" in calls.at(-1)![1].p_fields) && calls.at(-1)![1].p_fields.price === "990", "правка карточки: только название, описание, цена");
+ok((await r("sales?from=2026-1-1", { headers: K })).status === 400, "продажи: плохая дата — 400");
+await r("sales?kind=return&offset=-5", { headers: K }); ok(calls.at(-1)![1].p_kind === "return" && calls.at(-1)![1].p_offset === 0, "возвраты, отступ не меньше 0");
+ok((await r("finance?from=2026-11-01", { headers: K })).status === 400, "финансы без to — 400");
+ok((await r("customer?id=x", { headers: K })).status === 400, "клиент: плохой id — 400");
+await r("customer", { method: "POST", headers: K, body: JSON.stringify({ name: "Иван", phone: "+79101234567", extra: 1 }) });
+ok(calls.at(-1)![0] === "bot_customer_save" && !("extra" in calls.at(-1)![1].p), "клиент: только разрешённые поля");
 if (fails) { console.error(fails + " проверок не прошли"); Deno.exit(1); }
