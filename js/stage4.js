@@ -47,7 +47,7 @@ ACT.dealNew=(arg)=>{const c=typeof arg==="string"&&arg?App.cust(arg):null;DL={ki
     <div class="form"><div class="fld full"><label for="dlQ">Товар в каталоге (если есть такая модель)</label><input id="dlQ" type="search" placeholder="iPhone 13 128 ГБ…" autocomplete="off"><div id="dlBox" class="pick" hidden></div><small id="dlPicked" class="muted">Если не выбрать — CRM создаст карточку б/у товара с названием ниже</small></div>
       ${App.fld("dlDev","Устройство",App.inp("dlDev","","text","iPhone 13 128 ГБ, синий"),"full")}
       ${App.fld("dlCode","IMEI или серийный номер",App.inp("dlCode",""))}${App.fld("dlCond","Состояние",App.sel("dlCond",App.CONDS.filter(x=>x!=="Новый"),"Б/у хорошее"))}
-      ${App.fld("dlBatt","Ёмкость АКБ, %",App.inp("dlBatt","","number"))}${App.fld("dlKit","Комплектация",App.inp("dlKit","","text","Коробка, кабель"))}
+      ${App.fld("dlBatt","Ёмкость АКБ, %",App.inp("dlBatt","","number","",'min="0" max="100"'))}${App.fld("dlKit","Комплектация",App.inp("dlKit","","text","Коробка, кабель"))}
       ${App.fld("dlWh","Склад",App.sel("dlWh",App.whOpts(),pt.cashWh||App.cashWh()||""))}</div>
     <h3 class="sub-h">Деньги</h3>
     <div class="form">${App.fld("dlAmt",'<span id="dlAmtL">Выкупаем за, ₽</span>',App.inp("dlAmt","","number"))}${App.fld("dlPrice","Цена продажи в магазине, ₽",App.inp("dlPrice","","number"))}
@@ -67,6 +67,7 @@ ACT.dealSave=(_,btn)=>run(btn,async()=>{const V=App.val;
   if(App.phoneKey(V("dlPhone")).length!==10)throw new Error("Укажите телефон клиента");if(V("dlName").split(/\s+/).length<2)throw new Error("Укажите ФИО полностью — оно нужно в договоре");
   if(!V("dlDoc"))throw new Error("Укажите серию и номер паспорта");if(!V("dlDev"))throw new Error("Укажите устройство");if(!V("dlCode"))throw new Error("Укажите IMEI или серийный номер");
   const code=V("dlCode").replace(/\s+/g,"");if(/^\d+$/.test(code)&&!/^\d{15}$/.test(code))throw new Error("IMEI — это 15 цифр");
+  if(!App.battOk(V("dlBatt")))throw new Error("Ёмкость АКБ — число от 0 до 100 %");
   const cid=await App.api.customer(V("dlPhone"),V("dlName"),"Магазин");
   const p={kind:DL.kind,customer_id:cid,wh_id:V("dlWh"),product_id:DL.productId||null,device:V("dlDev"),[/^\d{15}$/.test(code)?"imei":"serial_no"]:code.toUpperCase(),condition:V("dlCond"),battery_health:V("dlBatt")||null,kit:V("dlKit")||null,
     amount:num(V("dlAmt")),price:V("dlPrice")?num(V("dlPrice")):null,term_days:DL.kind==="commission"?num(V("dlTerm"))||30:null,pay_method:DL.kind==="buyout"?V("dlPay"):null,note:V("dlNote")||null,

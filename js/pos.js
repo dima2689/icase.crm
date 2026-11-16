@@ -136,13 +136,13 @@ VIEWS.pos={
           ${App.fld("posName","Имя",App.inp("posName",P.name,"text","Как обращаться",'data-pos="name"'))}
         </div>
         ${c?`<div class="hint ${c.blacklisted?"bad":"ok"}" style="margin-top:6px">${c.blacklisted?'<span class="pill bad">Чёрный список</span> '+esc(c.blackReason||"")+" · ":""}${esc(c.name)} · покупок ${S.sales.filter(s=>s.customerId===c.id).length}${num(c.discount)?" · скидка "+num(c.discount)+"%":""}${(c.tags||[]).length?" · "+esc(c.tags.join(", ")):""}${App.bonusOn&&App.bonusOn()?" · бонусов "+App.bonusBal(c.id):""}</div>`:App.phoneKey(P.phone).length===10?'<div class="hint" style="margin-top:6px">Новый клиент, добавится при продаже</div>':""}</div>
-                <details class="more" ${P.discPct||P.discSum||P.tiDev?"open":""}><summary>Скидка на чек и trade-in</summary>
+                <details class="more" id="posMore" ${P.discPct||P.discSum||P.tiDev||P.tiImei||P.tiAmt?"open":""}><summary>Скидка на чек и trade-in</summary>
           <div class="form">
             ${App.fld("posPct","Скидка, %",App.inp("posPct",P.discPct||"","number","0",'data-pos="discPct"'))}
             ${App.fld("posDsum","Скидка, ₽",App.inp("posDsum",P.discSum||"","number","0",'data-pos="discSum"'))}
+            ${App.fld("posTiI","Trade-in: IMEI или серийный номер",App.inp("posTiI",P.tiImei,"text","сканируйте — модель подставится",'data-pos="tiImei" autocomplete="off" class="mono"'),"full")}
             ${App.fld("posTi","Trade-in: устройство",App.inp("posTi",P.tiDev,"text","iPhone 11 64 ГБ",'data-pos="tiDev"'))}
             ${App.fld("posTiA","Trade-in: зачёт, ₽",App.inp("posTiA",P.tiAmt||"","number","0",'data-pos="tiAmt"'))}
-            ${App.fld("posTiI","Trade-in: IMEI",App.inp("posTiI",P.tiImei,"text","",'data-pos="tiImei"'),"full")}
           </div></details>
         <div class="sumlines"><span>Товары</span><span>${money(t.sub)}</span>${t.disc?`<span>Скидка</span><span>−${money(t.disc)}</span>`:""}${num(P.tiAmt)?`<span>Trade-in</span><span>−${money(P.tiAmt)}</span>`:""}</div>
         <div class="total"><span>К оплате</span><b id="posTotal">${money(t.total)}</b></div>

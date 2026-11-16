@@ -1,4 +1,4 @@
--- справочник моделей Apple (можно править в «Настройки → Каталог Apple»)
+-- Справочник моделей Apple для приёмки и подсказок по IMEI. Применяется один раз; дальше владелец правит его в «Настройки → Каталог Apple».
 with sim as (select '{"SIM":["nano-SIM + eSIM","eSIM","2 nano-SIM"]}'::jsonb j),
      pad as (select '{"Сеть":["Wi-Fi","Wi-Fi + Cellular"]}'::jsonb j)
 insert into apple_models(family,name,year,memories,colors,options,sort)

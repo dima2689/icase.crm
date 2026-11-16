@@ -128,7 +128,9 @@ function ops(){
 }
 
 /* --- форма операции --- */
-ACT.finOp=(kind,_,pre)=>{
+ACT.finOp=async(kind,_,pre)=>{
+  if(!App.can("finance"))return App.toast("Деньги записывает владелец или управляющий");
+  if(!S.finaccounts.length){setupTried=false;await autoSetup();if(!S.finaccounts.length)return App.toast("Нет счетов: «Финансы → Настройка»")}
   pre=pre||{};const k=["in","out","transfer"].includes(kind)?kind:"out";
   const list=accs(),pt=App.point(),drawer=list.find(a=>a.kind==="drawer"&&pt&&a.pointId===pt.id)||list.find(a=>a.kind==="drawer");
   const d0=pre.debt,drawerFirst=k==="transfer"||(d0&&d0.direction==="in"&&d0.kind==="customer");
@@ -159,6 +161,7 @@ ACT.finOp=(kind,_,pre)=>{
 const hintFor=(a,k)=>a&&a.kind==="drawer"?(S.shifts.some(s=>s.pointId===a.pointId&&s.status==="open")?(k==="in"?"Наличные попадут в кассу точки — будут видны в X-отчёте смены.":"Наличные будут изъяты из кассы точки — будут видны в X-отчёте смены."):"Смена на этой точке закрыта: чтобы двигать наличные в кассе, откройте смену."):"";
 ACT.finOpSave=(_,btn)=>run(btn,async()=>{
   const c=App.ui.finOpCtx||{},V=App.val;const amt=num(V("foAmt"));if(!(amt>0))throw new Error("Укажите сумму");
+  if(!V("foAcc"))throw new Error("Выберите счёт");if(c.kind==="transfer"&&!V("foTo"))throw new Error("Выберите, куда перевести");
   const p={kind:c.kind,account_id:V("foAcc"),amount:amt,op_date:V("foDate")||today(),note:V("foNote")||null,debt_id:c.debtId,plan_id:c.planId};
   if(c.kind==="transfer")p.to_account_id=V("foTo");else{p.category_id=V("foCat")||null;p.counterparty=V("foCp")||null;p.point_id=V("foPoint")||null;p.channel=V("foCh")||null}
   if(c.payee&&c.kind==="out")p.payee_staff=c.payee;

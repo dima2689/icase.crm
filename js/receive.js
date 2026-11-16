@@ -247,7 +247,7 @@ function drawDP(){
       ${m&&m.colors.length?`<div class="fld full"><label>Цвет</label><div class="chips">${chips("color",m.colors,DP.color)}</div></div>`:m?App.fld("dpColorFree","Цвет",App.inp("dpColorFree",DP.color,"text","впишите цвет"),"full"):""}
       ${m?Object.entries(m.options||{}).map(([k,vals])=>`<div class="fld full"><label>${esc(k)}</label><div class="chips">${chips("opt:"+k,vals,DP.opts[k]||"")}</div></div>`).join(""):""}
       ${App.fld("dpCond","Состояние",App.sel("dpCond",App.CONDS,DP.cond))}
-      ${App.fld("dpBatt","Ёмкость АКБ, %",App.inp("dpBatt",DP.battery,"number","для б/у"))}
+      ${App.fld("dpBatt","Ёмкость АКБ, %",App.inp("dpBatt",DP.battery,"number","для б/у",'min="0" max="100"'))}
       ${App.can("cost")?App.fld("dpCost","Закупка, ₽",App.inp("dpCost",DP.cost,"number")):""}
       ${App.can("price")||(!ex&&App.can("receive"))?App.fld("dpPrice",DP.cond==="Новый"?"Цена продажи, ₽":"Цена этого экземпляра, ₽",App.inp("dpPrice",DP.price,"number",ex?String(num(ex.price)):"")):""}
       ${DP.cond!=="Новый"?`<div class="fld full">${App.usedForm("dpu_",DP.ua||{})}</div>`:""}
@@ -277,6 +277,7 @@ ACT.dpAdd=async(_,btn)=>{
   if(m.memories.length&&!DP.mem)return App.toast("Выберите память");
   if(!DP.color&&m.colors.length)return App.toast("Выберите цвет");
   const code=String(DP.code||"").trim();if(!code)return App.toast("Отсканируйте IMEI или серийный номер");
+  if(!App.battOk(DP.battery))return App.toast("Ёмкость АКБ — число от 0 до 100 %");
   if(btn&&btn.disabled)return;if(btn)btn.disabled=true;
   try{
     const name=dpName();let p=S.products.find(x=>!x.archived&&x.name===name&&x.condition===DP.cond);

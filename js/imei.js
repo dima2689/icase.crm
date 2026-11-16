@@ -6,6 +6,8 @@ const {S,$,esc,ACT}=App;
 /* артикул Apple с коробки: MTUV3ZD/A или 1PMTUV3ZD/A (так он лежит в штрихкоде) */
 App.isPartNo=v=>/^(1P)?[A-Z][A-Z0-9]{4}[A-Z]{1,2}\/[A-Z]$/i.test(String(v||"").replace(/\s/g,""));
 App.normPart=v=>String(v||"").replace(/\s/g,"").toUpperCase().replace(/^1P/,"");
+/* ёмкость АКБ: пусто или целое 0–100 */
+App.battOk=v=>{const s=String(v==null?"":v).trim();return !s||(/^\d{1,3}$/.test(s)&&+s<=100)};
 App.luhnOk=v=>{const s=String(v||"");if(!/^\d{15}$/.test(s))return false;let t=0;for(let i=0;i<15;i++){let d=+s[i];if(i%2){d*=2;if(d>9)d-=9}t+=d}return t%10===0};
 const looks=v=>{const c=String(v||"").replace(/\s/g,"").toUpperCase();return /^\d{14,15}$/.test(c)||App.isPartNo(c)||(/^[A-Z0-9]{10,13}$/.test(c)&&/\d/.test(c)&&/[A-Z]/.test(c))};
 App.looksLikeDeviceCode=looks;
@@ -24,7 +26,7 @@ App.devSure=(info,field)=>{const b=info&&info.learned&&info.learned.best&&info.l
   if(info.kind==="part")return b.value;return b.n>=3&&b.n/b.of>=0.9?b.value:null};
 App.devGuess=(info,field)=>{const b=info&&info.learned&&info.learned.best&&info.learned.best[field];return b?b.value:null};
 /* название для свободных полей (ремонт, выкуп, trade-in) */
-App.devName=(info)=>{if(!info)return "";
+App.devName=(info)=>{if(!info)return "";if(info.unit&&info.unit.name)return info.unit.name;
   const base=info.model?info.model.name:info.ref?(/^apple$/i.test(info.ref.brand)?info.ref.model:info.ref.brand+" "+info.ref.model):(info.learned&&info.learned.name)||"";
   if(!base)return "";const mem=App.devSure(info,"memory"),col=App.devSure(info,"color");return [base,mem,col].filter(Boolean).join(", ")};
 const ST={in_stock:"на складе",reserved:"в резерве",sold:"продан",in_repair:"в ремонте",written_off:"списан",returned_supplier:"возвращён поставщику"};

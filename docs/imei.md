@@ -11,7 +11,10 @@
 
 Таблицы: `tac_db`, `device_hints`, колонка `units.part_no`; функции `device_lookup(code)`, `tac_stats()`, триггер `units_learn`.
 
-Обновить справочник TAC (SQL Editor Supabase, без ограничения по времени):
+Справочник моделей Apple ставится миграцией `0007_apple_catalog` один раз; дальше его правит владелец в «Настройки → Каталог Apple».
+Справочник TAC загружает выкладка (`deploy/migrate.sh`), когда таблица `tac_db` пуста. Адрес — переменная `TAC_URL`; пустая `TAC_URL` отключает загрузку. Без сети выкладка продолжается, загрузка повторится при следующей.
+
+Обновить уже загруженный справочник TAC (SQL Editor Supabase, без ограничения по времени):
 ```sql
 select net.http_get(url := 'https://raw.githubusercontent.com/MoazEb/tac-database/main/tac_full.csv', timeout_milliseconds := 120000); -- вернёт id
 select tac_load_csv((select content from net._http_response where id = <id>));

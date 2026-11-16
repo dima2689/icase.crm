@@ -56,8 +56,11 @@ App.render = function(){
   const a=document.activeElement,fid=a&&a.id&&$("#view").contains(a)?a.id:null;let pos=null;try{pos=fid?a.selectionStart:null}catch(e){}
   // формы в разделе (настройки и т.п.) не теряют введённое при обновлении данных
   const dirty={};if(lastView===App.ui.view)$("#view").querySelectorAll("[data-dirty]").forEach(el=>{dirty[el.id]=el.type==="checkbox"?el.checked:el.value});
+  // раскрытые блоки <details id> остаются раскрытыми: иначе поле внутри теряет фокус на первом же символе
+  const opened=lastView===App.ui.view?[...$("#view").querySelectorAll("details[id]")].map(d=>[d.id,d.open]):[];
   lastView=App.ui.view;
   $("#view").innerHTML=V?V.render():"";
+  opened.forEach(([id,o])=>{const d=document.getElementById(id);if(d)d.open=o});
   Object.keys(dirty).forEach(k=>{const el=document.getElementById(k);if(el){if(el.type==="checkbox")el.checked=dirty[k];else el.value=dirty[k];el.dataset.dirty="1"}});
   if(fid){const n=document.getElementById(fid);if(n){n.focus();try{if(pos!=null)n.setSelectionRange(pos,pos)}catch(e){}}}
   if(V&&V.after)V.after();
@@ -100,6 +103,8 @@ App.ICO={receipt:'<path d="M5 3v18l2.5-1.5L10 21l2-1.5 2 1.5 2.5-1.5L19 21V3l-2.
   alert:'<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>'};
 App.ico=(k,cls="")=>`<svg class="ico ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${App.ICO[k]||""}</svg>`;
 App.fld = (id,label,input,cls="")=>`<div class="fld ${cls}"><label for="${id}">${label}</label>${input}</div>`;
+/* подсказка у полей предоплаты: деньги принимаются только при открытой смене */
+App.shiftNote = ()=>App.point()&&!App.openShift()?`<small class="muted">Смена закрыта: без предоплаты сохранится, с предоплатой — после открытия смены</small>`:"";
 App.inp = (id,v="",type="text",ph="",attrs="")=>`<input id="${id}" type="${type}" value="${esc(v)}" placeholder="${esc(ph)}"${type==="number"?' inputmode="decimal" step="any"':""} ${attrs}>`;
 App.sel = (id,opts,v="",attrs="")=>`<select id="${id}" ${attrs}>${opts.map(o=>{const [val,lab]=Array.isArray(o)?o:[o,o];return `<option value="${esc(val)}"${String(val)===String(v)?" selected":""}>${esc(lab)}</option>`}).join("")}</select>`;
 App.area = (id,v="",ph="")=>`<textarea id="${id}" placeholder="${esc(ph)}">${esc(v)}</textarea>`;

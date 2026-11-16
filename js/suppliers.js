@@ -54,11 +54,11 @@ ACT.spOpen=id=>{
       ${same.length>1?`<div class="whlist">${same.map((x,i)=>`<div class="whr"><span class="whr-main" style="cursor:default"><b>${esc(supName(x.supplierId))}${i===0&&x.price?' <span class="pill ok">дешевле всех</span>':""}</b><small>${esc(x.name)}${x.stock?" · "+esc(x.stock):""}</small></span><span class="whr-q">${x.price?money(x.price):"—"}</span><span class="whr-p">${i&&same[0].price&&x.price?"+"+money(x.price-same[0].price):""}</span></div>`).join("")}</div>`:""}
       ${App.can("stock")?`<div class="fld" style="margin-top:12px"><label for="spPQ">${p?"Привязан к товару CRM — сменить":"Привязать к товару CRM"}</label><input id="spPQ" type="search" autocomplete="off" placeholder="Название, артикул, штрихкод"><div class="pick" id="spPick" hidden></div></div>`:""}
       <div class="acts">${p?`<button class="btn" data-act="openProduct" data-id="${esc(p.id)}">Карточка товара</button>`:""}${p&&App.can("stock")?`<button class="btn ghost" data-act="spUnlink" data-id="${o.id}">Отвязать</button><button class="btn pri" data-act="spIn" data-id="${o.id}">Оформить приход по этой цене</button>`:""}<button class="btn" data-act="close">Закрыть</button></div>`);
-    if(document.getElementById("spPQ"))App.productPicker("spPQ","spPick",{inStock:false,showCost:true,onPick:async pr=>{try{await App.api.update("supplier_prices",o.id,{productId:pr.id});App.toast("Привязано к «"+pr.name+"»")}catch(e){App.toast(e.message)}}});
+    if(document.getElementById("spPQ"))App.productPicker("spPQ","spPick",{inStock:false,showCost:true,onPick:async pr=>{try{await App.api.update("supplier_prices",o.id,{product_id:pr.id});App.toast("Привязано к «"+pr.name+"»")}catch(e){App.toast(e.message)}}});
   };
   App.openModal("",{wide:true,refresh:draw});draw();
 };
-ACT.spUnlink=(id,btn)=>run(btn,async()=>{await App.api.update("supplier_prices",+id,{productId:null});App.toast("Отвязано")});
+ACT.spUnlink=(id,btn)=>run(btn,async()=>{await App.api.update("supplier_prices",+id,{product_id:null});App.toast("Отвязано")});
 ACT.spIn=id=>{const o=S.sprices.find(x=>String(x.id)===String(id));const p=o&&App.byId("products",o.productId);if(!p)return;
   App.closeModal();ACT.newDoc("in",{productId:p.id,name:p.name,qty:p.trackSerial?0:1,cost:o.price,newUnits:[],unitIds:[],foundCodes:[]});
   App.docSet&&App.docSet(d=>{d.supplierId=o.supplierId})};

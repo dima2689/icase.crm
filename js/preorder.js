@@ -58,7 +58,7 @@ function drawNew(){keep();const m=pzModel(),name=pzName(),ex=PZ.mode==="apple"&&
     :`<div class="fld full"><input id="pzQ2" type="search" autocomplete="off" placeholder="Название, артикул"><div id="pzBox" class="pick" hidden></div></div>`}
     <div class="full dpname">${name?`<b>${esc(name)}</b> ${ex?(stock?`<span class="pill ok">в наличии ${stock} — сразу забронируем</span>`:'<span class="pill warn">нет в наличии — ждём поставку</span>'):'<span class="pill info">карточка будет создана</span>'}`:'<span class="muted">Выберите устройство</span>'}</div>
     ${App.fld("pzPrice","Цена для клиента, ₽",App.inp("pzPrice",PZ.price,"number","0"))}${App.fld("pzDue","Ожидаемая дата",App.inp("pzDue",PZ.due,"date"))}
-    ${App.fld("pzDep","Предоплата, ₽",App.inp("pzDep",PZ.deposit,"number","0"))}${App.fld("pzMethod","Способ оплаты",App.sel("pzMethod",payOpts(),PZ.method))}
+    ${App.fld("pzDep","Предоплата, ₽",App.inp("pzDep",PZ.deposit,"number","0")+App.shiftNote())}${App.fld("pzMethod","Способ оплаты",App.sel("pzMethod",payOpts(),PZ.method))}
     ${App.fld("pzNote","Комментарий",App.inp("pzNote",PZ.note,"text","Пожелания клиента, условия"),"full")}
   </div><div class="acts"><button class="btn" data-act="close">Отмена</button><button class="btn pri" data-act="pzSave">Принять предзаказ</button></div>`;
   if($("#scrim").hidden)App.openModal(html,{wide:true});else{$("#modal").className="modal wide";$("#modal").innerHTML=html}

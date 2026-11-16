@@ -7,6 +7,7 @@
 #
 # Использование: PSQL="docker exec -i supabase-db psql -U postgres -d postgres" deploy/migrate.sh [путь_к_репозиторию]
 #   FUNCTIONS_URL — адрес edge-функций для расписаний (по умолчанию http://functions:9000)
+#   TAC_URL — справочник IMEI (TAC) для пустой таблицы tac_db; пусто — не загружать
 set -euo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 PSQL="${PSQL:-docker exec -i supabase-db psql -U postgres -d postgres}"
@@ -45,5 +46,17 @@ for f in "$ROOT"/db/always/*.sql; do
   echo "migrate: повторяемый $(basename "$f")"
   q -1 -f - < "$f" >/dev/null
 done
+# справочник IMEI → модель (docs/imei.md): загружается, только если таблица пуста; без сети выкладка не останавливается
+TAC_URL="${TAC_URL-https://raw.githubusercontent.com/MoazEb/tac-database/main/tac_full.csv}"
+if [ -n "$TAC_URL" ] && [ "$(q -c "select count(*) from public.tac_db")" = "0" ]; then
+  tac=$(mktemp)
+  if curl -fsSL --max-time 300 "$TAC_URL" -o "$tac" && [ -s "$tac" ]; then
+    { echo "create temp table _tac_raw(l text);"
+      echo "copy _tac_raw from stdin with (format csv, delimiter E'\\x01', quote E'\\x02');"
+      cat "$tac"; printf '\n\\.\n'
+      echo "select 'migrate: справочник IMEI — '||public.tac_load_csv(string_agg(l, E'\\n'))||' кодов' from _tac_raw;"; } | q -1 -f -
+  else echo "migrate: справочник IMEI не скачан ($TAC_URL) — повторится при следующей выкладке"; fi
+  rm -f "$tac"
+fi
 q -c "notify pgrst, 'reload schema'" >/dev/null
 echo "migrate: применено новых миграций — $n"

@@ -14,6 +14,12 @@ function err(e,ctx){
   if(/duplicate key.*(sku|barcode|serial)/i.test(m))return new Error("Товар с таким артикулом, штрихкодом или IMEI уже есть");
   if(/duplicate key.*one_open_shift/i.test(m))return new Error("На этой точке уже открыта смена");
   if(/Failed to fetch|NetworkError|network/i.test(m))return new Error("Нет связи с базой. Проверьте интернет");
+  if(/battery_health_check/i.test(m))return new Error("Ёмкость АКБ — число от 0 до 100 %");
+  if(/discount_check/i.test(m))return new Error("Скидка — от 0 до 100 %");
+  if(/violates check constraint/i.test(m))return new Error("Недопустимое значение в форме — проверьте числа и даты");
+  if(/invalid input syntax for type uuid/i.test(m))return new Error("Не выбрано обязательное значение в списке");
+  if(/invalid input syntax for type (integer|numeric)/i.test(m))return new Error("В числовом поле не число");
+  if(/violates not-null constraint/i.test(m)){const c=(m.match(/column "([^"]+)"/)||[])[1];return new Error("Заполните обязательное поле"+(c?" ("+c+")":""))}
   return new Error(m);
 }
 /* закупочные цены закрыты в базе: читаем разрешённые колонки, а себестоимость — функциями costs_* (если есть право) */
