@@ -63,7 +63,7 @@ function lineHtml(l,i,{cost,price}){
   const prices=`${cost?`<label class="mini">Закупка, ₽<input type="number" min="0" value="${num(l.cost)||""}" data-rl="${i}|cost" placeholder="0"></label>`:""}
     ${price?`<label class="mini">Цена продажи, ₽<input type="number" min="0" value="${num(l.price)||""}" data-rl="${i}|price" placeholder="${num(p.price)||0}"></label>`:""}`;
   return `<div class="rline">
-    <div class="rhead"><div><b>${esc(p.name)}</b><span class="sub">${esc([App.catName(p),p.condition,p.barcode?"ШК "+p.barcode:"",p.sku?"арт. "+p.sku:""].filter(Boolean).join(" · "))}</span></div>
+    <div class="rhead"><div><b>${esc(p.name)}</b><span class="sub">${esc([App.catName(p),p.condition,p.barcode?"ШК "+p.barcode:"",App.skuShow(p.sku)?"арт. "+App.skuShow(p.sku):""].filter(Boolean).join(" · "))}</span></div>
       <div class="rq">${ser?`<span class="pill info">${App.codeLbl(p)}</span> <b>${q}</b> шт`:`<button class="btn sm" data-act="rcvQty" data-id="${i}|-1" aria-label="Меньше">−</button><input type="number" min="1" value="${q}" data-rl="${i}|qty" aria-label="Количество"><button class="btn sm" data-act="rcvQty" data-id="${i}|1" aria-label="Больше">+</button>`}</div>
       <div class="rprices">${prices}</div>
       <button class="btn sm ghost danger" data-act="rcvDel" data-id="${i}" aria-label="Убрать">${App.ico("x","sm")}</button></div>

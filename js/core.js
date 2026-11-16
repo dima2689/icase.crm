@@ -68,6 +68,8 @@ App.dtt = iso=>_fmt(_dtf,iso).replace(", ",",\u00a0");
 App.plural=(n,a,b,c)=>{n=Math.abs(Math.trunc(n))%100;const k=n%10;return n>10&&n<20?c:k===1?a:k>=2&&k<=4?b:c};
 App.nw=(n,a,b,c)=>n+" "+App.plural(n,a,b,c);
 App.phoneKey = p=>String(p||"").replace(/\D/g,"").slice(-10);
+/* артикул для показа: служебные коды интеграций (msi-woo:…, случайные 20+ символов из МоегоСклада) не показываем — поиск по ним работает */
+App.skuShow = s=>{s=String(s||"");return /^msi-woo:/.test(s)||/^[A-Za-z0-9]{20,}$/.test(s)?"":s};
 App.fmtPhone = p=>{const k=App.phoneKey(p);return k.length===10?"+7 "+k.slice(0,3)+" "+k.slice(3,6)+"-"+k.slice(6,8)+"-"+k.slice(8):(p||"")};
 /* индексы по id: строятся лениво и сбрасываются, когда коллекция заменена или изменилась её длина */
 const _ix=new WeakMap();

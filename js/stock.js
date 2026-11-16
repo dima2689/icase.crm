@@ -85,16 +85,16 @@ VIEWS.stock={
       if(mob){const q=qty(p),mk=num(p.price)-num(p.cost);
         rows+=`<div class="pcard rowlink" data-act="openProduct" data-id="${esc(p.id)}"><input type="checkbox" class="pck" data-act="tagPick" data-id="${esc(p.id)}" aria-label="Ценник" ${App.ui.tagPick.has(p.id)?"checked":""}>
           <div class="pci"><b>${esc(p.name)}</b><div class="chips">${App.apprPill?App.apprPill(p):""}${p.condition&&p.condition!=="Новый"?`<span class="pill">${esc(p.condition)}</span>`:""}${p.trackSerial?'<span class="pill info">'+App.codeLbl(p)+'</span>':""}${p.onSite?'<span class="pill info">Сайт</span>':""}${p.onAvito?'<span class="pill info">Авито</span>':""}</div>
-          <span class="sub">${esc([f.group!=="cat"?App.catName(p):"",p.brand,p.sku?"арт. "+p.sku:""].filter(Boolean).join(" · "))}</span>
+          <span class="sub">${esc([f.group!=="cat"?App.catName(p):"",p.brand,App.skuShow(p.sku)?"арт. "+App.skuShow(p.sku):""].filter(Boolean).join(" · "))}</span>
 </div>
-          <div class="pcr"><b>${money(p.price)}</b><span>${qtyCell(q,p)} шт</span>${showCost?`<small>закупка ${money(p.cost)}</small>`:""}</div></div>`;return}
+          <div class="pcr"><b>${money(p.price)}</b><span>${qtyCell(q,p)} шт</span>${showCost&&num(p.cost)>0?`<small>закупка ${money(p.cost)}</small>`:""}</div></div>`;return}
       if(f.group!=="none"&&k!==g){g=k;const inG=list.filter(x=>gkey(x)===k);
         rows+=`<tr class="grow"><td colspan="${cols}"><b>${esc(k)}</b><span>${inG.length} поз. · ${inG.reduce((a,x)=>a+Math.max(0,qty(x)),0)} шт${showCost?" · "+money(inG.reduce((a,x)=>a+num(x.cost)*Math.max(0,qty(x)),0)):""}</span></td></tr>`}
       const mk=num(p.price)-num(p.cost);
       rows+=`<tr class="rowlink" data-act="openProduct" data-id="${esc(p.id)}">
       <td class="tagsel"><input type="checkbox" data-act="tagPick" data-id="${esc(p.id)}" aria-label="Ценник" ${App.ui.tagPick.has(p.id)?"checked":""}></td>
       <td><b>${esc(p.name)}</b>${App.apprPill?App.apprPill(p," "):""}${p.condition&&p.condition!=="Новый"?` <span class="pill">${esc(p.condition)}</span>`:""}${p.trackSerial?' <span class="pill info">'+App.codeLbl(p)+'</span>':""}${p.onSite?' <span class="pill info">Сайт</span>':""}${p.onAvito?' <span class="pill info">Авито</span>':""}
-        <span class="sub">${esc([f.group!=="cat"?App.catName(p):"",f.group!=="brand"&&p.brand?p.brand:"",p.sku?"арт. "+p.sku:"",p.barcode?"ШК "+p.barcode:"",usedRange(p)].filter(Boolean).join(" · "))}</span></td>
+        <span class="sub">${esc([f.group!=="cat"?App.catName(p):"",f.group!=="brand"&&p.brand?p.brand:"",App.skuShow(p.sku)?"арт. "+App.skuShow(p.sku):"",p.barcode?"ШК "+p.barcode:"",usedRange(p)].filter(Boolean).join(" · "))}</span></td>
       ${u.stockWh?`<td class="n">${qtyCell(App.qtyIn(p,u.stockWh),p)}</td>`:`<td class="n">${qtyCell(App.qtyTotal(p),p)}</td>`}
       ${showCost?`<td class="n">${money(p.cost)}</td>`:""}<td class="n"><b>${money(p.price)}</b></td></tr>`});
     const curCat=App.cat(f.cat),catLabel=f.cat==="__none"?"Без категории":curCat?App.catName({categoryId:curCat.id}):"";

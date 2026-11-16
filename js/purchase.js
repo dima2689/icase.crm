@@ -92,7 +92,7 @@ function view(o){if(!o)return;const cost=App.can("cost"),s=App.byId("suppliers",
       ${App.can("stock")&&o.status==="partial"?`<button class="btn" data-act="poClose" data-id="${o.id}">Закрыть без остатка</button>`:""}
       ${App.can("stock")&&["sent","partial"].includes(o.status)?`<button class="btn pri" data-act="poReceive" data-id="${o.id}">Принять товар по заказу</button>`:""}
     </div>`,{wide:true})}
-const txt=o=>`Заказ ${o.num} от ${App.settings().shopName||"iCase"}\n`+o.lines.map((l,i)=>{const p=App.byId("products",l.productId)||{};return `${i+1}. ${p.name}${p.sku?" (арт. "+p.sku+")":""} — ${l.qty} шт`}).join("\n")+(o.expectedDate?`\nНужно к ${App.dt(o.expectedDate)}`:"")+(o.note?`\n${o.note}`:"");
+const txt=o=>`Заказ ${o.num} от ${App.settings().shopName||"iCase"}\n`+o.lines.map((l,i)=>{const p=App.byId("products",l.productId)||{};return `${i+1}. ${p.name}${App.skuShow(p.sku)?" (арт. "+App.skuShow(p.sku)+")":""} — ${l.qty} шт`}).join("\n")+(o.expectedDate?`\nНужно к ${App.dt(o.expectedDate)}`:"")+(o.note?`\n${o.note}`:"");
 ACT.poCopy=id=>ACT.copyTxt(txt(App.byId("porders",id)));
 ACT.poPrint=id=>{const o=App.byId("porders",id),st=App.settings(),cost=App.can("cost");
   App.printHtml(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(o.num)}</title><style>@page{size:A4;margin:14mm}body{font:11pt Arial,sans-serif}h1{font-size:16pt;margin:0 0 4px}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #bbb;padding:5px 7px;text-align:left}.n{text-align:right}</style></head><body>
