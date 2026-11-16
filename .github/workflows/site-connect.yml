@@ -1,13 +1,18 @@
 # Связь сайта айкейс.рф (проект icase-review на сервере) с CRM.
 #   stage=inspect — только чтение: как установлен сайт (версия, образы, файлы настроек — только имена переменных).
 #   stage=inspect2 — только чтение: файлы запуска Compose, раздача статики, наличие ключа сайта в CRM (только длина).
+#   stage=apply — выпустить версию сайта с CRM вместо МоегоСклада (icase-store aa8d16b) из ветки site-update-enc
+#                 (зашифровано ключом сервера): образ backend = установленный образ + изменённые файлы, новая сборка webapp.
+#                 Сначала проверяется, что на сервере стоит ожидаемая версия; делается копия настроек и базы сайта.
+#                 Ключ сайта создаётся в CRM (если его нет) и записывается в api.env и scheduler.env прямо на сервере.
+#                 Затем перезапуск api и scheduler, переключение webapp и привязка товаров (crm:map). При сбое всё возвращается.
 # Секреты и персональные данные в журнал не выводятся.
 name: Site connect
 on:
   workflow_dispatch:
     inputs:
       stage:
-        description: "inspect или inspect2"
+        description: "inspect, inspect2 или apply"
         required: true
         default: inspect
 permissions:
@@ -24,7 +29,7 @@ jobs:
       - name: SSH
         env: { K: "${{ secrets.DEPLOY_SSH_KEY }}" }
         run: |
-          case "$STAGE" in inspect|inspect2) ;; *) echo "stage: inspect или inspect2"; exit 1;; esac
+          case "$STAGE" in inspect|inspect2|apply) ;; *) echo "stage: inspect, inspect2 или apply"; exit 1;; esac
           install -m 700 -d ~/.ssh
           printf '%s\n' "$K" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e '/^$/d' > ~/.ssh/id_deploy; chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -T 20 -t ed25519 "$H" 2>/dev/null > ~/.ssh/known_hosts
@@ -64,4 +69,77 @@ jobs:
           docker run --rm --entrypoint sh icase-backend:release-56c39ecdc36e -c 'ls -la /app/backend /app/backend/scripts | head -40; stat -c "%U %a %n" /app/backend/src/env.ts'
           echo "== ключ сайта в CRM"; docker exec supabase-db psql -U postgres -d postgres -qAt -c "select length(decrypted_secret) from vault.decrypted_secrets where name='icase_site_api_key'"
           echo "== доступ из контейнера к CRM"; docker exec icase-review-api-1 bun -e </dev/null "const r=await fetch('https://api.icase-dzr.ru/functions/v1/site-api/provider-lookups');console.log(r.status)" 2>&1 | tail -1
+          SH
+      - uses: actions/checkout@v4
+        if: inputs.stage == 'apply'
+        with: { ref: site-update-enc, path: upd }
+      - name: Выпуск сайта с CRM
+        if: inputs.stage == 'apply'
+        run: |
+          scp -i ~/.ssh/id_deploy -o BatchMode=yes upd/update.tgz.enc upd/pass.enc root@"$H":/root/
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes root@"$H" 'bash -s' <<'SH'
+          set -euo pipefail
+          O=/opt/icase-review/operator; E=/etc/icase-review; S=/var/lib/icase-review/operator; P=/srv/icase-review/public-releases
+          OLD_ID=icase-review-20261115-56c39ec; NEW_ID=icase-review-20261116-aa8d16b
+          OLD_IMG=sha256:60affa3edb7360bd7191334053d90328c67ace849c66fd5029b82bbc00aacbbb
+          CE=$S/compose-ea8b7dc319bc23dd31c6da76.env; NE=$S/compose-aa8d16b.env
+          T=$(mktemp -d); STARTED=0; CREATED=0; BK=""
+          dc() { docker compose -p icase-review --env-file "$1" -f $O/deploy/compose.production.yml "${@:2}"; }
+          healthy() { for i in $(seq 1 60); do a=$(docker inspect -f '{{.State.Health.Status}}' icase-review-api-1 2>/dev/null || true); b=$(docker inspect -f '{{.State.Health.Status}}' icase-review-scheduler-1 2>/dev/null || true); [ "$a $b" = "healthy healthy" ] && return 0; sleep 3; done; return 1; }
+          rollback() {
+            echo "!! сбой — возвращаю прежнюю версию"
+            [ -n "$BK" ] && cp -a "$BK/api.env" "$BK/scheduler.env" $E/
+            if [ "$STARTED" = 1 ]; then dc "$CE" up -d --no-deps api scheduler || true; healthy && echo "прежняя версия работает" || echo "!! прежняя версия не стала healthy — нужна проверка"; fi
+            [ "$(readlink $P/current)" = "releases/$OLD_ID" ] || { ln -s "releases/$OLD_ID" $P/current.new && mv -T $P/current.new $P/current; }
+            [ "$CREATED" = 1 ] && [ "$(readlink $P/current)" = "releases/$OLD_ID" ] && rm -rf "$P/releases/$NEW_ID.tmp" "$P/releases/$NEW_ID"; true
+          }
+          trap 'rc=$?; [ $rc -ne 0 ] && rollback; rm -rf "$T" /root/update.tgz.enc /root/pass.enc; exit $rc' EXIT
+          openssl pkeyutl -decrypt -inkey /root/.icase-bot-update.pem -pkeyopt rsa_padding_mode:oaep -in /root/pass.enc -out "$T/pass"
+          openssl enc -d -aes-256-cbc -pbkdf2 -in /root/update.tgz.enc -pass file:"$T/pass" | tar xz -C "$T"
+          K="$T/pkg"
+          echo "== проверки до изменений"
+          [ "$(readlink $P/current)" = "releases/$OLD_ID" ] || { echo "на сайте не та версия"; exit 1; }
+          grep -qx "BACKEND_IMAGE=\"$OLD_IMG\"" "$CE" || { echo "в файле запуска другой образ"; exit 1; }
+          for c in api scheduler; do [ "$(docker inspect -f '{{.Config.Image}}' icase-review-$c-1)" = "$OLD_IMG" ] || { echo "$c запущен не из ожидаемого образа"; exit 1; }; done
+          [ ! -e "$P/releases/$NEW_ID" ] || { echo "$NEW_ID уже есть"; exit 1; }
+          (cd $P/releases/$OLD_ID/webapp && sha256sum -c --quiet "$K/webapp-old.sha256") && [ "$(find $P/releases/$OLD_ID/webapp -type f | wc -l)" = "$(wc -l < "$K/webapp-old.sha256")" ] || { echo "webapp на сервере отличается от ожидаемой"; exit 1; }
+          docker run --rm -v "$K/base.sha256:/b:ro" --entrypoint sha256sum "$OLD_IMG" -c --quiet /b || { echo "файлы в образе отличаются от ожидаемых"; exit 1; }
+          (cd "$K/overlay" && sha256sum -c --quiet ../overlay.sha256); (cd "$K/webapp" && sha256sum -c --quiet ../webapp.sha256)
+          echo "проверки пройдены; версия $(cat "$K/REVISION")"
+          echo "== копия настроек и базы сайта"
+          BK=/var/backups/icase-review/$(date +%Y%m%d-%H%M%S); install -d -m 700 /var/backups/icase-review "$BK"
+          cp -a $E/api.env $E/scheduler.env "$CE" "$BK"/
+          docker exec icase-review-postgres-1 pg_dump -U postgres -d icase -Fc > "$BK/icase.dump"; chmod 600 "$BK/icase.dump"
+          echo "копия: $BK ($(du -h "$BK/icase.dump" | cut -f1))"
+          echo "== образ backend"
+          printf 'webapp\n*.sha256\nREVISION\n' > "$K/.dockerignore"
+          docker build -q -t icase-backend:release-aa8d16b "$K" >/dev/null
+          NEW_IMG=$(docker image inspect -f '{{.Id}}' icase-backend:release-aa8d16b); echo "образ $NEW_IMG"
+          docker run -i --rm --entrypoint sha256sum "$NEW_IMG" -c --quiet /dev/stdin < <(sed 's#  \./#  /app/#' "$K/overlay.sha256")
+          docker run --rm --entrypoint bun "$NEW_IMG" -e "await import('/app/backend/src/modules/moysklad/index.ts'); await import('/app/backend/src/modules/moysklad-sync/index.ts'); console.log('модули загружаются')" </dev/null
+          echo "== ключ сайта в CRM"
+          docker exec supabase-db psql -U postgres -d postgres -qAt -v ON_ERROR_STOP=1 -c "select case when exists(select 1 from vault.secrets where name='icase_site_api_key') then 'есть' else (select 'создан' from vault.create_secret(encode(extensions.gen_random_bytes(24),'hex'),'icase_site_api_key')) end" </dev/null
+          KEY=$(docker exec supabase-db psql -U postgres -d postgres -qAt -c "select decrypted_secret from vault.decrypted_secrets where name='icase_site_api_key'" </dev/null)
+          [[ "$KEY" =~ ^[A-Za-z0-9]{32,128}$ ]] || { echo "ключ не получен"; exit 1; }
+          AD=$(sed -n 's/^API_DOMAIN=//p' /etc/icase/icase.env | sed -E 's/[[:space:]#].*//; s/"//g' | head -1); [ -n "$AD" ] || exit 1; URL="https://$AD/functions/v1/site-api"
+          CODE=$(docker exec -e K="$KEY" -e U="$URL" icase-review-api-1 bun -e "const r=await fetch(process.env.U+'/provider-lookups',{headers:{'x-api-key':process.env.K}});const j=await r.json().catch(()=>({}));console.log(r.status, (j.stores||[]).length+' складов, для сайта '+(j.siteStores||[]).length)" </dev/null)
+          echo "CRM отвечает: $CODE"; case "$CODE" in 200*) ;; *) exit 1;; esac
+          for f in api.env scheduler.env; do sed -i -E '/^(CRM_API_URL|CRM_API_KEY)=/d' $E/$f; printf 'CRM_API_URL=%s\nCRM_API_KEY=%s\n' "$URL" "$KEY" >> $E/$f; done
+          unset KEY
+          echo "== webapp $NEW_ID"
+          CREATED=1; cp -a $P/releases/$OLD_ID $P/releases/$NEW_ID.tmp; rm -rf $P/releases/$NEW_ID.tmp/webapp; cp -r "$K/webapp" $P/releases/$NEW_ID.tmp/webapp
+          FM=$(find $P/releases/$OLD_ID/webapp -type f -printf '%m\n' | sort -u | head -1); DM=$(stat -c %a $P/releases/$OLD_ID/webapp)
+          chown -R root:root $P/releases/$NEW_ID.tmp/webapp; find $P/releases/$NEW_ID.tmp/webapp -type d -exec chmod "$DM" {} +; find $P/releases/$NEW_ID.tmp/webapp -type f -exec chmod "$FM" {} +
+          (cd $P/releases/$NEW_ID.tmp/webapp && sha256sum -c --quiet "$K/webapp.sha256"); mv $P/releases/$NEW_ID.tmp $P/releases/$NEW_ID
+          echo "== перезапуск api и scheduler"
+          sed "s#^BACKEND_IMAGE=.*#BACKEND_IMAGE=\"$NEW_IMG\"#" "$CE" > "$NE"; chmod 600 "$NE"
+          STARTED=1; dc "$NE" up -d --no-deps api scheduler
+          healthy || { echo "новая версия не стала healthy"; exit 1; }
+          docker exec icase-review-api-1 bun -e "const r=await fetch('http://127.0.0.1:3000/health/ready');process.exit(r.ok?0:1)" </dev/null
+          ln -s "releases/$NEW_ID" $P/current.new && mv -T $P/current.new $P/current
+          echo "api и scheduler работают; webapp переключён"
+          echo "== привязка товаров к CRM"
+          docker exec icase-review-api-1 bun run --silent crm:map </dev/null 2>&1 | tail -3 | sed -E 's/[A-Za-z0-9]{32,}/<…>/g'
+          printf '{"releaseId":"%s","sourceRevision":"%s","backendImage":"%s","basedOn":"%s","composeEnv":"%s","backup":"%s","appliedAt":"%s","note":"Overlay hotfix: CRM provider (ADR 0014). See docs/DEPLOYMENT.md."}\n' "$NEW_ID" "$(cat "$K/REVISION")" "$NEW_IMG" "$OLD_ID" "$NE" "$BK" "$(date -u +%FT%TZ)" > $S/hotfix-$NEW_ID.json; chmod 600 $S/hotfix-$NEW_ID.json
+          echo "готово"
           SH
