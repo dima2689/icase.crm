@@ -50,6 +50,20 @@ jobs:
           echo "Отпечаток ключа сервера (сверьте с панелью провайдера):"; ssh-keygen -lf ~/.ssh/known_hosts
           ssh -i ~/.ssh/id_deploy -o BatchMode=yes -o ConnectTimeout=20 root@"$H" 'grep -E "^(NAME|VERSION_ID)=" /etc/os-release; nproc; free -g | awk "/Mem:/{print \$2\" ГБ ОЗУ\"}"; df -h / | tail -1' \
             || { echo "::error::Не удалось войти root по ключу. Добавьте открытую часть DEPLOY_SSH_KEY в /root/.ssh/authorized_keys"; exit 1; }
+      - name: Сервер свободен (порты 80/443, место на диске)
+        run: |
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes root@"$H" 'bash -s' <<'SH'
+          set -u
+          . /etc/os-release; echo "система: $PRETTY_NAME"
+          free=$(df -BG --output=avail / | tail -1 | tr -dc 0-9); echo "свободно на диске: ${free} ГБ"
+          [ "$free" -ge 25 ] || { echo "::error::нужно хотя бы 25 ГБ свободного места"; exit 1; }
+          busy=$(ss -Hltnp '( sport = :80 or sport = :443 )' | grep -v -E 'docker-proxy|caddy' || true)
+          if [ -n "$busy" ]; then
+            echo "::error::порты 80/443 заняты другой программой — её нужно остановить, иначе сайт CRM не откроется:"; echo "$busy" | sed -E 's/.*users:\(\("([^"]+)".*/  \1/' | sort -u; exit 1
+          fi
+          echo "порты 80 и 443 свободны"
+          systemctl is-active --quiet docker && echo "Docker уже установлен: $(docker --version)" || echo "Docker будет установлен"
+          SH
       - name: Настройки сервера (/etc/icase/icase.env)
         env:
           REWRITE: ${{ inputs.rewrite_env }}

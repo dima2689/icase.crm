@@ -23,7 +23,15 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y -qq ca-certificates curl git jq gnupg rclone rsync python3 openssl ufw fail2ban unattended-upgrades >/dev/null
 # Docker: если уже установлен (у некоторых провайдеров в образе), не трогаем
-if ! docker compose version >/dev/null 2>&1; then apt-get install -y -qq docker.io docker-compose-v2 >/dev/null; fi
+if ! docker compose version >/dev/null 2>&1; then
+  # пакеты Ubuntu; если в этой версии их нет или compose старый — официальный репозиторий Docker
+  apt-get install -y -qq docker.io docker-compose-v2 >/dev/null 2>&1 || true
+  if ! docker compose version >/dev/null 2>&1; then
+    log "Docker из официального репозитория"
+    apt-get remove -y -qq docker.io docker-compose-v2 >/dev/null 2>&1 || true
+    curl -fsSL https://get.docker.com -o /tmp/get-docker.sh && sh /tmp/get-docker.sh >/dev/null || die "не удалось установить Docker"
+  fi
+fi
 cv=$(docker compose version --short 2>/dev/null | sed 's/^v//')
 python3 -c "import sys;v=[int(x) for x in sys.argv[1].split('.')[:2]];sys.exit(0 if v>=[2,24] else 1)" "${cv:-0.0}" || die "нужен docker compose ≥ 2.24 (сейчас ${cv:-нет})"
 
