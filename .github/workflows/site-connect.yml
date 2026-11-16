@@ -155,5 +155,7 @@ jobs:
           echo "== синхронизации (последние 6)"
           q "select to_char(created_at at time zone 'Europe/Moscow','DD.MM HH24:MI'), mode, status, coalesce(jsonb_array_length(snapshot->'changes'),0)||' изм.', coalesce(left(error,80),'') from moysklad_sync_runs order by created_at desc limit 6"
           echo "== настройка"; q "select revision, jsonb_array_length(config->'mappings')||' привязок', config->'schedule' from moysklad_sync_configs"
-          echo "== ошибки за час"; docker logs --since 1h icase-review-scheduler-1 2>&1 | grep -ciE 'error|fail' || true
+          echo "== запуск контейнеров"; for c in icase-review-api-1 icase-review-scheduler-1; do docker inspect -f '{{.Name}} создан {{.Created}} запущен {{.State.StartedAt}} перезапусков {{.RestartCount}}' $c; done
+          echo "== ошибки за час"; for c in icase-review-api-1 icase-review-scheduler-1; do echo "-- $c"; docker logs --since 1h $c 2>&1 | grep -iE 'error|fail' | sed -E 's/[A-Za-z0-9+\/_=-]{24,}/<…>/g; s/[[:alnum:]._%+-]+@[[:alnum:].-]+/<почта>/g' | cut -c1-300 | tail -8; done
+          echo "== другие проекты сайта"; docker compose ls 2>&1 | grep -v supabase
           SH
