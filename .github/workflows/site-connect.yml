@@ -1,12 +1,13 @@
 # Связь сайта айкейс.рф (проект icase-review на сервере) с CRM.
 #   stage=inspect — только чтение: как установлен сайт (версия, образы, файлы настроек — только имена переменных).
+#   stage=inspect2 — только чтение: файлы запуска Compose, раздача статики, наличие ключа сайта в CRM (только длина).
 # Секреты и персональные данные в журнал не выводятся.
 name: Site connect
 on:
   workflow_dispatch:
     inputs:
       stage:
-        description: "inspect"
+        description: "inspect или inspect2"
         required: true
         default: inspect
 permissions:
@@ -23,7 +24,7 @@ jobs:
       - name: SSH
         env: { K: "${{ secrets.DEPLOY_SSH_KEY }}" }
         run: |
-          case "$STAGE" in inspect) ;; *) echo "stage: inspect"; exit 1;; esac
+          case "$STAGE" in inspect|inspect2) ;; *) echo "stage: inspect или inspect2"; exit 1;; esac
           install -m 700 -d ~/.ssh
           printf '%s\n' "$K" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e '/^$/d' > ~/.ssh/id_deploy; chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -T 20 -t ed25519 "$H" 2>/dev/null > ~/.ssh/known_hosts
@@ -46,4 +47,21 @@ jobs:
           echo "== docker hub"; timeout 10 curl -sI https://registry-1.docker.io/v2/ 2>&1 | head -1 || echo нет
           echo "== bun на хосте"; command -v bun node 2>&1
           echo "== диск"; df -h / | tail -1; free -m | sed -n 2p
+          SH
+      - name: Осмотр запуска сайта
+        if: inputs.stage == 'inspect2'
+        run: |
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes root@"$H" 'bash -s' <<'SH'
+          set -u
+          S=/var/lib/icase-review/operator
+          show() { grep -E '^(COMPOSE_PROJECT_NAME|BACKEND_IMAGE|CADDY_IMAGE|POSTGRES_IMAGE|RELEASE_ROOT|[A-Z_]+_FILE|INGRESS_BIND|HTTP_PORT|HTTPS_PORT)=' "$1"; }
+          echo "== /etc/icase-review/compose.env"; show /etc/icase-review/compose.env
+          for f in $S/compose-*.env; do echo "== $f"; show "$f"; done
+          echo "== current.json"; python3 -c "import json;d=json.load(open('$S/current.json'));print(json.dumps({k:d[k] for k in d if k not in ('artifacts','evidence')},ensure_ascii=False)[:1500])"
+          echo "== releases"; ls -la $S/releases; ls -la /srv/icase-review/public-releases/releases/*/
+          echo "== контейнеры"; for c in icase-review-api-1 icase-review-scheduler-1 icase-review-caddy-1; do docker inspect -f '{{.Name}} {{.Config.Image}} {{index .Config.Labels "com.docker.compose.project.config_files"}} {{index .Config.Labels "com.docker.compose.project.environment_file"}} {{range .Mounts}}{{.Source}}->{{.Destination}} {{end}}' $c; done
+          docker image inspect icase-backend:release-56c39ecdc36e -f '{{.Id}} {{.Config.User}} {{.Config.WorkingDir}}'
+          docker run --rm --entrypoint sh icase-backend:release-56c39ecdc36e -c 'ls -la /app/backend /app/backend/scripts | head -40; stat -c "%U %a %n" /app/backend/src/env.ts'
+          echo "== ключ сайта в CRM"; docker exec -i supabase-db psql -U postgres -d postgres -qAt -c "select length(decrypted_secret) from vault.decrypted_secrets where name='icase_site_api_key'"
+          echo "== доступ из контейнера к CRM"; docker exec icase-review-api-1 bun -e "const r=await fetch('https://api.icase-dzr.ru/functions/v1/site-api/provider-lookups');console.log(r.status)" 2>&1 | tail -1
           SH
