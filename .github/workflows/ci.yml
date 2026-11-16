@@ -28,6 +28,7 @@ jobs:
           deno run supabase/functions/tests/moysklad_test.ts
           deno run supabase/functions/tests/site_link_test.ts
           deno run supabase/functions/tests/bot_api_test.ts
+          deno run supabase/functions/tests/site_provider_test.ts
       - name: Caddyfile (свой HTTPS и режим за Caddy сервера)
         run: |
           for s in https http; do

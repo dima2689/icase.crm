@@ -9,6 +9,10 @@
 //   POST /site-api/repair-decide — решение клиента по смете: {num, t, decision:"yes"|"no", comment}
 //   POST /site-api/woo-order    — веб-хук WooCommerce (подпись X-WC-Webhook-Signature)
 //   GET  /site-api/feed         — весь каталог одним списком (совместимость)
+//   Для сайта айкейс.рф (icase-store: цены и остатки из CRM в формате, который сайт раньше читал из МоегоСклада):
+//   GET  /site-api/provider-lookups — склады, организация, тип цены
+//   GET  /site-api/provider-catalog — ?offset= &limit= (до 1000): товары без архива, цена, артикул, номер товара на icase52.ru
+//   GET  /site-api/provider-stock   — ?ids=uuid,uuid (до 100): остаток по каждому складу
 import { fieldsOf, shape, slugOf } from "./shape.ts";
 export type Rpc = (fn: string, args?: Record<string, unknown>) => Promise<any>;
 
@@ -93,6 +97,23 @@ export async function handle(req: Request, rpc: Rpc): Promise<Response> {
     return json({ total: list.length, page, per_page: per, items: list.slice((page - 1) * per, page * per) }, 200, true);
   }
 
+  // ---------- источник цен и остатков для icase-store ----------
+  if (req.method === "GET" && route?.startsWith("provider-")) {
+    if (!authed) return json({ error: "Неверный ключ" }, 401);
+    if (route === "provider-lookups") return json(await rpc("site_provider_lookups"));
+    if (route === "provider-catalog") {
+      const offset = Math.min(Math.max(Number.parseInt(P.get("offset") || "0", 10) || 0, 0), 1000000);
+      const limit = Math.min(Math.max(Number.parseInt(P.get("limit") || "100", 10) || 100, 1), 1000);
+      return json(await rpc("site_provider_catalog", { p_offset: offset, p_limit: limit }));
+    }
+    if (route === "provider-stock") {
+      const ids = String(P.get("ids") || "").split(",").filter(Boolean);
+      const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!ids.length || ids.length > 100 || ids.some((x) => !uuid.test(x)) || new Set(ids).size !== ids.length) return json({ error: "ids: от 1 до 100 разных UUID" }, 400);
+      return json({ observedAt: new Date().toISOString(), items: await rpc("site_provider_stock", { p_ids: ids }) });
+    }
+  }
+
   // ---------- статус заказа ----------
   if (req.method === "GET" && route === "order-status") {
     if (!authed) return json({ error: "Неверный ключ" }, 401);
@@ -148,5 +169,5 @@ export async function handle(req: Request, rpc: Rpc): Promise<Response> {
     const st = id ? await rpc("site_order_public", { p_num: "С-" + order.number, p_phone4: String(order.billing?.phone || "") }) : null;
     return json({ ok: true, crm_order: id, num: st ? st.num : null, status: st ? st.status : null });
   }
-  return json({ error: "Неизвестный адрес. Доступно: GET catalog, product, categories, order-status, repair-status, repair-quote, feed; POST order, woo-order, repair-decide" }, 404);
+  return json({ error: "Неизвестный адрес. Доступно: GET catalog, product, categories, order-status, repair-status, repair-quote, feed, provider-lookups, provider-catalog, provider-stock; POST order, woo-order, repair-decide" }, 404);
 }
