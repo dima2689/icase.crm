@@ -3,8 +3,9 @@ name: Server setup
 # Нужны секреты окружения production (Settings → Environments → production):
 #   DEPLOY_HOST        — IP сервера
 #   DEPLOY_SSH_KEY     — закрытый SSH-ключ, открытая часть которого добавлена пользователю root на сервере
-#   BACKUP_PASSPHRASE  — длинный пароль шифрования бэкапов (храните копию вне сервера)
-#   OWNER_PASSWORD     — временный пароль владельца CRM (смените после первого входа)
+#   BACKUP_PASSPHRASE  — (необязательно) пароль шифрования бэкапов; если нет — создаётся сам
+#   OWNER_PASSWORD     — (необязательно) временный пароль владельца CRM; если нет — создаётся сам
+#   Созданные пароли в журнал не выводятся: они записываются на сервер в /root/icase-secrets.txt (только root).
 #   необязательно: S3_ENDPOINT S3_REGION S3_BUCKET S3_ACCESS_KEY S3_SECRET_KEY · SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASS · ALERT_TG_TOKEN ALERT_TG_CHAT
 # Секреты в журнал не попадают: GitHub их маскирует, а скрипт передаёт их на сервер только через ssh.
 on:
@@ -32,10 +33,13 @@ jobs:
           BP: ${{ secrets.BACKUP_PASSPHRASE }}
           OP: ${{ secrets.OWNER_PASSWORD }}
         run: |
-          miss=""; [ -n "$H" ] || miss="$miss DEPLOY_HOST"; [ -n "$K" ] || miss="$miss DEPLOY_SSH_KEY"; [ -n "$BP" ] || miss="$miss BACKUP_PASSPHRASE"; [ -n "$OP" ] || miss="$miss OWNER_PASSWORD"
+          miss=""; [ -n "$H" ] || miss="$miss DEPLOY_HOST"; [ -n "$K" ] || miss="$miss DEPLOY_SSH_KEY"
           [ -z "$miss" ] || { echo "::error::Не заданы секреты окружения production:$miss"; exit 1; }
-          [ ${#BP} -ge 16 ] || { echo "::error::BACKUP_PASSPHRASE короче 16 символов"; exit 1; }
-          [ ${#OP} -ge 10 ] || { echo "::error::OWNER_PASSWORD короче 10 символов"; exit 1; }
+          gen() { openssl rand -base64 48 | tr -d '/+=\n' | cut -c1-"$1"; }
+          if [ -z "$BP" ]; then g=$(gen 32); echo "::add-mask::$g"; echo "GEN_BP=$g" >> "$GITHUB_ENV"; echo "пароль бэкапов будет создан автоматически"
+          elif [ ${#BP} -lt 16 ]; then echo "::error::BACKUP_PASSPHRASE короче 16 символов"; exit 1; fi
+          if [ -z "$OP" ]; then g=$(gen 16); echo "::add-mask::$g"; echo "GEN_OP=$g" >> "$GITHUB_ENV"; echo "пароль владельца будет создан автоматически"
+          elif [ ${#OP} -lt 10 ]; then echo "::error::OWNER_PASSWORD короче 10 символов"; exit 1; fi
           [[ "$DOMAIN" =~ ^[a-z0-9.-]+\.[a-z]{2,}$ ]] || [[ "$DOMAIN" =~ ^xn--[a-z0-9.-]+$ ]] || { echo "::error::Домен указан неверно: $DOMAIN"; exit 1; }
           [[ "$OWNER" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] || { echo "::error::Почта указана неверно"; exit 1; }
       - uses: actions/checkout@v4
@@ -83,6 +87,7 @@ jobs:
           S="ssh -i $HOME/.ssh/id_deploy -o BatchMode=yes root@$H"
           if $S 'test -s /etc/icase/icase.env' && [ "$REWRITE" != "true" ]; then echo "/etc/icase/icase.env уже есть — оставляю как есть"; exit 0; fi
           umask 077
+          export BACKUP_PASSPHRASE="${BACKUP_PASSPHRASE:-${GEN_BP:-}}"
           python3 - > /tmp/icase.env <<'PY'
           import os, re, shlex
           s = open("deploy/icase.env.example").read()
@@ -102,6 +107,9 @@ jobs:
           bash -n /tmp/icase.env && (set -a; . /tmp/icase.env) || { echo "::error::файл настроек не читается"; exit 1; }
           $S 'install -d -m 700 /etc/icase && cat > /etc/icase/icase.env.new && chmod 600 /etc/icase/icase.env.new && mv /etc/icase/icase.env.new /etc/icase/icase.env' < /tmp/icase.env
           rm -f /tmp/icase.env
+          if [ -n "${GEN_BP:-}" ]; then
+            printf 'BACKUP_PASSPHRASE (пароль бэкапов, сохраните копию вне сервера): %s\n' "$GEN_BP" | $S 'umask 077; cat >> /root/icase-secrets.txt'
+          fi
           echo "настройки записаны: crm.$DOMAIN, api.$DOMAIN$( [ -n "$S3_ACCESS_KEY" ] && echo ', бэкапы в S3' || echo ', бэкапы только на сервере — добавьте S3 позже')$( [ -n "$SMTP_PASS" ] && echo ', почта' )"
       - name: DNS
         run: |
@@ -127,7 +135,14 @@ jobs:
         run: |
           S="ssh -i $HOME/.ssh/id_deploy -o BatchMode=yes root@$H"
           if $S "docker exec supabase-db psql -U postgres -qAt -c \"select 1 from public.staff where role='owner' limit 1\"" | grep -q 1; then echo "владелец уже есть"
-          else printf '%s' "$OWNER_PASSWORD" | $S "OWNER_PASSWORD=\$(cat) /opt/icase/app/deploy/create-owner.sh '$OWNER' 'Владелец'"; fi
+          else
+            OP="${OWNER_PASSWORD:-${GEN_OP:-}}"
+            printf '%s' "$OP" | $S "OWNER_PASSWORD=\$(cat) /opt/icase/app/deploy/create-owner.sh '$OWNER' 'Владелец'"
+            if [ -z "${OWNER_PASSWORD:-}" ]; then
+              printf 'Вход в CRM: %s / %s (смените после первого входа)\n' "$OWNER" "$GEN_OP" | $S 'umask 077; cat >> /root/icase-secrets.txt'
+              echo "GEN_OWNER=1" >> "$GITHUB_ENV"
+            fi
+          fi
           $S 'systemctl start icase-backup.timer icase-health.timer && systemctl list-timers "icase-*" --no-pager'
       - name: Итог
         run: |
@@ -135,7 +150,8 @@ jobs:
           kh=$(cut -d" " -f2- ~/.ssh/known_hosts)   # без IP: он остаётся только в секрете DEPLOY_HOST
           {
             echo "### iCase установлен · версия \`$V\`"
-            echo "- CRM: https://crm.$DOMAIN — вход: $OWNER и пароль из секрета OWNER_PASSWORD (смените в «Профиль → Пароль»)"
+            if [ -n "${GEN_OWNER:-}" ]; then echo "- CRM: https://crm.$DOMAIN — вход: $OWNER, пароль создан автоматически и лежит на сервере: \`cat /root/icase-secrets.txt\` (смените в «Профиль → Пароль»)"
+            else echo "- CRM: https://crm.$DOMAIN — вход: $OWNER и пароль из секрета OWNER_PASSWORD (смените в «Профиль → Пароль»)"; fi
             echo "- API для сайта: https://api.$DOMAIN/functions/v1/site-api"
             echo "- **Добавьте секрет DEPLOY_KNOWN_HOSTS** (окружение production) — ключ сервера ниже; без него автоматическая выкладка из main не пойдёт:"
             echo '```'; echo "$kh"; echo '```'
