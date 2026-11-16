@@ -62,6 +62,6 @@ jobs:
           echo "== контейнеры"; for c in icase-review-api-1 icase-review-scheduler-1 icase-review-caddy-1; do docker inspect -f '{{.Name}} {{.Config.Image}} {{index .Config.Labels "com.docker.compose.project.config_files"}} {{index .Config.Labels "com.docker.compose.project.environment_file"}} {{range .Mounts}}{{.Source}}->{{.Destination}} {{end}}' $c; done
           docker image inspect icase-backend:release-56c39ecdc36e -f '{{.Id}} {{.Config.User}} {{.Config.WorkingDir}}'
           docker run --rm --entrypoint sh icase-backend:release-56c39ecdc36e -c 'ls -la /app/backend /app/backend/scripts | head -40; stat -c "%U %a %n" /app/backend/src/env.ts'
-          echo "== ключ сайта в CRM"; docker exec -i supabase-db psql -U postgres -d postgres -qAt -c "select length(decrypted_secret) from vault.decrypted_secrets where name='icase_site_api_key'"
-          echo "== доступ из контейнера к CRM"; docker exec icase-review-api-1 bun -e "const r=await fetch('https://api.icase-dzr.ru/functions/v1/site-api/provider-lookups');console.log(r.status)" 2>&1 | tail -1
+          echo "== ключ сайта в CRM"; docker exec supabase-db psql -U postgres -d postgres -qAt -c "select length(decrypted_secret) from vault.decrypted_secrets where name='icase_site_api_key'"
+          echo "== доступ из контейнера к CRM"; docker exec icase-review-api-1 bun -e </dev/null "const r=await fetch('https://api.icase-dzr.ru/functions/v1/site-api/provider-lookups');console.log(r.status)" 2>&1 | tail -1
           SH
