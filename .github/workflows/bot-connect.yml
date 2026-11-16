@@ -3,6 +3,7 @@
 #   stage=apply — поставить обновление бота из ветки bot-update-enc (зашифровано ключом сервера), создать ключ бота в CRM,
 #                 записать CRM_API_URL и CRM_BOT_KEY в /opt/icase-bot/.env и перезапустить бота.
 #                 Перед заменой проверяется, что файлы бота на сервере не менялись (иначе — стоп); при сбое всё возвращается.
+#   stage=compare — только чтение: сравнить остатки МоегоСклада (кэш бота) с остатками CRM по артикулу и штрихкоду.
 #   stage=crm-on / crm-off — включить или выключить режим CRM в боте (CRM_MODE в .env): склад, продажи, клиенты,
 #                 правка карточек и переоценка берутся из CRM вместо МоегоСклада. При сбое настройки возвращаются.
 # Секреты не покидают сервер: ключ бота создаётся и записывается прямо там.
@@ -11,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       stage:
-        description: "key, apply, crm-on или crm-off"
+        description: "key, apply, compare, crm-on или crm-off"
         required: true
         default: key
 permissions:
@@ -28,7 +29,7 @@ jobs:
       - name: SSH
         env: { K: "${{ secrets.DEPLOY_SSH_KEY }}" }
         run: |
-          case "$STAGE" in key|apply|crm-on|crm-off) ;; *) echo "stage: key, apply, crm-on или crm-off"; exit 1;; esac
+          case "$STAGE" in key|apply|compare|crm-on|crm-off) ;; *) echo "stage: key, apply, compare, crm-on или crm-off"; exit 1;; esac
           install -m 700 -d ~/.ssh
           printf '%s\n' "$K" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e '/^$/d' > ~/.ssh/id_deploy; chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -T 20 -t ed25519 "$H" 2>/dev/null > ~/.ssh/known_hosts
@@ -105,4 +106,44 @@ jobs:
             [ "$src" = crm ] || { cp -a "$BK/.env" "$B/.env"; systemctl restart icase-bot; echo "каталог из CRM не загрузился — режим выключен обратно"; exit 1; }
           fi
           echo "Готово: режим CRM в боте — $STAGE. Прежние настройки: $BK/.env"
+          SH
+      - name: Сравнение остатков МойСклад ↔ CRM
+        if: inputs.stage == 'compare'
+        run: |
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes root@"$H" 'bash -s' <<'SH'
+          set -euo pipefail
+          cd /opt/icase-bot
+          PY=$(systemctl show -p ExecStart --value icase-bot | sed -E 's/.*path=([^ ;]+).*/\1/')
+          "$PY" - <<'PYEOF'
+          import json, os, sqlite3, time
+          from dotenv import dotenv_values
+          import requests
+          env = dotenv_values('.env')
+          db = sqlite3.connect(env.get('DB_PATH') or 'data/icase.db')
+          print('источник кэша бота:', (db.execute("select value from kv where key='catalog_source'").fetchone() or ['moysklad'])[0])
+          at = float((db.execute("select value from kv where key='ms_stock_at'").fetchone() or ['0'])[0])
+          print('кэш МоегоСклада обновлён', int((time.time() - at) / 60), 'мин назад')
+          ms = [json.loads(d) for (d,) in db.execute('select data from ms_items where active=1')]
+          ms = [e for e in ms if e.get('type') != 'service' and e.get('source') != 'crm']
+          r = requests.get(env['CRM_API_URL'] + '/catalog', headers={'X-Bot-Key': env['CRM_BOT_KEY']}, timeout=60)
+          r.raise_for_status()
+          crm = r.json()['products']
+          by_sku = {p['sku']: p for p in crm if p.get('sku')}
+          by_bar = {p['barcode']: p for p in crm if p.get('barcode')}
+          diff, missing, same = [], [], 0
+          for e in ms:
+              p = by_sku.get(e.get('sku')) or next((by_bar[b] for b in e.get('barcodes') or [] if b in by_bar), None)
+              qty = float(e.get('stock') or 0)
+              if not p:
+                  if qty > 0: missing.append((e['title'], qty))
+                  continue
+              cq = float(p['stock']) + float(p['reserve'])
+              if abs(cq - qty) > 1e-6: diff.append((e['title'], qty, cq, bool(p.get('serial_tracked'))))
+              else: same += 1
+          print('товаров МоегоСклада:', len(ms), '· в CRM:', len(crm), '· остаток совпал:', same)
+          print('остаток отличается:', len(diff), '(МойСклад → CRM, * — учёт по IMEI)')
+          for t, a, b, s in sorted(diff, key=lambda x: -abs(x[1] - x[2]))[:60]: print(f'  {a:g} → {b:g}{" *" if s else ""}  {t[:90]}')
+          print('есть в МоемСкладе с остатком, нет в CRM:', len(missing))
+          for t, a in missing[:30]: print(f'  {a:g}  {t[:90]}')
+          PYEOF
           SH
