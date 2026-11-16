@@ -48,13 +48,25 @@ sb_set CRM_DOMAIN "$CRM_DOMAIN"; sb_set API_DOMAIN "$API_DOMAIN"; sb_set ACME_EM
 if [ -z "${ICASE_EDGE:-}" ] && systemctl is-active --quiet caddy 2>/dev/null; then ICASE_EDGE=host-caddy; fi
 if [ "${ICASE_EDGE:-}" = host-caddy ]; then
   sb_set ICASE_HTTP_BIND 127.0.0.1:18090; sb_set ICASE_HTTPS_BIND 127.0.0.1:18091; sb_set ICASE_SITE_SCHEME http
-  cat > /etc/caddy/icase.caddy <<CAD
-# iCase CRM — создано deploy/supabase-setup.sh; HTTPS здесь, дальше — Caddy iCase в Docker
-$CRM_DOMAIN, $API_DOMAIN {
-	encode zstd gzip
-	reverse_proxy 127.0.0.1:18090
-}
-CAD
+  # короткие адреса CRM (icase-dzr.ru, www.icase-dzr.ru → https://crm.icase-dzr.ru).
+  # CRM_ALIASES в icase.env задаёт их явно; без него берём домен без «crm.» и www — но только если DNS уже смотрит
+  # на этот сервер (и нет AAAA на чужой адрес): иначе сертификат не выпустится, а чужой сайт перехватывать нельзя
+  aliases=""
+  if [ -n "${CRM_ALIASES+x}" ]; then cand="$CRM_ALIASES"
+  else case "$CRM_DOMAIN" in crm.*) base="${CRM_DOMAIN#crm.}"; cand="$base www.$base";; *) cand="";; esac; fi
+  mine=" $(hostname -I 2>/dev/null || true) "
+  for a in $cand; do
+    v4=$(getent ahostsv4 "$a" 2>/dev/null | awk '{print $1}' | sort -u || true); v6=$(getent ahostsv6 "$a" 2>/dev/null | awk '$1 ~ /:/ && $1 !~ /^::ffff:/ {print $1}' | sort -u || true)
+    ok=1; [ -n "$v4" ] || ok=0
+    for ip in $v4 $v6; do case "$mine" in *" $ip "*) ;; *) ok=0;; esac; done
+    if [ $ok = 1 ]; then aliases="$aliases${aliases:+, }$a"; else log "адрес $a пока не смотрит на этот сервер (A: ${v4:-нет}${v6:+, AAAA: $v6}) — CRM по нему не открываю"; fi
+  done
+  {
+    echo "# iCase CRM — создано deploy/supabase-setup.sh; HTTPS здесь, дальше — Caddy iCase в Docker"
+    printf '%s, %s {\n\tencode zstd gzip\n\treverse_proxy 127.0.0.1:18090\n}\n' "$CRM_DOMAIN" "$API_DOMAIN"
+    if [ -n "$aliases" ]; then printf '%s {\n\tredir https://%s{uri} permanent\n}\n' "$aliases" "$CRM_DOMAIN"; fi
+  } > /etc/caddy/icase.caddy
+  if [ -n "$aliases" ]; then log "короткие адреса CRM: $aliases → https://$CRM_DOMAIN"; fi
   if ! grep -qE '^[[:space:]]*import[[:space:]]+/etc/caddy/icase\.caddy' /etc/caddy/Caddyfile; then
     cp /etc/caddy/Caddyfile /etc/caddy/Caddyfile.before-icase
     printf '\nimport /etc/caddy/icase.caddy\n' >> /etc/caddy/Caddyfile
