@@ -34,5 +34,9 @@ jobs:
               | grep -E '^[^#[:space:]].*\{|reverse_proxy|root |file_server|handle|redir' | sed -E 's/(basicauth|basic_auth).*/\1 …/' | sed 's/^/  /'
             echo "== монтирования $cad"; docker inspect --format '{{range .Mounts}}  {{.Source}} → {{.Destination}}{{"\n"}}{{end}}' "$cad"
           fi
+          echo "== Caddy на самом сервере (вне Docker)"
+          systemctl is-active caddy 2>/dev/null | sed 's/^/  служба caddy: /'; command -v caddy >/dev/null && echo "  $(caddy version | cut -c1-40)"
+          ls -la /etc/caddy 2>/dev/null | sed 's/^/  /'
+          [ -f /etc/caddy/Caddyfile ] && grep -nE '^[^#[:space:]].*\{|^\s*import|reverse_proxy|^\{|email' /etc/caddy/Caddyfile | sed -E 's/(basicauth|basic_auth).*/\1 …/' | sed 's/^/  /'
           echo "== DNS сайтов (A-записи на этот сервер)"; for d in icase-dzr.ru crm.icase-dzr.ru api.icase-dzr.ru; do echo "  $d → $(getent hosts $d | awk '{print $1}' | head -1)"; done
           SH
