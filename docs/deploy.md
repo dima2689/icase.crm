@@ -23,6 +23,22 @@
 
 Персональные данные клиентов (152-ФЗ): сервер и бэкапы — в РФ. Тестовую базу Supabase во Франкфурте для реальных данных не используем.
 
+## Быстрый путь: установка из GitHub (без входа на сервер)
+
+1. **SSH-ключ** (на своём компьютере, один раз): `ssh-keygen -t ed25519 -C icase-deploy -f ~/.ssh/icase_deploy -N ""`.
+   Открытую часть (`~/.ssh/icase_deploy.pub`) добавьте пользователю root на сервере: в панели провайдера («SSH-ключи» при создании/переустановке
+   сервера) или командой `ssh-copy-id -i ~/.ssh/icase_deploy.pub root@IP`.
+2. **DNS**: A-записи `crm.<домен>` и `api.<домен>` → IP сервера.
+3. **GitHub → Settings → Environments → production → Secrets**:
+   `DEPLOY_HOST` (IP), `DEPLOY_SSH_KEY` (весь файл `~/.ssh/icase_deploy`), `BACKUP_PASSPHRASE` (длинный пароль, копию — в менеджер паролей),
+   `OWNER_PASSWORD` (временный пароль владельца). По желанию: `S3_ENDPOINT S3_REGION S3_BUCKET S3_ACCESS_KEY S3_SECRET_KEY`,
+   `SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASS`, `ALERT_TG_TOKEN ALERT_TG_CHAT`.
+4. **Actions → Server setup → Run workflow**: домен и почта владельца. Сценарий проверит ключ и DNS, поставит всё через `install.sh`,
+   выложит текущую версию, создаст владельца, включит бэкапы и проверку. ~15–20 минут.
+5. В итоге запуска — ключ сервера: сохраните его секретом `DEPLOY_KNOWN_HOSTS`. После этого каждый push в `main` выкладывается сам.
+
+Журналы Actions в публичном репозитории видны всем — секреты в них GitHub скрывает, но репозиторий лучше сделать приватным.
+
 ## 2. DNS
 
 У регистратора домена создайте A-записи на IP сервера:

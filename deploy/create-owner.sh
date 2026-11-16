@@ -18,4 +18,4 @@ insert into public.staff(id, full_name, role, email) values (:'uid', :'nm', 'own
 insert into public.audit_log(action, ref, details) values ('Создан владелец', :'em', 'deploy/create-owner.sh');
 SQL
 log "владелец создан: $EMAIL"
-[ $CI_MODE = 1 ] || echo "Временный пароль: $PASS   (смените после первого входа)"
+[ $CI_MODE = 1 ] || [ -n "${OWNER_PASSWORD:-}" ] || echo "Временный пароль: $PASS   (смените после первого входа)"

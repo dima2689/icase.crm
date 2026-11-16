@@ -1,0 +1,128 @@
+name: Server setup
+# Первая установка iCase на новый VPS (и повторная — безопасно): Actions → Server setup → Run workflow.
+# Нужны секреты окружения production (Settings → Environments → production):
+#   DEPLOY_HOST        — IP сервера
+#   DEPLOY_SSH_KEY     — закрытый SSH-ключ, открытая часть которого добавлена пользователю root на сервере
+#   BACKUP_PASSPHRASE  — длинный пароль шифрования бэкапов (храните копию вне сервера)
+#   OWNER_PASSWORD     — временный пароль владельца CRM (смените после первого входа)
+#   необязательно: S3_ENDPOINT S3_REGION S3_BUCKET S3_ACCESS_KEY S3_SECRET_KEY · SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASS · ALERT_TG_TOKEN ALERT_TG_CHAT
+# Секреты в журнал не попадают: GitHub их маскирует, а скрипт передаёт их на сервер только через ssh.
+on:
+  workflow_dispatch:
+    inputs:
+      domain: { description: "Домен (например icase52.ru) — будут crm.<домен> и api.<домен>", required: true }
+      email: { description: "Почта владельца: вход в CRM и уведомления Let's Encrypt", required: true }
+      rewrite_env: { description: "Перезаписать /etc/icase/icase.env, если он уже есть", type: boolean, default: false }
+concurrency: { group: deploy-production, cancel-in-progress: false }
+permissions: { contents: read }
+
+jobs:
+  setup:
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 60
+    env:
+      H: ${{ secrets.DEPLOY_HOST }}
+      DOMAIN: ${{ inputs.domain }}
+      OWNER: ${{ inputs.email }}
+    steps:
+      - name: Проверка настроек
+        env:
+          K: ${{ secrets.DEPLOY_SSH_KEY }}
+          BP: ${{ secrets.BACKUP_PASSPHRASE }}
+          OP: ${{ secrets.OWNER_PASSWORD }}
+        run: |
+          miss=""; [ -n "$H" ] || miss="$miss DEPLOY_HOST"; [ -n "$K" ] || miss="$miss DEPLOY_SSH_KEY"; [ -n "$BP" ] || miss="$miss BACKUP_PASSPHRASE"; [ -n "$OP" ] || miss="$miss OWNER_PASSWORD"
+          [ -z "$miss" ] || { echo "::error::Не заданы секреты окружения production:$miss"; exit 1; }
+          [ ${#BP} -ge 16 ] || { echo "::error::BACKUP_PASSPHRASE короче 16 символов"; exit 1; }
+          [ ${#OP} -ge 10 ] || { echo "::error::OWNER_PASSWORD короче 10 символов"; exit 1; }
+          [[ "$DOMAIN" =~ ^[a-z0-9.-]+\.[a-z]{2,}$ ]] || [[ "$DOMAIN" =~ ^xn--[a-z0-9.-]+$ ]] || { echo "::error::Домен указан неверно: $DOMAIN"; exit 1; }
+          [[ "$OWNER" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] || { echo "::error::Почта указана неверно"; exit 1; }
+      - uses: actions/checkout@v4
+      - name: SSH
+        env: { K: "${{ secrets.DEPLOY_SSH_KEY }}" }
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$K" > ~/.ssh/id_deploy; chmod 600 ~/.ssh/id_deploy
+          ssh-keygen -y -f ~/.ssh/id_deploy > ~/.ssh/id_deploy.pub || { echo "::error::DEPLOY_SSH_KEY — не закрытый ключ OpenSSH"; exit 1; }
+          ssh-keyscan -T 20 -t ed25519 "$H" 2>/dev/null > ~/.ssh/known_hosts
+          [ -s ~/.ssh/known_hosts ] || { echo "::error::Сервер не отвечает по SSH (порт 22)"; exit 1; }
+          echo "Отпечаток ключа сервера (сверьте с панелью провайдера):"; ssh-keygen -lf ~/.ssh/known_hosts
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes -o ConnectTimeout=20 root@"$H" 'grep -E "^(NAME|VERSION_ID)=" /etc/os-release; nproc; free -g | awk "/Mem:/{print \$2\" ГБ ОЗУ\"}"; df -h / | tail -1' \
+            || { echo "::error::Не удалось войти root по ключу. Добавьте открытую часть DEPLOY_SSH_KEY в /root/.ssh/authorized_keys"; exit 1; }
+      - name: Настройки сервера (/etc/icase/icase.env)
+        env:
+          REWRITE: ${{ inputs.rewrite_env }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_REGION: ${{ secrets.S3_REGION }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
+          S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          ALERT_TG_TOKEN: ${{ secrets.ALERT_TG_TOKEN }}
+          ALERT_TG_CHAT: ${{ secrets.ALERT_TG_CHAT }}
+        run: |
+          S="ssh -i $HOME/.ssh/id_deploy -o BatchMode=yes root@$H"
+          if $S 'test -s /etc/icase/icase.env' && [ "$REWRITE" != "true" ]; then echo "/etc/icase/icase.env уже есть — оставляю как есть"; exit 0; fi
+          umask 077
+          python3 - > /tmp/icase.env <<'PY'
+          import os, re, shlex
+          s = open("deploy/icase.env.example").read()
+          d = os.environ["DOMAIN"]; e = os.environ["OWNER"]
+          v = {"CRM_DOMAIN": "crm." + d, "API_DOMAIN": "api." + d, "ACME_EMAIL": e, "BACKUP_PASSPHRASE": os.environ["BACKUP_PASSPHRASE"]}
+          for k in ["S3_ENDPOINT", "S3_REGION", "S3_BUCKET", "S3_ACCESS_KEY", "S3_SECRET_KEY", "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS"]:
+              if os.environ.get(k): v[k] = os.environ[k]
+          if os.environ.get("SMTP_USER"): v["SMTP_ADMIN_EMAIL"] = os.environ["SMTP_USER"]
+          if not os.environ.get("S3_ACCESS_KEY"): v.update({"S3_ACCESS_KEY": "", "S3_SECRET_KEY": ""})
+          for k, x in v.items():
+              line = "%s=%s" % (k, shlex.quote(x) if x else "")
+              s = re.sub(r"(?m)^%s=.*$" % k, lambda m, line=line: line, s)
+          for k in ["ALERT_TG_TOKEN", "ALERT_TG_CHAT"]:
+              if os.environ.get(k): s += "\n%s=%s" % (k, shlex.quote(os.environ[k]))
+          print(s)
+          PY
+          bash -n /tmp/icase.env && (set -a; . /tmp/icase.env) || { echo "::error::файл настроек не читается"; exit 1; }
+          $S 'install -d -m 700 /etc/icase && cat > /etc/icase/icase.env.new && chmod 600 /etc/icase/icase.env.new && mv /etc/icase/icase.env.new /etc/icase/icase.env' < /tmp/icase.env
+          rm -f /tmp/icase.env
+          echo "настройки записаны: crm.$DOMAIN, api.$DOMAIN$( [ -n "$S3_ACCESS_KEY" ] && echo ', бэкапы в S3' || echo ', бэкапы только на сервере — добавьте S3 позже')$( [ -n "$SMTP_PASS" ] && echo ', почта' )"
+      - name: DNS
+        run: |
+          command -v dig >/dev/null || sudo apt-get install -y -qq dnsutils >/dev/null
+          ip=$(ssh -i ~/.ssh/id_deploy -o BatchMode=yes root@"$H" 'curl -fsS -4 -m 10 https://ifconfig.me || hostname -I | cut -d" " -f1')
+          ok=1; for n in crm api; do a=$(dig +short A "$n.$DOMAIN" @1.1.1.1 | tail -1); echo "$n.$DOMAIN → ${a:-нет записи} (сервер $ip)"; [ "$a" = "$ip" ] || ok=0; done
+          [ $ok = 1 ] || { echo "::error::A-записи crm.$DOMAIN и api.$DOMAIN должны указывать на $ip. Добавьте их у регистратора, подождите 5–30 минут и запустите снова"; exit 1; }
+      - name: install.sh (Docker, Supabase, файрвол, бэкапы)
+        run: |
+          git archive --format=tar.gz -o /tmp/src.tar.gz HEAD -- deploy
+          S="ssh -i $HOME/.ssh/id_deploy -o BatchMode=yes root@$H"
+          $S 'rm -rf /root/icase-deploy && mkdir -p /root/icase-deploy && tar -C /root/icase-deploy -xzf -' < /tmp/src.tar.gz
+          $S "bash /root/icase-deploy/deploy/install.sh '$(cat ~/.ssh/id_deploy.pub)'"
+      - name: Первая выкладка версии
+        run: |
+          V="$(date -u +%Y%m%d-%H%M)-$(git rev-parse --short=7 HEAD)"
+          git archive --format=tar.gz -o "/tmp/$V.tar.gz" HEAD -- index.html styles.css sw.js manifest*.webmanifest icons js db deploy supabase
+          scp -i ~/.ssh/id_deploy -o BatchMode=yes "/tmp/$V.tar.gz" "deploy@$H:incoming/$V.tar.gz"
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes "deploy@$H" "sudo /opt/icase/bin/icase-release $V"
+          echo "V=$V" >> "$GITHUB_ENV"
+      - name: Владелец и таймеры
+        env: { OWNER_PASSWORD: "${{ secrets.OWNER_PASSWORD }}" }
+        run: |
+          S="ssh -i $HOME/.ssh/id_deploy -o BatchMode=yes root@$H"
+          if $S "docker exec supabase-db psql -U postgres -qAt -c \"select 1 from public.staff where role='owner' limit 1\"" | grep -q 1; then echo "владелец уже есть"
+          else printf '%s' "$OWNER_PASSWORD" | $S "OWNER_PASSWORD=\$(cat) /opt/icase/app/deploy/create-owner.sh '$OWNER' 'Владелец'"; fi
+          $S 'systemctl start icase-backup.timer icase-health.timer && systemctl list-timers "icase-*" --no-pager'
+      - name: Итог
+        run: |
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes root@"$H" /opt/icase/app/deploy/healthcheck.sh
+          kh=$(cut -d" " -f2- ~/.ssh/known_hosts)   # без IP: он остаётся только в секрете DEPLOY_HOST
+          {
+            echo "### iCase установлен · версия \`$V\`"
+            echo "- CRM: https://crm.$DOMAIN — вход: $OWNER и пароль из секрета OWNER_PASSWORD (смените в «Профиль → Пароль»)"
+            echo "- API для сайта: https://api.$DOMAIN/functions/v1/site-api"
+            echo "- **Добавьте секрет DEPLOY_KNOWN_HOSTS** (окружение production) — ключ сервера ниже; без него автоматическая выкладка из main не пойдёт:"
+            echo '```'; echo "$kh"; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

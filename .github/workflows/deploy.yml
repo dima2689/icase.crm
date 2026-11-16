@@ -20,9 +20,11 @@ jobs:
     steps:
       - name: Есть ли сервер
         id: chk
-        env: { H: "${{ secrets.DEPLOY_HOST }}" }
+        env: { H: "${{ secrets.DEPLOY_HOST }}", KH: "${{ secrets.DEPLOY_KNOWN_HOSTS }}" }
         run: |
-          if [ -z "$H" ]; then echo "::notice::Секрет DEPLOY_HOST не задан — выкладка пропущена (см. docs/deploy.md)"; echo "go=0" >> "$GITHUB_OUTPUT"; else echo "go=1" >> "$GITHUB_OUTPUT"; fi
+          if [ -z "$H" ]; then echo "::notice::Секрет DEPLOY_HOST не задан — выкладка пропущена (см. docs/deploy.md)"; echo "go=0" >> "$GITHUB_OUTPUT"
+          elif [ -z "$KH" ]; then echo "::notice::Сервер ещё не установлен (нет DEPLOY_KNOWN_HOSTS): запустите Actions → Server setup"; echo "go=0" >> "$GITHUB_OUTPUT"
+          else echo "go=1" >> "$GITHUB_OUTPUT"; fi
       - uses: actions/checkout@v4
         if: steps.chk.outputs.go == '1'
         with:
@@ -41,7 +43,9 @@ jobs:
         run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "$KEY" > ~/.ssh/id_deploy; chmod 600 ~/.ssh/id_deploy
-          printf '%s\n' "$KH" > ~/.ssh/known_hosts
+          H="${{ secrets.DEPLOY_HOST }}"
+          # можно хранить строку known_hosts целиком или только ключ сервера («ssh-ed25519 AAAA…»)
+          case "$KH" in ssh-*|ecdsa-*) printf '%s %s\n' "$H" "$KH" > ~/.ssh/known_hosts;; *) printf '%s\n' "$KH" > ~/.ssh/known_hosts;; esac
       - name: Выкладка
         if: steps.chk.outputs.go == '1'
         env:
