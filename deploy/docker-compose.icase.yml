@@ -23,10 +23,12 @@ services:
     container_name: icase-caddy
     image: caddy:2.10-alpine
     restart: unless-stopped
+    # обычно Caddy сам принимает 80/443; если на сервере уже есть свой Caddy (ICASE_EDGE=host-caddy) —
+    # наш слушает только 127.0.0.1:18090 по http, а HTTPS делает Caddy сервера
     ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
+      - "${ICASE_HTTP_BIND:-80}:80"
+      - "${ICASE_HTTPS_BIND:-443}:443"
+      - "${ICASE_HTTPS_BIND:-443}:443/udp"
     depends_on:
       api-gw:
         condition: service_healthy
@@ -34,6 +36,7 @@ services:
       CRM_DOMAIN: ${CRM_DOMAIN}
       API_DOMAIN: ${API_DOMAIN}
       ACME_EMAIL: ${ACME_EMAIL}
+      ICASE_SITE_SCHEME: ${ICASE_SITE_SCHEME:-https}
     volumes:
       - ./icase/Caddyfile:/etc/caddy/Caddyfile:ro
       # папку выше, а не саму crm: при выкладке crm подменяется целиком, и монтирование самой папки осталось бы на старой версии

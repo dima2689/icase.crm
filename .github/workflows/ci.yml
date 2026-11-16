@@ -26,6 +26,14 @@ jobs:
           deno check supabase/functions/site-api/index.ts supabase/functions/site-sync/index.ts supabase/functions/staff-admin/index.ts supabase/functions/evotor/index.ts supabase/functions/moysklad/index.ts
           deno run supabase/functions/tests/staff_admin_test.ts
           deno run supabase/functions/tests/moysklad_test.ts
+      - name: Caddyfile (свой HTTPS и режим за Caddy сервера)
+        run: |
+          for s in https http; do
+            docker run --rm -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" -e CRM_DOMAIN=crm.example.ru -e API_DOMAIN=api.example.ru -e ACME_EMAIL=a@example.ru -e ICASE_SITE_SCHEME=$s \
+              caddy:2.10-alpine caddy adapt --config /etc/caddy/Caddyfile --adapter caddyfile | python3 -c "import json,sys;d=json.load(sys.stdin);print('$s', {n:x.get('listen') for n,x in d['apps']['http']['servers'].items()})"
+          done
+          printf 'crm.example.ru, api.example.ru {\n\tencode zstd gzip\n\treverse_proxy 127.0.0.1:18090\n}\n' > /tmp/ic.caddy
+          docker run --rm -v /tmp/ic.caddy:/etc/caddy/Caddyfile:ro caddy:2.6-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
       - name: Образец настроек читается bash
         run: bash -euc 'set -a; . deploy/icase.env.example'
       - name: Секреты не попали в код

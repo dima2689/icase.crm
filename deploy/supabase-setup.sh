@@ -44,6 +44,30 @@ sb_set API_EXTERNAL_URL "https://$API_DOMAIN/auth/v1"
 sb_set SITE_URL "$SITE_URL"
 sb_set ADDITIONAL_REDIRECT_URLS "$SITE_URL/**"
 sb_set CRM_DOMAIN "$CRM_DOMAIN"; sb_set API_DOMAIN "$API_DOMAIN"; sb_set ACME_EMAIL "$ACME_EMAIL"
+# на сервере уже работает свой Caddy (служба caddy на 80/443)? Тогда HTTPS делает он, а наш Caddy — только http внутри
+if [ -z "${ICASE_EDGE:-}" ] && systemctl is-active --quiet caddy 2>/dev/null; then ICASE_EDGE=host-caddy; fi
+if [ "${ICASE_EDGE:-}" = host-caddy ]; then
+  sb_set ICASE_HTTP_BIND 127.0.0.1:18090; sb_set ICASE_HTTPS_BIND 127.0.0.1:18091; sb_set ICASE_SITE_SCHEME http
+  cat > /etc/caddy/icase.caddy <<CAD
+# iCase CRM — создано deploy/supabase-setup.sh; HTTPS здесь, дальше — Caddy iCase в Docker
+$CRM_DOMAIN, $API_DOMAIN {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:18090
+}
+CAD
+  if ! grep -qE '^[[:space:]]*import[[:space:]]+/etc/caddy/icase\.caddy' /etc/caddy/Caddyfile; then
+    cp /etc/caddy/Caddyfile /etc/caddy/Caddyfile.before-icase
+    printf '\nimport /etc/caddy/icase.caddy\n' >> /etc/caddy/Caddyfile
+  fi
+  if caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; then systemctl reload caddy
+  else
+    [ -f /etc/caddy/Caddyfile.before-icase ] && cp /etc/caddy/Caddyfile.before-icase /etc/caddy/Caddyfile
+    die "Caddy сервера не принял настройки iCase — его файл возвращён как был"
+  fi
+  log "HTTPS для $CRM_DOMAIN и $API_DOMAIN — через Caddy сервера (/etc/caddy/icase.caddy)"
+else
+  sb_set ICASE_HTTP_BIND 80; sb_set ICASE_HTTPS_BIND 443; sb_set ICASE_SITE_SCHEME https
+fi
 # сотрудники не регистрируются сами: их добавляет владелец (staff-admin), первого — deploy/create-owner.sh
 sb_set DISABLE_SIGNUP true
 sb_set ENABLE_EMAIL_AUTOCONFIRM false

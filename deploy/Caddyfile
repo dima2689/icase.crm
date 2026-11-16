@@ -26,7 +26,7 @@
 	}
 }
 
-{$CRM_DOMAIN} {
+{$ICASE_SITE_SCHEME:https}://{$CRM_DOMAIN} {
 	import common crm
 	root * /srv/icase/crm
 	header {
@@ -44,7 +44,7 @@
 	file_server
 }
 
-{$API_DOMAIN} {
+{$ICASE_SITE_SCHEME:https}://{$API_DOMAIN} {
 	import common api
 	# Studio и служебные пути наружу не открываем: Studio доступна только через SSH-туннель (127.0.0.1:3000)
 	@api path /auth/v1/* /rest/v1/* /realtime/v1/* /storage/v1/* /functions/v1/* /graphql/v1
