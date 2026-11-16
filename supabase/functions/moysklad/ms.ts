@@ -7,7 +7,7 @@ export const PAGE = 1000;
 // что можно читать (и как превратить строку МоегоСклада в строку для CRM)
 export const KINDS: Record<string, { path: string; map: (r: any) => any }> = {
   store: { path: "/entity/store", map: (r) => ({ id: r.id, name: r.name || "Склад", address: r.address || null, archived: !!r.archived }) },
-  folder: { path: "/entity/productfolder", map: (r) => ({ id: r.id, name: r.name || "Без названия", path: r.pathName || "", archived: !!r.archived }) },
+  folder: { path: "/entity/productfolder", map: (r) => ({ id: r.id, name: r.name || "Без названия", parent: idOf(r.productFolder?.meta?.href) || null, path: r.pathName || "", archived: !!r.archived }) },
   product: { path: "/entity/product", map: mapProduct },
   variant: { path: "/entity/variant", map: mapVariant },
   counterparty: { path: "/entity/counterparty", map: mapParty },

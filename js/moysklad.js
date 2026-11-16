@@ -85,14 +85,13 @@ ACT.msRun=async(_,btn)=>{
       const folders=await all("folder","Группы");
       const catKey=(name,parent)=>(parent||"")+"|"+name.toLowerCase();
       const cats=SESS.cats=SESS.cats||new Map(S.categories.map(c=>[catKey(c.name,c.parentId),c.id]));
-      const byPath=new Map();   // «Телефоны/Apple» → id категории
-      const ensure=async full=>{if(!full)return null;if(byPath.has(full))return byPath.get(full);
-        const parts=full.split("/"),name=parts.pop(),parent=parts.length?await ensure(parts.join("/")):null,k=catKey(name,parent);
-        if(!cats.has(k)){const c=await App.api.insert("categories",{name,parent_id:parent});cats.set(k,c.id);R.cat++}
-        byPath.set(full,cats.get(k));return cats.get(k)};
-      const catOf={};
-      for(const f of folders.sort((a,b)=>a.path.split("/").length-b.path.split("/").length)){if(opt.arch&&f.archived)continue;
-        catOf[f.id]=opt.goods?await ensure((f.path?f.path+"/":"")+f.name):null}
+      // вложенность — по ссылке на родительскую группу (в названиях бывает «/», например «iPhone б/у»)
+      const fById=Object.fromEntries(folders.map(f=>[f.id,f])),catOf={};
+      const ensure=async f=>{if(!f)return null;if(f.id in catOf)return catOf[f.id];
+        const parent=f.parent?await ensure(fById[f.parent]):null,k=catKey(f.name,parent);
+        if(!cats.has(k)){const c=await App.api.insert("categories",{name:f.name,parent_id:parent});cats.set(k,c.id);R.cat++}
+        return catOf[f.id]=cats.get(k)};
+      for(const f of folders){if(opt.arch&&f.archived)continue;if(opt.goods)await ensure(f)}
       if(R.cat)log("Создано категорий: "+R.cat);
 
       /* 3. товары и модификации */

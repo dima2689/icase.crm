@@ -38,3 +38,6 @@ ok(idOf(B + "/entity/product/abc?expand=1") === "abc", "id из ссылки");
 try { await page(fake as any, "tok", "../../security"); ok(false, "чужой путь"); } catch { ok(true, "читать можно только разрешённые разделы"); }
 try { await page(fake as any, "tok", "constructor"); ok(false, "constructor"); } catch { ok(true, "служебные имена не проходят"); }
 ok(seen.every((u) => u.startsWith(B + "/")), "запросы только в api.moysklad.ru");
+import { KINDS } from "../moysklad/ms.ts";
+const fo = KINDS.folder.map({ id: "F2", name: "iPhone б/у", pathName: "Apple", productFolder: { meta: { href: B + "/entity/productfolder/F1" } } });
+ok(fo.parent === "F1" && fo.name === "iPhone б/у", "группа: родитель по ссылке, «/» в названии не режется");
