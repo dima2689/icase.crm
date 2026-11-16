@@ -1,0 +1,45 @@
+# Копия исходного кода бота Telegram (/opt/icase-bot) для доработки — только чтение на сервере.
+# Код шифруется открытым ключом из поля pubkey (расшифровать может только владелец закрытого ключа)
+# и кладётся в ветку bot-source-enc. Настройки (.env*), базы данных, таблицы и бэкапы не копируются.
+name: Bot source
+on:
+  workflow_dispatch:
+    inputs:
+      pubkey:
+        description: "Открытый ключ RSA (PEM в base64)"
+        required: true
+permissions:
+  contents: write
+concurrency: { group: server, cancel-in-progress: false }
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      H: ${{ secrets.DEPLOY_HOST }}
+    steps:
+      - name: SSH
+        env: { K: "${{ secrets.DEPLOY_SSH_KEY }}" }
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$K" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e '/^$/d' > ~/.ssh/id_deploy; chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -T 20 -t ed25519 "$H" 2>/dev/null > ~/.ssh/known_hosts
+      - name: Код бота (без настроек и данных)
+        run: |
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes root@"$H" \
+            "tar czf - -C /opt/icase-bot --exclude='.env*' --exclude='*.db' --exclude='*.db-*' --exclude='*.sqlite*' --exclude='*.csv' --exclude='*.xlsx' --exclude='*.xls' \
+               --exclude='*.log' --exclude='backups' --exclude='backup*' --exclude='data' --exclude='venv' --exclude='.venv' --exclude='__pycache__' --exclude='.git' --exclude='node_modules' --exclude='*.pem' --exclude='*.key' --exclude='credentials*' --exclude='service_account*' ." > /tmp/bot.tgz
+          echo "размер: $(du -h /tmp/bot.tgz | cut -f1)"
+          tar tzf /tmp/bot.tgz | wc -l | sed 's/^/файлов: /'
+      - name: Шифрование и ветка bot-source-enc
+        env: { PUB: "${{ inputs.pubkey }}" }
+        run: |
+          printf '%s' "$PUB" | base64 -d > /tmp/k.pub
+          openssl rand -hex 32 > /tmp/pass
+          openssl enc -aes-256-cbc -pbkdf2 -salt -in /tmp/bot.tgz -out /tmp/bot.tgz.enc -pass file:/tmp/pass
+          openssl pkeyutl -encrypt -pubin -inkey /tmp/k.pub -pkeyopt rsa_padding_mode:oaep -in /tmp/pass -out /tmp/pass.enc
+          rm -f /tmp/pass /tmp/bot.tgz
+          mkdir /tmp/out && cd /tmp/out && git init -q -b bot-source-enc
+          cp /tmp/bot.tgz.enc /tmp/pass.enc .
+          git -c user.name=icase -c user.email=icase@localhost commit -qm "encrypted bot source" -a 2>/dev/null || { git add -A; git -c user.name=icase -c user.email=icase@localhost commit -qm "encrypted bot source"; }
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" bot-source-enc
