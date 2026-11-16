@@ -3,13 +3,15 @@
 #   stage=apply — поставить обновление бота из ветки bot-update-enc (зашифровано ключом сервера), создать ключ бота в CRM,
 #                 записать CRM_API_URL и CRM_BOT_KEY в /opt/icase-bot/.env и перезапустить бота.
 #                 Перед заменой проверяется, что файлы бота на сервере не менялись (иначе — стоп); при сбое всё возвращается.
+#   stage=crm-on / crm-off — включить или выключить режим CRM в боте (CRM_MODE в .env): склад, продажи, клиенты,
+#                 правка карточек и переоценка берутся из CRM вместо МоегоСклада. При сбое настройки возвращаются.
 # Секреты не покидают сервер: ключ бота создаётся и записывается прямо там.
 name: Bot connect
 on:
   workflow_dispatch:
     inputs:
       stage:
-        description: "key или apply"
+        description: "key, apply, crm-on или crm-off"
         required: true
         default: key
 permissions:
@@ -26,7 +28,7 @@ jobs:
       - name: SSH
         env: { K: "${{ secrets.DEPLOY_SSH_KEY }}" }
         run: |
-          case "$STAGE" in key|apply) ;; *) echo "stage: key или apply"; exit 1;; esac
+          case "$STAGE" in key|apply|crm-on|crm-off) ;; *) echo "stage: key, apply, crm-on или crm-off"; exit 1;; esac
           install -m 700 -d ~/.ssh
           printf '%s\n' "$K" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e '/^$/d' > ~/.ssh/id_deploy; chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -T 20 -t ed25519 "$H" 2>/dev/null > ~/.ssh/known_hosts
@@ -63,7 +65,7 @@ jobs:
           BK="/var/backups/icase-bot/$(date +%Y%m%d-%H%M%S)"; mkdir -p "$BK"; chmod 700 /var/backups/icase-bot
           (cd "$B" && cp -a --parents $(cd "$T/files" && find . -type f) .env "$BK"/ 2>/dev/null || true)
           cp -a "$B/.env" "$BK/.env"; ls "$BK" | sed 's/^/  /'
-          rollback() { echo "!! откат"; (cd "$BK" && find . -type f -name '*.py' -exec cp -a {} "$B/{}" \;); cp -a "$BK/.env" "$B/.env"; [ -f "$T/files/app/crm_api.py" ] && [ ! -f "$BK/app/crm_api.py" ] && rm -f "$B/app/crm_api.py"; systemctl restart icase-bot; exit 1; }
+          rollback() { echo "!! откат"; (cd "$BK" && find . -type f -name '*.py' -exec cp -a {} "$B/{}" \;); cp -a "$BK/.env" "$B/.env"; (cd "$T/files" && find . -type f) | while read -r f; do [ -f "$BK/$f" ] || rm -f "$B/$f"; done; systemctl restart icase-bot; exit 1; }
           echo "== новые файлы"; (cd "$T/files" && find . -type f | sed 's/^/  /'; cp -a . "$B"/)
           chown -R --reference="$B" "$B/app" 2>/dev/null || true
           PY=$(systemctl show -p ExecStart --value icase-bot | sed -E 's/.*path=([^ ;]+).*/\1/')
@@ -80,4 +82,27 @@ jobs:
           echo "  ошибок в журнале после запуска: $(journalctl -u icase-bot --since "$since" --no-pager -o cat | grep -c ' ERROR ' || true)"
           journalctl -u icase-bot --since "$since" --no-pager -o cat | grep -q 'связь с CRM включена' || { echo "бот не включил связь с CRM"; rollback; }
           echo "Готово: бот работает и связан с CRM. Копия прежних файлов: $BK"
+          SH
+      - name: Режим CRM в боте
+        if: inputs.stage == 'crm-on' || inputs.stage == 'crm-off'
+        run: |
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes root@"$H" "STAGE=$STAGE bash -s" <<'SH'
+          set -euo pipefail
+          B=/opt/icase-bot
+          [ -f "$B/app/crm_mode.py" ] || { echo "в боте нет режима CRM — сначала stage=apply"; exit 1; }
+          grep -q '^CRM_BOT_KEY=.' "$B/.env" || { echo "бот не связан с CRM — сначала stage=apply"; exit 1; }
+          BK="/var/backups/icase-bot/$(date +%Y%m%d-%H%M%S)-env"; mkdir -p "$BK"; cp -a "$B/.env" "$BK/.env"
+          sed -i -E '/^CRM_MODE=/d' "$B/.env"
+          [ "$STAGE" = crm-on ] && echo 'CRM_MODE=on' >> "$B/.env"
+          since=$(date '+%Y-%m-%d %H:%M:%S'); systemctl restart icase-bot; sleep 20
+          if ! systemctl is-active --quiet icase-bot; then cp -a "$BK/.env" "$B/.env"; systemctl restart icase-bot; echo "бот не запустился — настройки возвращены"; exit 1; fi
+          echo "  ошибок в журнале после запуска: $(journalctl -u icase-bot --since "$since" --no-pager -o cat | grep -c ' ERROR ' || true)"
+          if [ "$STAGE" = crm-on ]; then
+            DB=$(cd "$B" && grep -E '^DB_PATH=' .env | cut -d= -f2-); DB=${DB:-data/icase.db}
+            src=$(cd "$B" && python3 -c "import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); r=c.execute(\"select value from kv where key='catalog_source'\").fetchone(); print(r[0] if r else '')" "$DB" 2>/dev/null || true)
+            n=$(cd "$B" && python3 -c "import sqlite3,sys,json; c=sqlite3.connect(sys.argv[1]); print(sum(1 for (d,) in c.execute('select data from ms_items where active=1') if json.loads(d).get('source')=='crm'))" "$DB" 2>/dev/null || echo '?')
+            echo "  источник каталога: ${src:-нет данных}; товаров из CRM: $n"
+            [ "$src" = crm ] || { cp -a "$BK/.env" "$B/.env"; systemctl restart icase-bot; echo "каталог из CRM не загрузился — режим выключен обратно"; exit 1; }
+          fi
+          echo "Готово: режим CRM в боте — $STAGE. Прежние настройки: $BK/.env"
           SH
