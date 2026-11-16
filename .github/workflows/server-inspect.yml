@@ -1,0 +1,38 @@
+name: Server inspect
+# Только чтение: что запущено на сервере и кто занимает 80/443 (для диагностики). Секретов не выводит.
+on: { workflow_dispatch: {} }
+permissions: { contents: read }
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 10
+    env: { H: "${{ secrets.DEPLOY_HOST }}" }
+    steps:
+      - name: SSH
+        env: { K: "${{ secrets.DEPLOY_SSH_KEY }}" }
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$K" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e '/^$/d' > ~/.ssh/id_deploy; chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -T 20 -t ed25519 "$H" 2>/dev/null > ~/.ssh/known_hosts
+      - name: Что на сервере
+        run: |
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes root@"$H" 'bash -s' <<'SH'
+          echo "== слушают 80/443"; ss -Hltnp '( sport = :80 or sport = :443 )' | sed -E 's/.*:([0-9]+) .*users:\(\("([^"]+)",pid=([0-9]+).*/  порт \1 — \2 (pid \3)/' | sort -u
+          echo "== контейнеры icase-review"
+          for c in $(docker ps -a --format '{{.Names}}' | grep -v -E '^(supabase-|realtime-dev|icase-caddy$)'); do
+            docker inspect --format '  {{.Name}} · сеть {{.HostConfig.NetworkMode}} · порты {{range $p,$b := .HostConfig.PortBindings}}{{$p}}→{{range $b}}{{.HostPort}}{{end}} {{end}}· образ {{.Config.Image}} · {{.State.Status}} · рабочая папка {{index .Config.Labels "com.docker.compose.project.working_dir"}}' "$c"
+            docker inspect --format '{{range .Config.ExposedPorts}}{{end}}{{range $p, $_ := .Config.ExposedPorts}}    открыт внутри: {{$p}}{{"\n"}}{{end}}' "$c"
+          done
+          echo "== сети"; docker network ls --format '  {{.Name}}' | grep -v -E '^  (bridge|host|none)$'
+          cad=$(docker ps -a --format '{{.Names}}' | grep -E 'review.*caddy' | head -1)
+          if [ -n "$cad" ]; then
+            echo "== сайты в Caddy $cad (адреса и куда проксируют)"
+            cf=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/etc/caddy/Caddyfile"}}{{.Source}}{{end}}{{end}}' "$cad")
+            echo "  файл: ${cf:-внутри контейнера}"
+            { [ -n "$cf" ] && cat "$cf" || docker exec "$cad" cat /etc/caddy/Caddyfile; } 2>/dev/null \
+              | grep -E '^[^#[:space:]].*\{|reverse_proxy|root |file_server|handle|redir' | sed -E 's/(basicauth|basic_auth).*/\1 …/' | sed 's/^/  /'
+            echo "== монтирования $cad"; docker inspect --format '{{range .Mounts}}  {{.Source}} → {{.Destination}}{{"\n"}}{{end}}' "$cad"
+          fi
+          echo "== DNS сайтов (A-записи на этот сервер)"; for d in icase-dzr.ru crm.icase-dzr.ru api.icase-dzr.ru; do echo "  $d → $(getent hosts $d | awk '{print $1}' | head -1)"; done
+          SH
