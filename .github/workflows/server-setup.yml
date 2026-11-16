@@ -105,6 +105,11 @@ jobs:
           S="ssh -i $HOME/.ssh/id_deploy -o BatchMode=yes root@$H"
           if $S 'test -s /etc/icase/icase.env' && [ "$REWRITE" != "true" ]; then echo "/etc/icase/icase.env уже есть — оставляю как есть"; exit 0; fi
           umask 077
+          # при перезаписи пароль бэкапов не меняем (иначе прежние копии не открыть): берём его из текущего файла
+          if [ -z "$BACKUP_PASSPHRASE" ]; then
+            old=$($S 'set -a; . /etc/icase/icase.env 2>/dev/null; printf %s "${BACKUP_PASSPHRASE:-}"' || true)
+            if [ -n "$old" ]; then echo "::add-mask::$old"; BACKUP_PASSPHRASE="$old"; GEN_BP=""; echo "пароль бэкапов — прежний"; fi
+          fi
           export BACKUP_PASSPHRASE="${BACKUP_PASSPHRASE:-${GEN_BP:-}}"
           python3 - > /tmp/icase.env <<'PY'
           import os, re, shlex
