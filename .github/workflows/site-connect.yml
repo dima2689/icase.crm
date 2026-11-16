@@ -6,13 +6,14 @@
 #                 Сначала проверяется, что на сервере стоит ожидаемая версия; делается копия настроек и базы сайта.
 #                 Ключ сайта создаётся в CRM (если его нет) и записывается в api.env и scheduler.env прямо на сервере.
 #                 Затем перезапуск api и scheduler, переключение webapp и привязка товаров (crm:map). При сбое всё возвращается.
+#   stage=status — только чтение: состояние сайта и последние синхронизации цен и остатков с CRM.
 # Секреты и персональные данные в журнал не выводятся.
 name: Site connect
 on:
   workflow_dispatch:
     inputs:
       stage:
-        description: "inspect, inspect2 или apply"
+        description: "inspect, inspect2, apply или status"
         required: true
         default: inspect
 permissions:
@@ -29,7 +30,7 @@ jobs:
       - name: SSH
         env: { K: "${{ secrets.DEPLOY_SSH_KEY }}" }
         run: |
-          case "$STAGE" in inspect|inspect2|apply) ;; *) echo "stage: inspect, inspect2 или apply"; exit 1;; esac
+          case "$STAGE" in inspect|inspect2|apply|status) ;; *) echo "stage: inspect, inspect2, apply или status"; exit 1;; esac
           install -m 700 -d ~/.ssh
           printf '%s\n' "$K" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e '/^$/d' > ~/.ssh/id_deploy; chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -T 20 -t ed25519 "$H" 2>/dev/null > ~/.ssh/known_hosts
@@ -142,4 +143,17 @@ jobs:
           docker exec icase-review-api-1 bun run --silent crm:map </dev/null 2>&1 | tail -3 | sed -E 's/[A-Za-z0-9]{32,}/<…>/g'
           printf '{"releaseId":"%s","sourceRevision":"%s","backendImage":"%s","basedOn":"%s","composeEnv":"%s","backup":"%s","appliedAt":"%s","note":"Overlay hotfix: CRM provider (ADR 0014). See docs/DEPLOYMENT.md."}\n' "$NEW_ID" "$(cat "$K/REVISION")" "$NEW_IMG" "$OLD_ID" "$NE" "$BK" "$(date -u +%FT%TZ)" > $S/hotfix-$NEW_ID.json; chmod 600 $S/hotfix-$NEW_ID.json
           echo "готово"
+          SH
+      - name: Состояние сайта и синхронизации
+        if: inputs.stage == 'status'
+        run: |
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes root@"$H" 'bash -s' <<'SH'
+          set -u
+          echo "== версия"; readlink /srv/icase-review/public-releases/current
+          docker ps --filter name=icase-review --format '{{.Names}} {{.Image}} {{.Status}}'
+          q() { docker exec icase-review-postgres-1 psql -U postgres -d icase -qAt -F ' | ' -c "$1" </dev/null; }
+          echo "== синхронизации (последние 6)"
+          q "select to_char(created_at at time zone 'Europe/Moscow','DD.MM HH24:MI'), mode, status, coalesce(jsonb_array_length(snapshot->'changes'),0)||' изм.', coalesce(left(error,80),'') from moysklad_sync_runs order by created_at desc limit 6"
+          echo "== настройка"; q "select revision, jsonb_array_length(config->'mappings')||' привязок', config->'schedule' from moysklad_sync_configs"
+          echo "== ошибки за час"; docker logs --since 1h icase-review-scheduler-1 2>&1 | grep -ciE 'error|fail' || true
           SH
