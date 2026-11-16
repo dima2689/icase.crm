@@ -473,6 +473,7 @@ ACT.saleReceipt=id=>{const s=App.byId("sales",id);App.textModal("Чек "+s.num,
 ACT.returnDlg=id=>{
   const s=App.byId("sales",id);if(!s)return;
   const lines=(s.items||[]).map(i=>Object.assign({},i,{left:num(i.qty)-App.returnedQty(id,i.productId,i.line)})).filter(i=>i.left>0);
+  if(!lines.length)return App.toast("По продаже "+s.num+" всё уже возвращено");
   const sub=num(s.subtotal)||(s.items||[]).reduce((a,i)=>a+i.qty*i.price-num(i.disc),0);
   const k=sub?(num(s.total)+num(s.tradeIn&&s.tradeIn.amount))/sub:1; // доля чековой скидки
   const unit=i=>(num(i.price)-num(i.disc)/Math.max(1,num(i.qty)))*k;
