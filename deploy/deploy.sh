@@ -48,6 +48,8 @@ window.ICASE_CONFIG = {
   version: "$VER"
 };
 CFG
+# у js/css кэш браузера на час: метка версии в ссылках, чтобы после выкладки сразу грузился новый код
+sed -i -E "s#(src|href)=\"(js/[^\"?]+\.js|styles\.css)\"#\1=\"\2?v=$VER\"#g" "$STAGE/index.html"
 # новая версия service worker → телефоны и кассы подхватят обновление сами
 sed -i -E "s/const VER=\"([^\"]+)\"/const VER=\"\1-$VER\"/" "$STAGE/sw.js"
 if [ -d "$OUT" ]; then rm -rf "$OUT.old"; mv "$OUT" "$OUT.old"; fi
