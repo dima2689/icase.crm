@@ -47,8 +47,16 @@ jobs:
         env: { K: "${{ secrets.DEPLOY_SSH_KEY }}" }
         run: |
           install -m 700 -d ~/.ssh
-          printf '%s\n' "$K" > ~/.ssh/id_deploy; chmod 600 ~/.ssh/id_deploy
-          ssh-keygen -y -f ~/.ssh/id_deploy > ~/.ssh/id_deploy.pub || { echo "::error::DEPLOY_SSH_KEY — не закрытый ключ OpenSSH"; exit 1; }
+          # вставка из буфера может принести \r и пробелы в начале строк — убираем
+          printf '%s\n' "$K" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e '/^$/d' > ~/.ssh/id_deploy; chmod 600 ~/.ssh/id_deploy
+          head -1 ~/.ssh/id_deploy | grep -q '^-----BEGIN .*PRIVATE KEY-----$' || { echo "::error::DEPLOY_SSH_KEY должен начинаться со строки -----BEGIN OPENSSH PRIVATE KEY-----"; exit 1; }
+          tail -1 ~/.ssh/id_deploy | grep -q '^-----END .*PRIVATE KEY-----$' || { echo "::error::DEPLOY_SSH_KEY должен заканчиваться строкой -----END OPENSSH PRIVATE KEY----- (ключ вставлен не целиком?)"; exit 1; }
+          if ! err=$(ssh-keygen -y -P '' -f ~/.ssh/id_deploy 2>&1 > ~/.ssh/id_deploy.pub); then
+            case "$err" in *passphrase*) echo "::error::Ключ защищён паролем — для GitHub нужен ключ без пароля (ssh-keygen ... -N \"\")";;
+              *) echo "::error::DEPLOY_SSH_KEY не читается как закрытый ключ OpenSSH ($(echo "$err" | head -1 | tr -cd '[:alnum:] :._-')); строк в ключе: $(wc -l < ~/.ssh/id_deploy)";; esac
+            exit 1
+          fi
+          echo "ключ: $(ssh-keygen -lf ~/.ssh/id_deploy.pub | awk '{print $2, $NF}')"
           ssh-keyscan -T 20 -t ed25519 "$H" 2>/dev/null > ~/.ssh/known_hosts
           [ -s ~/.ssh/known_hosts ] || { echo "::error::Сервер не отвечает по SSH (порт 22)"; exit 1; }
           echo "Отпечаток ключа сервера (сверьте с панелью провайдера):"; ssh-keygen -lf ~/.ssh/known_hosts
