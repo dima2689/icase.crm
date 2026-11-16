@@ -39,6 +39,9 @@ jobs:
           ls -la /etc/caddy 2>/dev/null | sed 's/^/  /'
           [ -f /etc/caddy/Caddyfile ] && grep -nE '^[^#[:space:]].*\{|^\s*import|reverse_proxy|^\{|email' /etc/caddy/Caddyfile | sed -E 's/(basicauth|basic_auth).*/\1 …/' | sed 's/^/  /'
           echo "== DNS сайтов (A-записи на этот сервер)"; for d in icase-dzr.ru crm.icase-dzr.ru api.icase-dzr.ru; do echo "  $d → $(getent hosts $d | awk '{print $1}' | head -1)"; done
+          echo "== сайт icase-review: настройки (только имена; МойСклад — пусто или задано)"
+          for f in /etc/icase-review/*.env /opt/icase-review/operator/deploy/.env; do [ -f "$f" ] || continue; echo "  $f: $(grep -oE '^[A-Z0-9_]+=' "$f" | tr '\n' ' ')"; v=$(grep -E '^MOYSKLAD_TOKEN=' "$f" | cut -d= -f2- || true); [ -n "$v" ] && echo "    MOYSKLAD_TOKEN: задано" || true; done
+          docker inspect icase-review-api-1 --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null | grep -oE '^MOYSKLAD[A-Z_]*=.?' | sed -E 's/=.$/= задано/; s/=$/= пусто/; s/^/  контейнер api: /' || true
           # бот Telegram (служба icase-bot): только устройство — без значений настроек и секретов (журнал публичный)
           mask() { sed -E 's/[A-Za-z0-9_+\/=:-]{24,}/***/g; s#(://)[^/@ ]+@#\1***@#g'; }
           echo "== службы с bot в имени"; systemctl list-units --type=service --all --no-legend 2>/dev/null | grep -i bot | sed 's/^/  /'
