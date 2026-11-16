@@ -1,0 +1,47 @@
+# Проверка CRM на сервере, только чтение: справочник IMEI, обученные коды, функции подсказок.
+# Персональные данные и секреты в журнал не выводятся.
+name: CRM check
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: "imei"
+        required: true
+        default: imei
+permissions:
+  contents: read
+concurrency: { group: server, cancel-in-progress: false }
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      H: ${{ secrets.DEPLOY_HOST }}
+      STAGE: ${{ inputs.stage }}
+    steps:
+      - name: SSH
+        env: { K: "${{ secrets.DEPLOY_SSH_KEY }}" }
+        run: |
+          case "$STAGE" in imei) ;; *) echo "stage: imei"; exit 1;; esac
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$K" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e '/^$/d' > ~/.ssh/id_deploy; chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -T 20 -t ed25519 "$H" 2>/dev/null > ~/.ssh/known_hosts
+      - name: Справочник IMEI
+        if: inputs.stage == 'imei'
+        run: |
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes root@"$H" 'bash -s' <<'SH'
+          set -u
+          q() { docker exec supabase-db psql -U postgres -d postgres -qAt -F ' | ' -c "$1" </dev/null 2>&1; }
+          echo "== таблицы"; q "select 'tac_db', count(*), count(*) filter (where brand='Apple') from tac_db union all select 'device_hints', count(*), count(*) filter (where key like 'part:%') from device_hints union all select 'apple_models', count(*), 0 from apple_models union all select 'units с IMEI', count(*) filter (where imei is not null), count(*) from units"
+          echo "== функции"; q "select p.proname, pg_get_function_identity_arguments(p.oid) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('device_lookup','tac_stats','tac_catalog_model','apple_part_base','imei_luhn_ok','tac_import_start','tac_import_finish','tac_load_csv','is_staff') order by 1"
+          echo "== триггер обучения"; q "select tgname, tgenabled from pg_trigger where tgrelid='public.units'::regclass and not tgisinternal"
+          echo "== права"; q "select has_function_privilege('authenticated','public.device_lookup(text)','execute'), has_function_privilege('authenticated','public.tac_stats()','execute')"
+          echo "== пробный поиск (роль владельца)"
+          OWN=$(q "select id from staff where role='owner' and is_active limit 1" | head -1)
+          for code in "$(q "select tac||'0000000' from tac_db where brand='Apple' and model ilike 'iPhone 16 Pro%' limit 1" | head -1)" MTUV3ZD/A; do
+            echo "-- код вида ${code:0:8}…"
+            printf '%s\n' "begin;" "select set_config('request.jwt.claims','{\"sub\":\"$OWN\",\"role\":\"authenticated\"}',true);" "set local role authenticated;" "select left(device_lookup('$code')::text,400);" "rollback;" | docker exec -i supabase-db psql -U postgres -d postgres -qAt 2>&1 | grep -v '^$' | tail -3
+          done
+          echo "== ошибки базы за час"; docker logs --since 1h supabase-db 2>&1 | grep -iE 'ERROR' | sed -E 's/[0-9]{8,}/<…>/g' | cut -c1-200 | sort | uniq -c | sort -rn | head -10
+          echo "== ошибки REST за час"; docker logs --since 1h supabase-rest 2>&1 | grep -iE 'error|4[0-9][0-9] ' | cut -c1-200 | tail -5
+          SH
