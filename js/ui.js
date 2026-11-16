@@ -228,6 +228,7 @@ App.ACT.profile=()=>{
   App.openModal(App.head("Мой профиль",`<span class="pill info">${esc(App.ROLES[App.me.role]||"")}</span>`)+`
     <div class="form">${App.fld("prName","Имя",App.inp("prName",App.me.name))}${App.fld("prPhone","Телефон",App.inp("prPhone",App.me.phone||"","tel","+7"))}</div>
     <div class="acts"><button class="btn pri" data-act="profSave">Сохранить</button></div>
+    ${App.myPayHtml?App.myPayHtml():""}
     <h3 class="sub-h">Пароль</h3>
     <div class="form">${App.fld("prOld","Текущий пароль",App.inp("prOld","","password","",'autocomplete="current-password"'))}${App.fld("prNew","Новый пароль (от 8 символов)",App.inp("prNew","","password","",'autocomplete="new-password"'))}${App.fld("prNew2","Повторите новый",App.inp("prNew2","","password","",'autocomplete="new-password"'))}</div>
     <div class="acts"><button class="btn" data-act="profPass">Сменить пароль</button></div>

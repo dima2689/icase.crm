@@ -8,11 +8,11 @@ const WS={
   pos:{title:"Касса",home:"pos",need:"sale",
     nav:["pos","repairs","preorders","receive","sales","orders","stock","clients","tasks","print"],
     tabs:[["pos","Касса"],["repairs","Ремонт"],["__scan","Скан"],["clients","Клиенты"],["__more","Ещё"]],
-    skip:["sprices","finaccounts","fincats","finops","finplans","debts","porders","payrules","unitcosts","log","staffreq","docs"]},
+    skip:["sprices","finaccounts","fincats","finops","finplans","debts","porders","unitcosts","log","staffreq","docs"]},
   service:{title:"Сервис",home:"repairs",need:"repair",
     nav:["repairs","stock","clients","tasks","print"],
     tabs:[["repairs","Ремонт"],["stock","Запчасти"],["__scan","Скан"],["tasks","Задачи"],["__more","Ещё"]],
-    skip:["sprices","finaccounts","fincats","finops","finplans","debts","porders","payrules","log","staffreq","docs","evotor","deals","siteorders","bonusops","lostdemand"]},
+    skip:["sprices","finaccounts","fincats","finops","finplans","debts","porders","log","staffreq","docs","evotor","deals","siteorders","bonusops","lostdemand"]},
   crm:{title:"CRM",home:"dashboard",need:null,nav:null,
     tabs:[["pos","Касса"],["repairs","Ремонт"],["__scan","Скан"],["tasks","Задачи"],["__more","Ещё"]],skip:[]}
 };

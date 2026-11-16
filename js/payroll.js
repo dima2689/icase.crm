@@ -31,6 +31,14 @@ App.payCalc=function(st,m){const c=App.payCalcRange(st,range(m));
   c.paid=S.finops.filter(o=>isPay(o)&&o.payee===st.id&&String(o.date).slice(0,7)===m).reduce((a,o)=>a+num(o.amount),0);c.left=c.total-c.paid;return c};
 /* начислено всем за период — для прибыли «по начислению» */
 App.payAccrued=(from,to)=>S.staff.filter(s=>S.payrules.some(r=>r.staffId===s.id)).map(s=>({staff:s,pointId:s.pointId||"",total:App.payCalcRange(s,[from,to]).total})).filter(x=>x.total);
+/* «Моя зарплата» для сотрудника: начисление за текущий месяц по его правилам (выплаты видит управляющий) */
+App.myPayHtml=function(){const me=S.staff.find(s=>s.id===App.me.id);if(!me||App.me.role==="owner")return "";
+  const c=App.payCalc?App.payCalcRange(me,range(curM())):null;if(!c)return "";
+  if(c.r.none)return `<h3 class="sub-h">Моя зарплата</h3><p class="muted">Правила начисления ещё не заданы — их задаёт владелец в «Финансы → Зарплата».</p>`;
+  const L=[["Оклад",c.parts.base],["За смены ("+c.shifts+")",c.parts.shifts],["% с продаж ("+c.nSales+" на "+money(c.rev)+")",c.parts.sales],["% с прибыли",c.parts.profit],["% с работ ("+c.nRep+" ремонтов, "+money(c.works)+")",c.parts.works]].filter(([,v])=>v);
+  return `<h3 class="sub-h">Моя зарплата · ${mName(curM())}</h3><p class="muted">${esc(ruleText(c.r))}</p>
+    <div class="sumlines">${L.map(([k,v])=>`<span>${esc(k)}</span><span>${money(v)}</span>`).join("")}<span><b>Начислено</b></span><span><b>${money(c.total)}</b></span></div>
+    <p class="muted small">Расчёт предварительный: выплаты и удержания видит управляющий.</p>`};
 const MONTHS=["январь","февраль","март","апрель","май","июнь","июль","август","сентябрь","октябрь","ноябрь","декабрь"];
 const mName=m=>{const [y,mo]=m.split("-");return MONTHS[+mo-1]+" "+y};
 const mOpts=()=>{const out=[],d=new Date();for(let i=0;i<12;i++){const x=new Date(d.getFullYear(),d.getMonth()-i,1);const k=x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0");out.push([k,mName(k)])}return out};
