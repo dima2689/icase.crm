@@ -210,7 +210,8 @@ jobs:
           B=/opt/icase-bot; T=/root/.ms_token.new; trap 'rm -f "$T"' EXIT
           TOK=$(tr -d '\r\n ' < "$T")
           echo "== проверка ключа в МоёмСкладе"
-          code=$(curl -s -o /dev/null -w '%{http_code}' --compressed -H "Authorization: Bearer $TOK" -H 'Accept-Encoding: gzip' https://api.moysklad.ru/api/remap/1.2/context/employee)
+          HF=$(mktemp); trap 'rm -f "$T" "$HF"' EXIT; printf 'Authorization: Bearer %s\n' "$TOK" > "$HF"
+          code=$(curl -s -o /dev/null -w '%{http_code}' --compressed -H @"$HF" -H 'Accept-Encoding: gzip' https://api.moysklad.ru/api/remap/1.2/context/employee)
           echo "  ответ МоегоСклада: $code"
           [ "$code" = 200 ] || { echo "Ключ не подходит (нужен 200). Настройки бота не менялись"; exit 1; }
           BK="/var/backups/icase-bot/$(date +%Y%m%d-%H%M%S)-env"; mkdir -p "$BK"; cp -a "$B/.env" "$BK/.env"
