@@ -4,6 +4,9 @@
 #                 записать CRM_API_URL и CRM_BOT_KEY в /opt/icase-bot/.env и перезапустить бота.
 #                 Перед заменой проверяется, что файлы бота на сервере не менялись (иначе — стоп); при сбое всё возвращается.
 #   stage=compare — только чтение: сравнить остатки МоегоСклада (кэш бота) с остатками CRM по артикулу и штрихкоду.
+#   stage=ms-on — вернуть боту прямую связь с МоимСкладом: ключ берётся из секрета MOYSKLAD_TOKEN (владелец вводит его в GitHub сам),
+#                 проверяется в МоёмСкладе, записывается в /opt/icase-bot/.env (MOYSKLAD_TOKEN, MOYSKLAD_ENABLED=true), бот перезапускается.
+#                 Если ключ не подходит или бот не тянет каталог — настройки возвращаются. Ключ в журнал не выводится.
 #   stage=inspect — только чтение: режим бота, имена настроек, адреса сайтов в настройках и коде, ошибки в журнале (без значений ключей).
 #   stage=crm-on / crm-off — включить или выключить режим CRM в боте (CRM_MODE в .env): склад, продажи, клиенты,
 #                 правка карточек и переоценка берутся из CRM вместо МоегоСклада. При сбое настройки возвращаются.
@@ -13,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       stage:
-        description: "key, apply, compare, crm-on, crm-off или inspect"
+        description: "key, apply, compare, crm-on, crm-off, inspect или ms-on"
         required: true
         default: key
 permissions:
@@ -30,7 +33,7 @@ jobs:
       - name: SSH
         env: { K: "${{ secrets.DEPLOY_SSH_KEY }}" }
         run: |
-          case "$STAGE" in key|apply|compare|crm-on|crm-off|inspect) ;; *) echo "stage: key, apply, compare, crm-on, crm-off или inspect"; exit 1;; esac
+          case "$STAGE" in key|apply|compare|crm-on|crm-off|inspect|ms-on) ;; *) echo "stage: key, apply, compare, crm-on, crm-off, inspect или ms-on"; exit 1;; esac
           install -m 700 -d ~/.ssh
           printf '%s\n' "$K" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e '/^$/d' > ~/.ssh/id_deploy; chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -T 20 -t ed25519 "$H" 2>/dev/null > ~/.ssh/known_hosts
@@ -195,4 +198,36 @@ jobs:
           echo "== последняя удачная выгрузка МоегоСклада"; journalctl -u icase-bot --no-pager -o short-iso 2>/dev/null | grep -iE "МойСклад|moysklad" | grep -viE "401|error|traceback|File " | tail -3 | sed -E 's/[0-9]{6,}/<…>/g' | cut -c1-170
           echo "== копии (откаты)"; ls -1 /var/backups/icase-bot 2>/dev/null | tail -10
           echo "== ошибки в журнале за 6 часов"; journalctl -u icase-bot --since -6h --no-pager 2>/dev/null | grep -iE 'error|traceback|exception' | sed -E 's/[0-9]{6,}/<…>/g' | cut -c1-200 | sort | uniq -c | sort -rn | head -15
+          SH
+      - name: Прямая связь бота с МоимСкладом
+        if: inputs.stage == 'ms-on'
+        env: { MST: "${{ secrets.MOYSKLAD_TOKEN }}" }
+        run: |
+          [ -n "$MST" ] || { echo "Секрет MOYSKLAD_TOKEN не задан в GitHub"; exit 1; }
+          printf '%s' "$MST" | ssh -i ~/.ssh/id_deploy -o BatchMode=yes root@"$H" 'umask 077; cat > /root/.ms_token.new'
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes root@"$H" 'bash -s' <<'SH'
+          set -euo pipefail
+          B=/opt/icase-bot; T=/root/.ms_token.new; trap 'rm -f "$T"' EXIT
+          TOK=$(tr -d '\r\n ' < "$T")
+          echo "== проверка ключа в МоёмСкладе"
+          code=$(curl -s -o /dev/null -w '%{http_code}' --compressed -H "Authorization: Bearer $TOK" -H 'Accept-Encoding: gzip' https://api.moysklad.ru/api/remap/1.2/context/employee)
+          echo "  ответ МоегоСклада: $code"
+          [ "$code" = 200 ] || { echo "Ключ не подходит (нужен 200). Настройки бота не менялись"; exit 1; }
+          BK="/var/backups/icase-bot/$(date +%Y%m%d-%H%M%S)-env"; mkdir -p "$BK"; cp -a "$B/.env" "$BK/.env"
+          sed -i -E '/^(MOYSKLAD_TOKEN|MOYSKLAD_ENABLED|CRM_MODE)=/d' "$B/.env"
+          printf 'MOYSKLAD_ENABLED=true\nMOYSKLAD_TOKEN=%s\n' "$TOK" >> "$B/.env"
+          since=$(date '+%Y-%m-%d %H:%M:%S'); systemctl restart icase-bot; sleep 150
+          bad() { cp -a "$BK/.env" "$B/.env"; systemctl restart icase-bot; echo "!! $1 — настройки возвращены"; exit 1; }
+          systemctl is-active --quiet icase-bot || bad "бот не запустился"
+          n401=$(journalctl -u icase-bot --since "$since" --no-pager -o cat | grep -c 'HTTP 401' || true)
+          echo "  ошибок 401 после запуска: $n401"
+          [ "$n401" = 0 ] || bad "МойСклад отвечает 401"
+          DB=$(cd "$B" && grep -E '^DB_PATH=' .env | cut -d= -f2- || true); DB=${DB:-data/icase.db}
+          (cd "$B" && python3 -c "
+          import sqlite3,sys,json,collections,time
+          c=sqlite3.connect(sys.argv[1]); n=collections.Counter(json.loads(d).get('source') or 'moysklad' for (d,) in c.execute('select data from ms_items where active=1'))
+          r=c.execute(\"select value from kv where key='ms_stock_at'\").fetchone(); e=c.execute(\"select value from kv where key='ms_stock_error'\").fetchone()
+          print('  товаров по источникам:', dict(n)); print('  последняя выгрузка остатков:', time.strftime('%H:%M:%S', time.gmtime(float(r[0]))) + ' UTC' if r and r[0] else 'нет'); print('  ошибка выгрузки:', (e[0] if e and e[0] else 'нет')[:160])
+          " "$DB" 2>&1 | sed 's/^ *//')
+          echo "Готово: бот связан с МоимСкладом напрямую. Прежние настройки: $BK/.env"
           SH
