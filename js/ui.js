@@ -322,3 +322,28 @@ App.tidyActs=box=>{if(!box)return;const all=[...box.children].filter(e=>e.matche
   hid.forEach(b=>{b.classList.remove("pri","sm");d.querySelector(".ma-pop").appendChild(b)});
   box.insertBefore(d,pri[0]||null)};
 document.addEventListener("click",e=>{document.querySelectorAll("details.moreacts[open]").forEach(d=>{if(!d.contains(e.target)||e.target.closest(".ma-pop .btn"))d.open=false})});
+
+/* ---------- выбор категории с поиском: над списком категорий — поле «Найти категорию» с подсказками полного пути ---------- */
+(function(){
+  const IDS=["pCat","niCat","cmTo","cmgTo","kParent","dCat","impCat"];
+  const esc=App.esc;
+  function decorate(sel){
+    if(sel.dataset.cpick||sel.disabled)return;sel.dataset.cpick="1";
+    const box=document.createElement("div");box.className="cpick";
+    box.innerHTML='<input type="search" class="cpick-q" placeholder="Найти категорию — начните вводить" autocomplete="off" aria-label="Найти категорию"><div class="cpick-list" role="listbox" hidden></div>';
+    sel.parentNode.insertBefore(box,sel);
+    const q=box.querySelector(".cpick-q"),list=box.querySelector(".cpick-list");
+    const opts=()=>[...sel.options].filter(o=>o.value&&o.value.length>8&&App.cat(o.value));
+    const draw=()=>{const v=q.value.trim().toLowerCase();if(!v){list.hidden=true;return}
+      const words=v.split(/\s+/),hit=opts().filter(o=>{const p=App.catPath(o.value).toLowerCase();return words.every(w=>p.includes(w))}).slice(0,12);
+      list.innerHTML=hit.map(o=>{const a=App.catAnc(o.value);return `<button type="button" role="option" data-v="${esc(o.value)}"><b>${esc(a[a.length-1].name)}</b><small>${esc(a.slice(0,-1).map(x=>x.name).join(" / "))}</small></button>`}).join("")||'<div class="muted">Не найдено</div>';
+      list.hidden=false};
+    const pick=v=>{sel.value=v;sel.dispatchEvent(new Event("change",{bubbles:true}));sel.dispatchEvent(new Event("input",{bubbles:true}));q.value="";list.hidden=true;q.placeholder="Выбрано: "+App.catPath(v)};
+    q.addEventListener("input",draw);
+    q.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();const b=list.querySelector("button");if(b)pick(b.dataset.v)}else if(e.key==="Escape"){q.value="";list.hidden=true}});
+    list.addEventListener("click",e=>{const b=e.target.closest("button[data-v]");if(b){e.preventDefault();pick(b.dataset.v)}});
+    if(sel.value&&App.cat(sel.value))q.placeholder="Выбрано: "+App.catPath(sel.value)+" — введите, чтобы найти другую";
+    sel.addEventListener("change",()=>{if(sel.value&&App.cat(sel.value))q.placeholder="Выбрано: "+App.catPath(sel.value)})}
+  let pend=0;const scan=()=>{pend=0;IDS.forEach(id=>{const s=document.getElementById(id);if(s&&s.tagName==="SELECT"&&s.options.length>8)decorate(s)})};
+  new MutationObserver(()=>{if(!pend)pend=requestAnimationFrame(scan)}).observe(document.documentElement,{childList:true,subtree:true});
+})();

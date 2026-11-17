@@ -1446,3 +1446,11 @@ td.uattr select{width:auto;max-width:130px;padding:4px 6px;font-size:13px;margin
 .ctree-m-dlg{position:static;max-height:60vh;overflow:auto;box-shadow:none;border:0;padding:0}
 .catbar-top{gap:8px}
 @media (min-width:1100px){.sgrid:has(.ctree.editing){grid-template-columns:330px minmax(0,1fr)}}
+/* выбор категории с поиском */
+.cpick{position:relative;margin-bottom:6px}
+.cpick-q{width:100%}
+.cpick-list{position:absolute;left:0;right:0;top:100%;z-index:70;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(15,23,42,.12);max-height:280px;overflow:auto;padding:4px}
+.cpick-list button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;border:0;background:none;text-align:left;padding:7px 10px;border-radius:8px;cursor:pointer;font:inherit}
+.cpick-list button:hover,.cpick-list button:focus{background:var(--sage-soft)}
+.cpick-list small{color:var(--muted);font-size:12px}
+.cpick-list .muted{padding:8px 10px}
