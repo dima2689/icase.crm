@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       stage:
-        description: "imei, counts или live"
+        description: "imei, counts, live или cats"
         required: true
         default: imei
 permissions:
@@ -22,7 +22,7 @@ jobs:
       - name: SSH
         env: { K: "${{ secrets.DEPLOY_SSH_KEY }}" }
         run: |
-          case "$STAGE" in imei|counts|live) ;; *) echo "stage: imei, counts или live"; exit 1;; esac
+          case "$STAGE" in imei|counts|live|cats) ;; *) echo "stage: imei, counts, live или cats"; exit 1;; esac
           install -m 700 -d ~/.ssh
           printf '%s\n' "$K" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e '/^$/d' > ~/.ssh/id_deploy; chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -T 20 -t ed25519 "$H" 2>/dev/null > ~/.ssh/known_hosts
@@ -78,4 +78,16 @@ jobs:
           echo "== внутренний 127.0.0.1:18090"; curl -sI -H 'Host: crm.icase-dzr.ru' http://127.0.0.1:18090/ | tr -d '\r' | grep -iE '^(strict|content-sec|x-frame|x-content|referrer|server|HTTP)'
           echo "== Caddyfile в контейнере"; docker exec icase-caddy head -30 /etc/caddy/Caddyfile | grep -nE 'header|Strict|X-Frame|site|://' | head
           echo "== host caddy: блоки с header"; grep -n "header" /etc/caddy/Caddyfile /etc/caddy/icase.caddy 2>/dev/null | head
+          SH
+      - name: Дерево категорий и товары в них (только чтение, без личных данных)
+        if: inputs.stage == 'cats'
+        run: |
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes root@"$H" 'bash -s' <<'SH'
+          q() { docker exec supabase-db psql -U postgres -d postgres -qAt -F ' | ' -c "$1" </dev/null 2>&1; }
+          echo "== категории: уровень | путь | товаров | в наличии шт | устройства | б/у"
+          q "with recursive t as (select id, name::text path, 1 lvl from categories where parent_id is null union all select c.id, t.path||' / '||c.name, t.lvl+1 from categories c join t on c.parent_id=t.id) select t.lvl, t.path, (select count(*) from products p where p.category_id=t.id and not p.is_archived), (select coalesce(sum(s.qty),0) from stock s join products p on p.id=s.product_id where p.category_id=t.id), c.is_device, c.is_used from t join categories c on c.id=t.id order by t.path"
+          echo "== без категории"; q "select count(*), coalesce(sum((select coalesce(sum(qty),0) from stock s where s.product_id=p.id)),0) from products p where category_id is null and not is_archived"
+          echo "== примеры товаров без категории"; q "select name from products where category_id is null and not is_archived order by created_at desc limit 60"
+          echo "== примеры товаров по категориям (до 6 на категорию)"; q "select c.name, string_agg(p.name, ' ; ' order by p.name) from categories c join lateral (select name from products where category_id=c.id and not is_archived order by name limit 6) p on true group by c.name order by 1"
+          echo "== всего товаров"; q "select count(*) filter (where not is_archived), count(*) from products"
           SH
