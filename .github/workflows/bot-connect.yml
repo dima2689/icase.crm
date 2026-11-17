@@ -166,6 +166,19 @@ jobs:
           n=collections.Counter(json.loads(d).get('source') or 'moysklad' for (d,) in c.execute('select data from ms_items where active=1')); print('товаров по источникам:', dict(n))
           " "$DB" 2>&1 | sed 's/^ *//')
           echo "== ссылки на сайт в коде (контекст)"; grep -rn -B2 -A3 "icase52" "$B/app/store.py" "$B/app/integrations.py" | cut -c1-170
+          echo "== где бот берёт доступ к МоемуСкладу (код, без значений)"; grep -rnE "def (_?token|_?auth|_?headers)|Bearer|ms_token|MS_TOKEN|moysklad_token|kv_get\([^)]*(token|login|ms)" "$B/app" --include=*.py | cut -c1-170 | head -15
+          echo "== ключи в kv (только имена)"; (cd "$B" && python3 -c "import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); print(' '.join(k for (k,) in c.execute('select key from kv order by key')))" "$DB" 2>&1 | cut -c1-900)
+          echo "== источники цен (сайты, без ключей)"; (cd "$B" && python3 -c "
+          import sqlite3,sys,json
+          c=sqlite3.connect(sys.argv[1])
+          for k in ('integrations','price_sources','sources'):
+              r=c.execute('select value from kv where key=?',(k,)).fetchone()
+              if r:
+                  try: v=json.loads(r[0])
+                  except Exception: v=r[0]
+                  print(k, json.dumps([{x:i.get(x) for x in ('name','url','type','on')} for i in v] if isinstance(v,list) else '…', ensure_ascii=False)[:1500])
+          " "$DB" 2>&1 | sed 's/^ *//')
+          echo "== журнал: сайт и МойСклад за 24 часа"; journalctl -u icase-bot --since -24h --no-pager -o cat 2>/dev/null | grep -iE 'icase52|наш сайт|woocommerce|МойСклад|moysklad' | sed -E 's/[0-9]{6,}/<…>/g' | cut -c1-200 | sort | uniq -c | sort -rn | head -15
           echo "== копии (откаты)"; ls -1 /var/backups/icase-bot 2>/dev/null | tail -10
           echo "== ошибки в журнале за 6 часов"; journalctl -u icase-bot --since -6h --no-pager 2>/dev/null | grep -iE 'error|traceback|exception' | sed -E 's/[0-9]{6,}/<…>/g' | cut -c1-200 | sort | uniq -c | sort -rn | head -15
           SH
