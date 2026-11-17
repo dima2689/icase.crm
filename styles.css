@@ -1340,3 +1340,10 @@ button .ico{display:inline-block;vertical-align:-3px}
 .reqm{color:var(--bad);font-weight:600}
 input.inv,select.inv,textarea.inv{border-color:var(--bad)!important;box-shadow:0 0 0 3px var(--bad-soft)}
 .ferr{color:var(--bad);font-size:12px;line-height:1.3}
+
+/* касса: отложенные чеки, подсказка клиента, позиция без цены */
+.parked{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:-4px 0 10px}
+.parked .chip{display:inline-flex;gap:6px;align-items:center}
+.linklike{background:none;border:0;padding:0;color:inherit;font:inherit;cursor:pointer}
+.posclient{position:relative}.custpick{position:absolute;left:0;right:0;z-index:60}
+.cline.noprice{border-color:var(--bad)}

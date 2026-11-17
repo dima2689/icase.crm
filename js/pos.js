@@ -83,6 +83,46 @@ function posToday(){const pt=App.point();if(!pt)return "";const t=App.posToday(p
     ${open?`<div class="tb-body"><div class="tb-h muted">${esc(pt.name)} · ${t.n} ${nw}${t.ret?" · возвраты "+money(t.ret):""}${t.debt?" · продано в долг "+money(t.debt):""}</div>
     <div class="tb-row"><div><span>Наличные</span><b>${money(t.cash)}</b>${sh?`<small>в ящике ${money(App.shiftTotals(sh).expectedCash)}</small>`:""}</div><div><span>Безналичные</span><b>${money(t.non)}</b><small>карта, СБП, перевод</small></div><div class="tb-tot"><span>Всего</span><b>${money(t.total)}</b></div></div></div>`:""}</div>`}
 ACT.posTodayT=()=>{App.ui.posTodayOpen=!App.ui.posTodayOpen;App.render()};
+/* проверки чека перед оплатой: цена, trade-in */
+function posCheck(){
+  const z=P.cart.find(i=>!(num(i.price)>0));if(z)return App.can("price")?"Укажите цену «"+z.name+"» в чеке":"У «"+z.name+"» не указана цена — попросите управляющего поставить цену";
+  const ti=num(P.tiAmt),dev=String(P.tiDev||"").trim(),code=String(P.tiImei||"").trim();
+  if(ti<0)return "Зачёт trade-in не может быть меньше нуля";
+  if(dev&&!(ti>0))return "Укажите сумму зачёта trade-in";
+  if((ti>0||code)&&!dev)return "Укажите устройство, принятое в trade-in";
+  if(code){const e=/^\d+$/.test(code)?(code.length!==15?"IMEI trade-in — 15 цифр":App.luhnOk&&!App.luhnOk(code)?"IMEI trade-in с ошибкой: не сходится контрольная цифра":""):(/^[A-Za-z0-9]{8,14}$/.test(code)?"":"Серийный номер trade-in: 8–14 латинских букв и цифр");if(e)return e}
+  const t=posTotals(),sub=t.sub-t.disc;
+  if(t.disc>t.sub)return "Скидка больше суммы чека";
+  if(ti>sub)return "Зачёт trade-in ("+money(ti)+") больше суммы покупки ("+money(sub)+"). Уменьшите зачёт или оформите устройство через «Выкуп»";
+  return ""}
+
+/* отложенные чеки: хранятся в этом браузере, по точке */
+const parkKey=()=>"icase_parked_"+((App.point()||{}).id||"");
+const parked=()=>{try{return JSON.parse(localStorage.getItem(parkKey())||"[]")}catch(e){return []}};
+const parkSave=l=>{try{localStorage.setItem(parkKey(),JSON.stringify(l.slice(0,20)))}catch(e){App.toast("Не удалось сохранить отложенный чек в браузере")}};
+function parkedHtml(){const l=parked();if(!l.length)return "";
+  return `<div class="parked"><span class="muted">Отложены:</span>${l.map(x=>`<span class="chip"><button type="button" class="linklike" data-act="posResume" data-id="${esc(x.id)}" title="Вернуть в кассу">${esc(x.name||x.phone||"чек")} · ${money(x.total)} · ${App.tm?App.tm(x.at):new Date(x.at).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})}</button><button type="button" class="linklike" data-act="posParkDel" data-id="${esc(x.id)}" aria-label="Удалить отложенный чек">×</button></span>`).join("")}</div>`}
+ACT.posPark=()=>{if(!P.cart.length)return;const l=parked();
+  l.unshift({id:String(Date.now()),at:Date.now(),by:App.me.id,name:P.name,phone:P.phone,total:posTotals().total,state:JSON.parse(JSON.stringify({cart:P.cart,phone:P.phone,name:P.name,discPct:P.discPct,discSum:P.discSum,tiDev:P.tiDev,tiAmt:P.tiAmt,tiImei:P.tiImei,manualPct:P.manualPct}))});
+  parkSave(l);ACT.posClear();App.toast("Чек отложен — вернуть можно кнопкой в блоке «Чек»");setTimeout(()=>{const q=document.getElementById("posQ");if(q)q.focus()},0)};
+ACT.posResume=id=>{const l=parked(),x=l.find(y=>y.id===id);if(!x)return;
+  if(P.cart.length)ACT.posPark();
+  const rest=parked().filter(y=>y.id!==id);parkSave(rest);
+  const st=x.state;let lost=0;
+  st.cart=st.cart.filter(i=>{if(i.unitId){const u=App.byId("units",i.unitId);if(!u||u.status!=="in_stock"){lost++;return false}}if(i.productId&&!App.byId("products",i.productId)){lost++;return false}return true});
+  Object.assign(P,st);App.schedule();App.toast(lost?"Чек возвращён, но "+lost+" поз. уже нет в наличии — убраны":"Чек возвращён в кассу")};
+/* горячие клавиши кассы: F2 — поиск товара, F4 — отложить чек, F9 — оплата */
+document.addEventListener("keydown",e=>{if(App.ui.view!=="pos"||!["F2","F4","F9"].includes(e.key))return;const sc=document.getElementById("scrim");if(sc&&!sc.hidden)return;
+  e.preventDefault();if(e.key==="F2"){const q=document.getElementById("posQ");if(q)q.focus()}else if(e.key==="F4")ACT.posPark();else ACT.posPay()});
+ACT.posParkDel=id=>{parkSave(parked().filter(y=>y.id!==id));App.schedule()};
+
+/* подсказка клиента по имени или телефону */
+function custMatches(q){q=String(q||"").trim().toLowerCase();const d=q.replace(/\D/g,"");if(q.length<2&&d.length<3)return [];
+  return S.customers.filter(c=>!c.mergedInto&&((d.length>=3&&App.phoneKey(c.phone).includes(d))||(q.length>=2&&/[a-zа-яё]/i.test(q)&&String(c.name||"").toLowerCase().includes(q)))).slice(0,6)}
+function custBox(){const q=App.ui.posCustQ||"",exact=App.findCustomerByPhone(P.phone);const m=exact?[]:custMatches(q);
+  return `<div class="pick custpick" id="posCustPick" ${m.length?"":"hidden"}>${m.map(c=>`<button type="button" data-act="posCustPick" data-id="${esc(c.id)}"><span>${esc(c.name)}<small> · ${esc(c.phone?App.fmtPhone(c.phone):"без телефона")}${num(c.discount)?" · скидка "+num(c.discount)+"%":""}</small></span></button>`).join("")}</div>`}
+ACT.posCustPick=id=>{App.ui.posCustQ="";const c=App.cust(id);if(!c)return;P.phone=c.phone||"";P.name=c.name||"";if(!P.manualPct)P.discPct=num(c.discount);const b=document.getElementById("posCustPick");if(b)b.hidden=true;App.schedule()};
+
 function posTotals(){
   const sub=P.cart.reduce((a,i)=>a+num(i.qty)*num(i.price)-num(i.disc),0);
   const disc=Math.round(sub*num(P.discPct)/100)+num(P.discSum);
@@ -106,7 +146,7 @@ VIEWS.pos={
     return `${sh?"":shiftBar}
     <div class="pos">
       <section class="card">
-        <div class="row-f"><div class="fld grow"><label for="posQ">Товар или сканер</label><input id="posQ" type="search" autocomplete="off" placeholder="Название, штрихкод или IMEI"><div class="pick" id="posPick" hidden></div></div><button class="btn" data-act="posCustom" style="align-self:flex-end">+ Услуга / товар вне каталога</button>
+        <div class="row-f"><div class="fld grow"><label for="posQ">Товар или сканер</label><input id="posQ" type="search" autocomplete="off" placeholder="Название, штрихкод или IMEI" title="F2 — сюда, F9 — оплата, F4 — отложить чек"><div class="pick" id="posPick" hidden></div></div><button class="btn" data-act="posCustom" style="align-self:flex-end">+ Услуга / товар вне каталога</button>
 </div>
         <div class="plist ${lo?"open":""} ${wide?"inline":""}" id="plist">
           <button type="button" class="pl-trig" data-act="posListT" aria-expanded="${!!lo}" ${wide?"hidden":""}><span class="pl-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span><span class="pl-t">Выбрать из списка</span><span class="pl-n">${inStock.length} в наличии</span><svg class="pl-car" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
@@ -121,10 +161,11 @@ VIEWS.pos={
 
       </section>
       <section class="card cartcard ${P.cart.length?"":"is-empty"}">
-        <div class="card-h"><h2>Чек</h2>${P.cart.length?'<button class="btn sm ghost danger" data-act="posClear">Очистить</button>':""}</div>
+        <div class="card-h"><h2>Чек</h2><span class="row-f">${P.cart.length?'<button class="btn sm ghost" data-act="posPark" title="Отложить чек (F4)">Отложить</button><button class="btn sm ghost danger" data-act="posClear">Очистить</button>':""}</span></div>
+        ${parkedHtml()}
         <div class="clist">
         ${P.cart.length?P.cart.map((i,k)=>{const p=App.byId("products",i.productId);const below=p&&num(i.price)-num(i.disc)/Math.max(1,num(i.qty))<num(i.unitId?i.cost:p.cost);
-          return `<div class="cline"><div class="cl-top"><div class="cl-name"><b>${esc(i.name)}${i.productId?"":` <span class="pill ${i.kind==="goods"?"":"info"}">${i.kind==="goods"?"вне каталога":"услуга"}</span>`}</b>${i.serial?'<span class="sub">'+App.codeLbl(i.productId)+" "+esc(i.serial)+(i.battery!=null&&i.battery!==""?" · АКБ "+i.battery+"%":"")+"</span>":""}${below?'<span class="sub bad">ниже закупки</span>':""}</div>
+          return `<div class="cline ${num(i.price)>0?"":"noprice"}"><div class="cl-top"><div class="cl-name"><b>${esc(i.name)}${num(i.price)>0?"":' <span class="pill bad">нет цены</span>'}${i.productId?"":` <span class="pill ${i.kind==="goods"?"":"info"}">${i.kind==="goods"?"вне каталога":"услуга"}</span>`}</b>${i.serial?'<span class="sub">'+App.codeLbl(i.productId)+" "+esc(i.serial)+(i.battery!=null&&i.battery!==""?" · АКБ "+i.battery+"%":"")+"</span>":""}${below?'<span class="sub bad">ниже закупки</span>':""}</div>
             <button class="btn sm ghost danger" data-act="posDel" data-id="${k}" aria-label="Убрать">${App.ico("x","sm")}</button></div>
             <div class="cl-row"><div class="cl-q">${i.serial?'<span class="muted">1 шт</span>':`<button type="button" class="btn sm" data-act="posQty" data-id="${k}|-1" aria-label="Меньше">−</button><input type="number" min="1" value="${num(i.qty)}" data-cart="${k}" data-f="qty" id="cq${k}" aria-label="Количество"><button type="button" class="btn sm" data-act="posQty" data-id="${k}|1" aria-label="Больше">+</button>`}</div>
             ${App.can("price")?`<label>Цена<input type="number" min="0" value="${num(i.price)}" data-cart="${k}" data-f="price" id="cp${k}"></label>`:`<div class="cl-pr"><span>Цена</span><b>${money(i.price)}</b></div>`}
@@ -133,8 +174,8 @@ VIEWS.pos={
         </div>
         <div class="posclient"><div class="form">
           ${App.fld("posPhone","Телефон клиента <small class=\"muted\">необязательно</small>",App.inp("posPhone",P.phone,"tel","+7 900 000-00-00",'data-pos="phone" autocomplete="off"'))}
-          ${App.fld("posName","Имя",App.inp("posName",P.name,"text","Как обращаться",'data-pos="name"'))}
-        </div>
+          ${App.fld("posName","Имя",App.inp("posName",P.name,"text","Как обращаться",'data-pos="name" autocomplete="off"'))}
+        </div>${custBox()}
         ${c?`<div class="hint ${c.blacklisted?"bad":"ok"}" style="margin-top:6px">${c.blacklisted?'<span class="pill bad">Чёрный список</span> '+esc(c.blackReason||"")+" · ":""}${esc(c.name)} · покупок ${S.sales.filter(s=>s.customerId===c.id).length}${num(c.discount)?" · скидка "+num(c.discount)+"%":""}${(c.tags||[]).length?" · "+esc(c.tags.join(", ")):""}${App.bonusOn&&App.bonusOn()?" · бонусов "+App.bonusBal(c.id):""}</div>`:App.phoneKey(P.phone).length===10?'<div class="hint" style="margin-top:6px">Новый клиент, добавится при продаже</div>':""}</div>
                 <details class="more" id="posMore" ${P.discPct||P.discSum||P.tiDev||P.tiImei||P.tiAmt?"open":""}><summary>Скидка на чек и trade-in</summary>
           <div class="form">
@@ -165,6 +206,9 @@ VIEWS.pos={
       q.addEventListener("keydown",e=>{if(e.key==="Escape"&&!App.posWide()){App.ui.posListOpen=false;App.render()}});
       if(!App.posWide()&&!App.ui._plFocus){App.ui._plFocus=1;setTimeout(()=>q.focus(),0)}}
     App.productPicker("posQ","posPick",{wh:posWh,inStock:false,onPick:(p,u)=>posAdd(p.id,u)});
+    ["posPhone","posName"].forEach(id=>{const el=document.getElementById(id);if(!el)return;
+      el.addEventListener("input",()=>{App.ui.posCustQ=el.value});
+      el.addEventListener("blur",()=>setTimeout(()=>{if(document.activeElement&&["posPhone","posName"].includes(document.activeElement.id))return;App.ui.posCustQ="";const b=document.getElementById("posCustPick");if(b)b.hidden=true},250))});
     document.querySelectorAll("[data-pos]").forEach(el=>el.addEventListener("input",()=>{const f=el.dataset.pos;P[f]=["discPct","discSum","tiAmt"].includes(f)?num(el.value):el.value;
       if(f==="phone"){const c=App.findCustomerByPhone(P.phone);if(c){if(!P.name)P.name=c.name;if(!P.manualPct)P.discPct=num(c.discount)}}
       if(f==="discPct")P.manualPct=true;
@@ -235,6 +279,7 @@ const PAYK=()=>Object.keys(App.PAY).concat(document.getElementById("pay_debt")?[
 ACT.posPay=()=>{
   if(!App.can("sale"))return App.toast("Нет права проводить продажи");
   if(!P.cart.length)return;
+  {const bad=posCheck();if(bad)return App.toast(bad)}
   const sh=App.openShift();if(!sh&&App.settings().requireShift)return App.toast("Сначала откройте смену");
   const t=posTotals();
   for(const i of P.cart){const p=App.byId("products",i.productId);if(p&&num(i.price)-num(i.disc)/Math.max(1,num(i.qty))<num(i.unitId?i.cost:p.cost)&&!App.can("belowCost"))return App.toast("«"+i.name+"» дешевле закупки: продать так может только управляющий")}
@@ -399,7 +444,7 @@ ACT.openShift=id=>{const sh=App.byId("shifts",id);if(sh)App.shiftModal(sh,(sh.st
 
 /* ======================= ПРОДАЖИ ======================= */
 TITLES.sales="Продажи";
-App.ui.salesPeriod="month";App.ui.salesQ="";App.ui.salesPay="";App.ui.salesTab="sales";
+App.ui.salesPeriod="month";App.ui.salesQ="";App.ui.salesPay="";App.ui.salesBy="";App.ui.salesTab="sales";
 App.periodRange=function(p,from,to){
   const d0=new Date(new Date().toDateString()),tom=new Date(+d0+864e5);
   switch(p){case"today":return[d0,tom];case"yesterday":return[new Date(+d0-864e5),d0];case"7d":return[new Date(+d0-6*864e5),tom];
@@ -414,15 +459,19 @@ VIEWS.sales={
     const u=App.ui,[from,to]=App.periodRange(u.salesPeriod);
     const q=u.salesQ.toLowerCase();
     const tabs=`<div class="tabs">${[["sales","Чеки"],["returns","Возвраты"],["shifts","Смены"],["cash","Кассовые операции"],...(App.evoOn&&App.evoOn()?[["evotor","Сверка с Эвотором"]]:[])].map(([k,l])=>`<button class="tab ${u.salesTab===k?"on":""}" data-act="salesTab" data-id="${k}">${l}</button>`).join("")}</div>`;
-    const filt=`<div class="row-f salesf">${App.sel("salesPeriod",App.PERIODS,u.salesPeriod,'data-filter-sel="salesPeriod" aria-label="Период"')}${u.salesTab==="sales"?App.sel("salesPay",[["","Любая оплата"],...Object.entries(App.PAY)],u.salesPay,'data-filter-sel="salesPay" aria-label="Оплата"'):""}<input id="salesQ" type="search" placeholder="№, клиент, товар" value="${esc(u.salesQ)}" data-filter="salesQ" aria-label="Поиск"></div>`;
+    const filt=`<div class="row-f salesf">${App.sel("salesPeriod",App.PERIODS,u.salesPeriod,'data-filter-sel="salesPeriod" aria-label="Период"')}${u.salesTab==="sales"?App.sel("salesPay",[["","Любая оплата"],...Object.entries(App.PAY)],u.salesPay,'data-filter-sel="salesPay" aria-label="Оплата"'):""}${u.salesTab==="sales"&&App.can("reports")?App.sel("salesBy",[["","Все продавцы"],...S.staff.filter(x=>S.sales.some(y=>y.by===x.id)).map(x=>[x.id,x.fullName])],u.salesBy,'data-filter-sel="salesBy" aria-label="Продавец"'):""}<input id="salesQ" type="search" placeholder="№, клиент, товар" value="${esc(u.salesQ)}" data-filter="salesQ" aria-label="Поиск"></div>`;
     const inP0=d=>{const t=new Date(d);return t>=from&&t<to};
     const myPt=App.can("allPoints")?null:(App.point()||{}).id;
     const inP=(d,x)=>inP0(d)&&(!myPt||!x||x.pointId===myPt||(App.byId("sales",x.saleId)||{}).pointId===myPt);
     let body="";
     if(u.salesTab==="sales"){
-      const list=App.sortDesc(S.sales.filter(s=>inP(s.createdAt,s)&&(!u.salesPay||(s.payments||[]).some(p=>p.method===u.salesPay))&&(!q||[s.num,(App.cust(s.customerId)||{}).name,(App.cust(s.customerId)||{}).phone,(s.items||[]).map(i=>i.name+" "+i.serial).join(" ")].join(" ").toLowerCase().includes(q))));
+      const list=App.sortDesc(S.sales.filter(s=>inP(s.createdAt,s)&&(!u.salesPay||(s.payments||[]).some(p=>p.method===u.salesPay))&&(!u.salesBy||s.by===u.salesBy)&&(!q||[s.num,(App.cust(s.customerId)||{}).name,(App.cust(s.customerId)||{}).phone,(s.items||[]).map(i=>i.name+" "+i.serial).join(" ")].join(" ").toLowerCase().includes(q))));
       const sum=list.reduce((a,s)=>a+num(s.total),0);
-      body=`<div class="tiles"><div class="tile"><span>Чеков</span><b>${list.length}</b></div><div class="tile"><span>Сумма</span><b>${money(sum)}</b></div><div class="tile"><span>Средний чек</span><b>${money(list.length?sum/list.length:0)}</b></div>${App.can("cost")?`<div class="tile"><span>Прибыль</span><b>${money(list.reduce((a,s)=>a+App.saleProfit(s),0))}</b></div>`:""}</div>
+      const ids=new Set(list.map(x=>x.id)),ret=S.returns.filter(r=>ids.has(r.saleId)).reduce((a,r)=>a+num(r.amount),0);
+      const byM={};list.forEach(x=>(x.payments||[]).forEach(p=>{byM[p.method]=(byM[p.method]||0)+num(p.amount)}));
+      const payLine=Object.entries(byM).filter(([,v])=>v).map(([m,v])=>`${esc((App.PAY[m]||(m==="debt"?"В долг":m==="bonus"?"Бонусы":m==="prepaid"?"Предоплата":m)))} <b>${money(v)}</b>`).join(" · ");
+      body=`<div class="tiles"><div class="tile"><span>Чеков</span><b>${list.length}</b></div><div class="tile"><span>Продажи</span><b>${money(sum)}</b></div>${ret?`<div class="tile"><span>Возвраты по ним</span><b class="badc">−${money(ret)}</b></div><div class="tile"><span>Итого</span><b>${money(sum-ret)}</b></div>`:""}<div class="tile"><span>Средний чек</span><b>${money(list.length?sum/list.length:0)}</b></div>${App.can("cost")?`<div class="tile"><span>Прибыль${ret?" за вычетом возвратов":""}</span><b>${money(list.reduce((a,s)=>a+App.saleProfit(s),0)-S.returns.filter(r=>ids.has(r.saleId)).reduce((a,r)=>a+num(r.amount)-(r.items||[]).reduce((b,i)=>b+num(i.cost)*num(i.qty),0),0))}</b></div>`:""}</div>
+      ${payLine?`<p class="muted paysum">Оплаты: ${payLine}</p>`:""}
       <section class="card"><div class="tbl-wrap"><table class="stbl"><thead><tr><th>№</th><th>Дата</th><th>Клиент</th><th>Товары</th><th>Оплата</th><th>Продавец</th><th class="n">Сумма</th></tr></thead><tbody>
       ${list.map(s=>{const c=App.cust(s.customerId);return `<tr class="rowlink" data-act="openSale" data-id="${esc(s.id)}"><td><b>${esc(s.num)}</b>${s.status==="returned"?' <span class="pill bad">возврат</span>':s.status==="partial"?' <span class="pill warn">частичный возврат</span>':""}</td><td>${App.dtt(s.createdAt)}</td><td>${esc(c?c.name:"—")}<span class="sub">${esc(c?c.phone:"")}</span></td><td><span class="clamp2" title="${esc((s.items||[]).map(i=>i.name+(i.qty>1?" ×"+i.qty:"")).join(", "))}">${esc((s.items||[]).map(i=>i.name+(i.qty>1?" ×"+i.qty:"")).join(", "))}</span>${s.tradeIn?'<span class="sub">Trade-in: '+esc(s.tradeIn.device)+"</span>":""}</td><td>${(s.payments||[]).filter(p=>num(p.amount)).map(p=>`<span class="nwsp">${esc(App.payLabel(p.method)+" "+money(p.amount))}</span>`).join(" + ")}</td><td>${esc(App.nameOf(s.by))}</td><td class="n"><b>${money(s.total)}</b></td></tr>`}).join("")||'<tr><td colspan="7" class="empty">Нет продаж за период</td></tr>'}
       </tbody></table></div></section>`;
