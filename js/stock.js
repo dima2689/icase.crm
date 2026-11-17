@@ -50,16 +50,25 @@ const coSave=()=>{try{localStorage.setItem(CO_KEY,JSON.stringify([...App.ui.catO
 function catCounts(){const base=stockBase("cat"),cnt=new Map();let none=0;
   base.forEach(p=>{if(!p.categoryId||!App.cat(p.categoryId)){none++;return}App.catAnc(p.categoryId).forEach(c=>cnt.set(c.id,(cnt.get(c.id)||0)+1))});return {base,cnt,none}}
 const CAR='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
-function catTree(){
-  const f=App.ui.sf,{base,cnt,none}=catCounts(),ed=App.can("settings"),open=App.ui.catOpen,sel=new Set(App.catAnc(f.cat).map(c=>c.id));
+function catTree(modal){
+  const f=App.ui.sf,{base,cnt,none}=catCounts(),ed=App.can("settings"),edit=ed&&!!App.ui.catEdit,open=App.ui.catOpen,sel=new Set(App.catAnc(f.cat).map(c=>c.id));
+  const pick=modal?"sfCatM":"sfCat",q=(App.ui.catQ||"").trim().toLowerCase();
+  const tools=c=>edit?`<span class="ctools"><button type="button" data-act="subCatNew" data-id="${esc(c.id)}" title="Подкатегория внутри «${esc(c.name)}»" aria-label="Добавить подкатегорию в «${esc(c.name)}»">+</button><button type="button" data-act="catForm" data-id="${esc(c.id)}" title="Переименовать, переложить, флажки" aria-label="Изменить «${esc(c.name)}»">✎</button><button type="button" data-act="catMergeDlg" data-id="${esc(c.id)}" title="Объединить с другой категорией" aria-label="Объединить «${esc(c.name)}»">⇄</button></span>`:"";
+  const row=(c,lvl,n,kidsBtn)=>`<div class="ctn${f.cat===c.id?" on":""}${n?"":" cz"}" style="--l:${lvl}">${kidsBtn}<button type="button" class="ctl" data-act="${pick}" data-id="${esc(c.id)}"${f.cat===c.id?' aria-current="true"':""}>${esc(c.name)}</button><small>${n||""}</small>${tools(c)}</div>`;
   const node=(c,lvl)=>{const n=cnt.get(c.id)||0;if(!n&&!ed&&!sel.has(c.id))return "";
     const kids=App.catChildren(c.id).filter(k=>ed||cnt.get(k.id)),isOpen=open.has(c.id);
-    return `<li><div class="ctn${f.cat===c.id?" on":""}${n?"":" cz"}" style="--l:${lvl}">${kids.length?`<button type="button" class="ctt${isOpen?" open":""}" data-act="catToggle" data-id="${esc(c.id)}" aria-expanded="${isOpen}" aria-label="${isOpen?"Свернуть":"Развернуть"} «${esc(c.name)}»">${CAR}</button>`:'<i class="ctt"></i>'}<button type="button" class="ctl" data-act="sfCat" data-id="${esc(c.id)}"${f.cat===c.id?' aria-current="true"':""}>${esc(c.name)}</button><small>${n||""}</small></div>${kids.length&&isOpen?`<ul>${kids.map(k=>node(k,lvl+1)).join("")}</ul>`:""}</li>`};
-  return `<aside class="card ctree" aria-label="Категории"><div class="ctree-h"><b>Категории</b>${ed?`<button type="button" class="btn sm ghost" data-act="catForm" title="Новая категория верхнего уровня">+ Категория</button>`:""}</div>
-    <ul><li><div class="ctn${!f.cat?" on":""}" style="--l:0"><i class="ctt"></i><button type="button" class="ctl" data-act="sfCat" data-id="">Все товары</button><small>${base.length}</small></div></li>
+    return `<li>${row(c,lvl,n,kids.length?`<button type="button" class="ctt${isOpen?" open":""}" data-act="catToggle" data-id="${esc(c.id)}" aria-expanded="${isOpen}" aria-label="${isOpen?"Свернуть":"Развернуть"} «${esc(c.name)}»">${CAR}</button>`:'<i class="ctt"></i>')}${kids.length&&isOpen?`<ul>${kids.map(k=>node(k,lvl+1)).join("")}</ul>`:""}</li>`};
+  /* поиск по категориям: плоский список с путём */
+  const found=q?S.categories.filter(c=>App.catPath(c.id).toLowerCase().includes(q)&&(ed||cnt.get(c.id))).sort((a,b)=>App.coll(App.catPath(a.id),App.catPath(b.id))):null;
+  const list=found?(found.map(c=>`<li><div class="ctn${f.cat===c.id?" on":""}${cnt.get(c.id)?"":" cz"}" style="--l:0"><i class="ctt"></i><button type="button" class="ctl" data-act="${pick}" data-id="${esc(c.id)}" title="${esc(App.catPath(c.id))}">${esc(c.name)}<span class="cpath">${esc(App.catAnc(c.id).slice(0,-1).map(x=>x.name).join(" / "))}</span></button><small>${cnt.get(c.id)||""}</small>${tools(c)}</div></li>`).join("")||'<li class="muted cnone">Не найдено</li>')
+    :`<li><div class="ctn${!f.cat?" on":""}" style="--l:0"><i class="ctt"></i><button type="button" class="ctl" data-act="${pick}" data-id="">Все товары</button><small>${base.length}</small></div></li>
     ${App.catChildren("").map(c=>node(c,0)).join("")}
-    ${none?`<li><div class="ctn${f.cat==="__none"?" on":""}" style="--l:0"><i class="ctt"></i><button type="button" class="ctl warnc" data-act="sfCat" data-id="__none">Без категории</button><small>${none}</small></div></li>`:""}</ul>
-    ${catManage()}</aside>`}
+    ${none?`<li><div class="ctn${f.cat==="__none"?" on":""}" style="--l:0"><i class="ctt"></i><button type="button" class="ctl warnc" data-act="${pick}" data-id="__none">Без категории</button><small>${none}</small></div></li>`:""}`;
+  const head=`<div class="ctree-h"><b>Категории</b><span class="row-f nowrap">${S.categories.length>1?`<button type="button" class="btn sm ghost" data-act="catAll" data-id="${modal?"m":""}" title="Раскрыть или свернуть всё">${open.size?"Свернуть":"Раскрыть"}</button>`:""}${ed?`<button type="button" class="btn sm ${edit?"pri":"ghost"}" data-act="catEditToggle">${edit?"Готово":"Настроить"}</button>`:""}</span></div>
+    <input type="search" id="catQ${modal?"M":""}" class="catq" placeholder="Найти категорию" value="${esc(App.ui.catQ||"")}" data-catq="1" aria-label="Найти категорию" autocomplete="off">
+    ${edit?`<div class="cedit-h"><button type="button" class="btn sm" data-act="catForm">+ Категория верхнего уровня</button><small class="muted">+ — подкатегория, ✎ — переименовать или переложить, ⇄ — объединить</small></div>`:""}`;
+  if(modal)return head+`<ul class="ctree-l">${list}</ul>`;
+  return `<aside class="card ctree${edit?" editing":""}" aria-label="Категории">${head}<ul class="ctree-l">${list}</ul>${catManage()}</aside>`}
 function catManage(){const f=App.ui.sf,c=App.cat(f.cat),pick=App.ui.tagPick.size;
   if(!App.can("settings")&&!(App.can("stock")&&pick))return "";
   return `<div class="ctree-m">${c?`<small class="muted">${esc(App.catPath(c.id))}</small>`:""}<div class="row-f wrap">
@@ -69,7 +78,7 @@ function catBar(){
   const f=App.ui.sf,{base,cnt,none}=catCounts(),ed=App.can("settings"),cur=App.cat(f.cat),anc=App.catAnc(f.cat);
   const kids=App.catChildren(cur?cur.id:"").filter(k=>ed||cnt.get(k.id));
   const chip=(id,label,n,on)=>`<button class="chip ${on?"on":""}" data-act="sfCat" data-id="${esc(id)}">${esc(label)}<b>${n}</b></button>`;
-  return `<div class="catbar"><nav class="crumbs" aria-label="Категория"><button type="button" data-act="sfCat" data-id=""${!f.cat?' aria-current="true"':""}>Все товары</button>${f.cat==="__none"?'<span>›</span><b>Без категории</b>':anc.map((c,i)=>`<span>›</span>${i===anc.length-1?`<b>${esc(c.name)}</b>`:`<button type="button" data-act="sfCat" data-id="${esc(c.id)}">${esc(c.name)}</button>`}`).join("")}<small>${cur?(cnt.get(cur.id)||0):f.cat==="__none"?none:base.length} поз.</small></nav>
+  return `<div class="catbar"><div class="row-f nowrap catbar-top"><button type="button" class="btn sm" data-act="catTreeDlg">Все категории</button></div><nav class="crumbs" aria-label="Категория"><button type="button" data-act="sfCat" data-id=""${!f.cat?' aria-current="true"':""}>Все товары</button>${f.cat==="__none"?'<span>›</span><b>Без категории</b>':anc.map((c,i)=>`<span>›</span>${i===anc.length-1?`<b>${esc(c.name)}</b>`:`<button type="button" data-act="sfCat" data-id="${esc(c.id)}">${esc(c.name)}</button>`}`).join("")}<small>${cur?(cnt.get(cur.id)||0):f.cat==="__none"?none:base.length} поз.</small></nav>
     ${kids.length||(!cur&&none)||(ed&&cur)?`<div class="chips catkids">${kids.map(k=>chip(k.id,k.name,cnt.get(k.id)||0,false)).join("")}${!cur&&f.cat!=="__none"&&none?chip("__none","Без категории",none,false):""}${ed&&cur?`<button class="chip add" data-act="subCatNew" data-id="${esc(cur.id)}">+ подкатегория</button><button class="chip add" data-act="catForm" data-id="${esc(cur.id)}">изменить</button>`:""}${ed&&!cur&&f.cat!=="__none"?'<button class="chip add" data-act="catForm">+ категория</button>':""}</div>`:""}
     ${App.can("stock")&&App.ui.tagPick.size?`<div class="row-f"><button type="button" class="btn sm pri" data-act="catMoveDlg">Перенести выбранные в категорию (${App.ui.tagPick.size})</button></div>`:""}</div>`}
 const secSum=(...a)=>a.filter(Boolean).join(", ");
@@ -162,7 +171,27 @@ VIEWS.stock={
   }
 };
 ACT.sfCat=id=>{App.ui.sf.cat=id;App.catAnc(id).forEach(c=>App.ui.catOpen.add(c.id));coSave();App.ui.stockLimit=0;sfSave();App.render()};
-ACT.catToggle=id=>{const o=App.ui.catOpen;o.has(id)?o.delete(id):o.add(id);coSave();App.render()};
+ACT.catToggle=id=>{const o=App.ui.catOpen;o.has(id)?o.delete(id):o.add(id);coSave();App.render();if(App.modalRefresh&&!$("#scrim").hidden)App.modalRefresh()};
+ACT.catAll=m=>{const o=App.ui.catOpen;if(o.size)o.clear();else S.categories.forEach(c=>{if(App.catChildren(c.id).length)o.add(c.id)});coSave();App.render();if(m&&App.modalRefresh)App.modalRefresh()};
+ACT.catEditToggle=()=>{App.ui.catEdit=!App.ui.catEdit;App.render();if(App.modalRefresh&&!$("#scrim").hidden)App.modalRefresh()};
+/* всё дерево в окне — для узкого экрана и телефона */
+ACT.catTreeDlg=()=>{const draw=()=>{const box=$("#modal");const q=document.activeElement&&document.activeElement.id==="catQM";App.redrawModal(App.head("Категории")+`<div class="ctree ctree-m-dlg${App.ui.catEdit&&App.can("settings")?" editing":""}">${catTree(true)}</div>
+    ${App.can("settings")?`<div class="acts"><button class="btn" data-act="catForm">+ Категория</button>${App.cat(App.ui.sf.cat)?`<button class="btn" data-act="subCatNew" data-id="${esc(App.ui.sf.cat)}">+ Подкатегория в «${esc(App.cat(App.ui.sf.cat).name)}»</button>`:""}</div>`:""}`);
+    if(q){const e=$("#catQM");if(e){e.focus();e.setSelectionRange(e.value.length,e.value.length)}}};
+  App.openModal("",{refresh:draw});draw()};
+ACT.sfCatM=id=>{App.closeModal();ACT.sfCat(id)};
+/* поиск по категориям */
+document.addEventListener("input",e=>{const t=e.target;if(!t.dataset||!t.dataset.catq)return;App.ui.catQ=t.value;if(t.id==="catQM"){if(App.modalRefresh)App.modalRefresh()}else App.render()});
+/* объединить категорию с другой: товары и подкатегории переходят, сама удаляется */
+ACT.catMergeDlg=id=>{const c=App.cat(id);if(!c)return;const nP=S.products.filter(p=>App.inCat(p,id)).length,nK=App.catDesc(id).size-1;
+  App.openModal(App.head("Объединить «"+esc(c.name)+"»")+`<p class="muted">${esc(App.catPath(id))}: товаров ${nP}, подкатегорий ${nK}.</p>
+    <div class="form">${App.fld("cmgTo","Перенести всё в категорию",App.sel("cmgTo",[["","— выберите —"],...App.catOpts(false,App.catDesc(id))],""),"full")}</div>
+    <p class="muted">Товары и подкатегории перейдут в выбранную категорию. Подкатегории с одинаковым названием сольются. Категория «${esc(c.name)}» удалится. Изменения уйдут и на сайт.</p>
+    <div class="acts"><button class="btn" data-act="close">Отмена</button><button class="btn pri" data-act="catMergeGo" data-id="${esc(id)}">Объединить</button></div>`)};
+ACT.catMergeGo=async(id,btn)=>{const to=App.val("cmgTo");if(!to)return App.toast("Выберите категорию");if(btn.disabled)return;btn.disabled=true;
+  try{const n=await App.api.rpc("category_merge",{p_src:id,p_dst:to});await App.reload(["categories","products"]);
+    if(App.ui.sf.cat===id||!App.cat(App.ui.sf.cat))App.ui.sf.cat=to;App.catAnc(to).forEach(c=>App.ui.catOpen.add(c.id));coSave();sfSave();App.closeModal();App.render();App.toast("Объединено → "+App.catPath(to)+". Товаров перенесено: "+n)}
+  catch(e){btn.disabled=false;App.toast(e.message)}};
 /* перенос выбранных товаров в категорию */
 ACT.catMoveDlg=()=>{const ids=[...App.ui.tagPick].filter(id=>App.byId("products",id));if(!ids.length)return App.toast("Отметьте товары галочками");
   const f=App.ui.sf,cur=App.cat(f.cat);
