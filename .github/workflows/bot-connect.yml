@@ -159,6 +159,13 @@ jobs:
           echo "== упоминания сайтов в коде"; grep -rnoE "icase52\.ru[^\"' ]*|xn--[a-z0-9-]+\.xn--p1ai[^\"' ]*|айкейс\.рф[^\"' ]*|SITE_URL|SHOP_URL|WOO[A-Z_]*|product-category[^\"' ]*" "$B/app" --include=*.py | sort | uniq -c | sort -rn | head -40
           echo "== источник каталога"; grep -rnE "CRM_MODE" "$B/app" --include=*.py | cut -c1-160 | head -15
           echo "== последние изменения файлов"; find "$B/app" -name '*.py' -printf '%TY-%Tm-%Td %TH:%TM %p\n' | sort -r | head -10
+          echo "== каталог в кэше бота"; DB=$(cd "$B" && grep -E '^DB_PATH=' .env | cut -d= -f2- || true); DB=${DB:-data/icase.db}
+          (cd "$B" && python3 -c "
+          import sqlite3,sys,json,collections
+          c=sqlite3.connect(sys.argv[1]); r=c.execute(\"select value from kv where key='catalog_source'\").fetchone(); print('источник:', r[0] if r else 'нет данных')
+          n=collections.Counter(json.loads(d).get('source') or 'moysklad' for (d,) in c.execute('select data from ms_items where active=1')); print('товаров по источникам:', dict(n))
+          " "$DB" 2>&1 | sed 's/^ *//')
+          echo "== ссылки на сайт в коде (контекст)"; grep -rn -B2 -A3 "icase52" "$B/app/store.py" "$B/app/integrations.py" | cut -c1-170
           echo "== копии (откаты)"; ls -1 /var/backups/icase-bot 2>/dev/null | tail -10
           echo "== ошибки в журнале за 6 часов"; journalctl -u icase-bot --since -6h --no-pager 2>/dev/null | grep -iE 'error|traceback|exception' | sed -E 's/[0-9]{6,}/<…>/g' | cut -c1-200 | sort | uniq -c | sort -rn | head -15
           SH
