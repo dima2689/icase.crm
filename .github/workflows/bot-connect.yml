@@ -184,6 +184,10 @@ jobs:
           echo "== MOYSKLAD_TOKEN в копиях .env"; for f in /var/backups/icase-bot/*/.env "$B/.env"; do printf '%s: %s\n' "$f" "$(grep -c '^MOYSKLAD_TOKEN=.' "$f" 2>/dev/null)"; done
           echo "== где код пишет или читает MOYSKLAD_TOKEN / ms_enabled"; grep -rnE "MOYSKLAD_TOKEN|ms_enabled|MOYSKLAD" "$B/app" --include=*.py | cut -c1-170 | head -15
           echo "== веб-панель бота: адреса настроек"; grep -rnoE "add_(get|post)\([^)]*\)" "$B/app/webapp.py" | cut -c1-140 | grep -iE "setting|ms|sklad|token|integr|config" | head -20
+          echo "== что лежит в первой копии (до обновления 16.11)"; O=/var/backups/icase-bot/20261116-145224; (cd "$O" && find . -type f | sort | head -40)
+          echo "== откуда старый бот брал каталог (код копии)"; grep -rnE "catalog_source|BOT_API_URL|script\.google|def (sync_stock|load_catalog|fetch_items|refresh)" "$O" --include=*.py | cut -c1-170 | head -25
+          echo "== то же в текущем коде"; grep -rnE "catalog_source" "$B/app" --include=*.py | cut -c1-170 | head -15
+          echo "== журнал 16.11 до 15:30 UTC: источник каталога"; journalctl -u icase-bot --since "2026-11-15 00:00" --until "2026-11-16 15:20" --no-pager -o cat 2>/dev/null | grep -iE "каталог|catalog|МойСклад|moysklad|google|api" | sed -E 's/[0-9]{6,}/<…>/g' | cut -c1-180 | sort | uniq -c | sort -rn | head -15
           echo "== копии (откаты)"; ls -1 /var/backups/icase-bot 2>/dev/null | tail -10
           echo "== ошибки в журнале за 6 часов"; journalctl -u icase-bot --since -6h --no-pager 2>/dev/null | grep -iE 'error|traceback|exception' | sed -E 's/[0-9]{6,}/<…>/g' | cut -c1-200 | sort | uniq -c | sort -rn | head -15
           SH
