@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       stage:
-        description: "key, apply, compare, crm-on, crm-off, inspect или ms-on"
+        description: "key, apply, patch, compare, crm-on, crm-off, inspect или ms-on"
         required: true
         default: key
 permissions:
@@ -33,7 +33,7 @@ jobs:
       - name: SSH
         env: { K: "${{ secrets.DEPLOY_SSH_KEY }}" }
         run: |
-          case "$STAGE" in key|apply|compare|crm-on|crm-off|inspect|ms-on) ;; *) echo "stage: key, apply, compare, crm-on, crm-off, inspect или ms-on"; exit 1;; esac
+          case "$STAGE" in key|apply|patch|compare|crm-on|crm-off|inspect|ms-on) ;; *) echo "stage: key, apply, patch, compare, crm-on, crm-off, inspect или ms-on"; exit 1;; esac
           install -m 700 -d ~/.ssh
           printf '%s\n' "$K" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e '/^$/d' > ~/.ssh/id_deploy; chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -T 20 -t ed25519 "$H" 2>/dev/null > ~/.ssh/known_hosts
@@ -47,7 +47,7 @@ jobs:
           echo "открытый ключ (base64):"; openssl pkey -in "$K" -pubout | base64 -w0; echo
           SH
       - uses: actions/checkout@v4
-        if: inputs.stage == 'apply'
+        if: inputs.stage == 'apply' || inputs.stage == 'patch'
         with: { ref: bot-update-enc, path: upd }
       - name: Обновление бота и связь с CRM
         if: inputs.stage == 'apply'
@@ -87,6 +87,35 @@ jobs:
           echo "  ошибок в журнале после запуска: $(journalctl -u icase-bot --since "$since" --no-pager -o cat | grep -c ' ERROR ' || true)"
           journalctl -u icase-bot --since "$since" --no-pager -o cat | grep -q 'связь с CRM включена' || { echo "бот не включил связь с CRM"; rollback; }
           echo "Готово: бот работает и связан с CRM. Копия прежних файлов: $BK"
+          SH
+      - name: Обновление файлов бота без изменения настроек
+        if: inputs.stage == 'patch'
+        run: |
+          scp -i ~/.ssh/id_deploy -o BatchMode=yes upd/update.tgz.enc upd/pass.enc root@"$H":/root/
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes root@"$H" 'bash -s' <<'SH'
+          set -euo pipefail
+          B=/opt/icase-bot; T=$(mktemp -d); trap 'rm -rf "$T" /root/update.tgz.enc /root/pass.enc' EXIT
+          openssl pkeyutl -decrypt -inkey /root/.icase-bot-update.pem -pkeyopt rsa_padding_mode:oaep -in /root/pass.enc -out "$T/pass"
+          openssl enc -d -aes-256-cbc -pbkdf2 -in /root/update.tgz.enc -pass file:"$T/pass" | tar xz -C "$T"
+          echo "== проверка: файлы бота на сервере те же, на которых сделано обновление"
+          ( cd "$B" && sha256sum -c "$T/base.sha256" ) || { echo "Файлы бота на сервере изменились — обновление не ставлю"; exit 1; }
+          BK="/var/backups/icase-bot/$(date +%Y%m%d-%H%M%S)-patch"; mkdir -p "$BK"; chmod 700 /var/backups/icase-bot
+          LIST=$(cd "$T/files" && find . -type f)
+          (cd "$B" && for f in $LIST; do if [ -f "$f" ]; then cp -a --parents "$f" "$BK"/; fi; done)
+          rollback() { echo "!! откат"; (cd "$BK" && find . -type f -exec cp -a {} "$B/{}" \;); for f in $LIST; do [ -f "$BK/$f" ] || rm -f "$B/$f"; done; systemctl restart icase-bot; exit 1; }
+          echo "== новые файлы"; echo "$LIST" | sed 's/^/  /'; (cd "$T/files" && cp -a . "$B"/)
+          chown -R --reference="$B" "$B/app" 2>/dev/null || true
+          PY=$(systemctl show -p ExecStart --value icase-bot | sed -E 's/.*path=([^ ;]+).*/\1/')
+          (cd "$B" && "$PY" -m py_compile app/*.py) || rollback
+          since=$(date '+%Y-%m-%d %H:%M:%S'); systemctl restart icase-bot; sleep 20
+          systemctl is-active --quiet icase-bot || { journalctl -u icase-bot --since "$since" -n 30 --no-pager -o cat | grep -E '^[A-Za-z]+(Error|Exception)|File "/opt' | cut -c1-200; rollback; }
+          if journalctl -u icase-bot --since "$since" --no-pager -o cat | grep -q Traceback; then journalctl -u icase-bot --since "$since" --no-pager -o cat | grep -E '^[A-Za-z]+(Error|Exception)|File "/opt' | cut -c1-200; rollback; fi
+          PORT=$(grep -oE '^WEBAPP_PORT=[0-9]+' "$B/.env" | cut -d= -f2 || true); PORT=${PORT:-8080}
+          c=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/" || true); echo "  мини-приложение → $c"
+          [ "$c" = 200 ] || rollback
+          echo "  ошибок в журнале после запуска: $(journalctl -u icase-bot --since "$since" --no-pager -o cat | grep -c ' ERROR ' || true)"
+          echo "  настройки (только имена): $(grep -oE '^(MOYSKLAD_ENABLED|MOYSKLAD_TOKEN|CRM_MODE)=' "$B/.env" | tr '\n' ' ')"
+          echo "Готово. Копия прежних файлов: $BK"
           SH
       - name: Режим CRM в боте
         if: inputs.stage == 'crm-on' || inputs.stage == 'crm-off'
