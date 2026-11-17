@@ -4,6 +4,7 @@
 #                 записать CRM_API_URL и CRM_BOT_KEY в /opt/icase-bot/.env и перезапустить бота.
 #                 Перед заменой проверяется, что файлы бота на сервере не менялись (иначе — стоп); при сбое всё возвращается.
 #   stage=compare — только чтение: сравнить остатки МоегоСклада (кэш бота) с остатками CRM по артикулу и штрихкоду.
+#   stage=inspect — только чтение: режим бота, имена настроек, адреса сайтов в настройках и коде, ошибки в журнале (без значений ключей).
 #   stage=crm-on / crm-off — включить или выключить режим CRM в боте (CRM_MODE в .env): склад, продажи, клиенты,
 #                 правка карточек и переоценка берутся из CRM вместо МоегоСклада. При сбое настройки возвращаются.
 # Секреты не покидают сервер: ключ бота создаётся и записывается прямо там.
@@ -12,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       stage:
-        description: "key, apply, compare, crm-on или crm-off"
+        description: "key, apply, compare, crm-on, crm-off или inspect"
         required: true
         default: key
 permissions:
@@ -29,7 +30,7 @@ jobs:
       - name: SSH
         env: { K: "${{ secrets.DEPLOY_SSH_KEY }}" }
         run: |
-          case "$STAGE" in key|apply|compare|crm-on|crm-off) ;; *) echo "stage: key, apply, compare, crm-on или crm-off"; exit 1;; esac
+          case "$STAGE" in key|apply|compare|crm-on|crm-off|inspect) ;; *) echo "stage: key, apply, compare, crm-on, crm-off или inspect"; exit 1;; esac
           install -m 700 -d ~/.ssh
           printf '%s\n' "$K" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e '/^$/d' > ~/.ssh/id_deploy; chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -T 20 -t ed25519 "$H" 2>/dev/null > ~/.ssh/known_hosts
@@ -146,4 +147,18 @@ jobs:
           print('есть в МоемСкладе с остатком, нет в CRM:', len(missing))
           for t, a in missing[:30]: print(f'  {a:g}  {t[:90]}')
           PYEOF
+          SH
+      - name: Состояние бота (только чтение)
+        if: inputs.stage == 'inspect'
+        run: |
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes root@"$H" 'bash -s' <<'SH'
+          B=/opt/icase-bot
+          echo "== служба"; systemctl is-active icase-bot; systemctl show -p ActiveEnterTimestamp --value icase-bot
+          echo "== настройки .env: имена"; grep -oE '^[A-Z_]+=' "$B/.env" | tr '\n' ' '; echo
+          echo "== режим и адреса (значения без ключей)"; grep -E '^(CRM_MODE|[A-Z_]*(URL|SITE|DOMAIN|HOST|SHOP)[A-Z_]*)=' "$B/.env" | grep -viE 'KEY|TOKEN|PASS|SECRET' | sed -E 's#(https?://[^/:@]+:)[^@]*@#\1***@#'
+          echo "== упоминания сайтов в коде"; grep -rnoE "icase52\.ru[^\"' ]*|xn--[a-z0-9-]+\.xn--p1ai[^\"' ]*|айкейс\.рф[^\"' ]*|SITE_URL|SHOP_URL|WOO[A-Z_]*|product-category[^\"' ]*" "$B/app" --include=*.py | sort | uniq -c | sort -rn | head -40
+          echo "== источник каталога"; grep -rnE "CRM_MODE" "$B/app" --include=*.py | cut -c1-160 | head -15
+          echo "== последние изменения файлов"; find "$B/app" -name '*.py' -printf '%TY-%Tm-%Td %TH:%TM %p\n' | sort -r | head -10
+          echo "== копии (откаты)"; ls -1 /var/backups/icase-bot 2>/dev/null | tail -10
+          echo "== ошибки в журнале за 6 часов"; journalctl -u icase-bot --since -6h --no-pager 2>/dev/null | grep -iE 'error|traceback|exception' | sed -E 's/[0-9]{6,}/<…>/g' | cut -c1-200 | sort | uniq -c | sort -rn | head -15
           SH
