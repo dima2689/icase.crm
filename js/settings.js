@@ -25,6 +25,7 @@ function shop(){
     ${App.fld("sSite","Сайт (QR в чеке)",App.inp("sSite",s.siteUrl,"url","https://…"))}${App.fld("sRev","Ссылка на отзывы (QR в чеке)",App.inp("sRev",s.reviewUrl,"url","Яндекс Карты, 2ГИС"))}
     ${App.fld("sWarr","Гарантия на устройства, мес.",App.inp("sWarr",s.deviceWarrantyMonths,"number"))}${App.fld("sRw","Гарантия на ремонт, дней",App.inp("sRw",s.repairWarrantyDays,"number"))}
     ${App.fld("sStore","Бесплатное хранение готовых ремонтов, дней",App.inp("sStore",s.storageDays,"number"))}${App.fld("sDead","Товар «залежался» через, дней",App.inp("sDead",s.deadDays,"number"))}
+    ${App.fld("sRcvM","Приёмка: наценка по умолчанию, %",App.inp("sRcvM",num((s.receive||{}).markup)||"","number","0 — не подставлять"))}${App.fld("sRcvR","Приёмка: округлять цену до, ₽",App.sel("sRcvR",[["1","1 ₽"],["10","10 ₽"],["100","100 ₽"],["1000","1 000 ₽"]],String(num((s.receive||{}).round)||10)))}
     ${App.fld("sAck","Отметка покупателя в товарном чеке",`<textarea id="sAck" rows="2">${esc(s.receiptAck||"")}</textarea>`,"full")}${App.fld("sFoot","Подпись в чеке",App.inp("sFoot",s.receiptFooter),"full")}
     <div class="fld full">${App.chk("sShift","Продажи только при открытой кассовой смене",s.requireShift)}</div>
     <div class="fld full"><label>Права и подтверждение управляющим или владельцем</label>
@@ -37,7 +38,7 @@ function shop(){
 ACT.saveSettings=(_,btn)=>run(btn,async()=>{
   const V=App.val;
   await App.api.update("settings",1,{shop_name:V("sName")||"iCase",city:V("sCity"),address:V("sAddr")||null,phone:V("sPhone")||null,inn:V("sInn")||null,legal_name:V("sLegal")||null,ogrnip:V("sOgrn")||null,site_url:V("sSite")||null,review_url:V("sRev")||null,receipt_ack:V("sAck")||App.DEFAULTS.receiptAck,
-    device_warranty_months:num(V("sWarr")),repair_warranty_days:num(V("sRw")),storage_days:num(V("sStore"))||30,dead_days:num(V("sDead"))||60,receipt_footer:V("sFoot")||null,require_shift:App.checked("sShift"),approvals:{productCreate:App.checked("sApC"),productDelete:App.checked("sApD"),sellerReceive:App.checked("sApR")}});
+    device_warranty_months:num(V("sWarr")),repair_warranty_days:num(V("sRw")),storage_days:num(V("sStore"))||30,dead_days:num(V("sDead"))||60,receive:{markup:Math.max(0,num(V("sRcvM"))),round:num(V("sRcvR"))||10},receipt_footer:V("sFoot")||null,require_shift:App.checked("sShift"),approvals:{productCreate:App.checked("sApC"),productDelete:App.checked("sApD"),sellerReceive:App.checked("sApR")}});
   await App.api.audit("Настройки изменены","","");App.toast("Настройки сохранены");
 });
 

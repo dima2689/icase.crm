@@ -26,6 +26,9 @@ ACT.printTab=k=>{App.ui.printTab=k;if(App.ui.view!=="print")location.hash="print
 const queueItems=()=>App.ui.tagQueue.map(q=>({q,p:App.byId("products",q.id)})).filter(x=>x.p);
 const qtyHere=p=>{const pt=App.point();return pt&&pt.cashWh?App.qtyIn(p,pt.cashWh):App.qtyTotal(p)};
 App.tagsAdd=ids=>addToQueue(ids);
+/* этикетки после приёмки: устройства — только принятые экземпляры, остальное — по одной */
+App.tagsAddUnits=(ids,units)=>{[...new Set(ids)].forEach(id=>{const p=App.byId("products",id);if(!p)return;const uids=p.trackSerial?units.filter(u=>u.productId===id).map(u=>u.id):null;
+  const q=App.ui.tagQueue.find(x=>x.id===id),it={id,copies:1,perUnit:true};if(uids&&uids.length)it.unitIds=uids;if(q)Object.assign(q,it);else App.ui.tagQueue.push(it)});saveQueue()};
 function addToQueue(ids){
   let n=0;ids.forEach(id=>{if(!App.ui.tagQueue.some(q=>q.id===id)){App.ui.tagQueue.push({id,copies:1});n++}});saveQueue();return n;
 }
@@ -39,9 +42,9 @@ ACT.tagDel=i=>{App.ui.tagQueue.splice(+i,1);saveQueue();App.render()};
 ACT.tagClear=()=>{App.ui.tagQueue=[];saveQueue();App.render()};
 ACT.tagByStock=()=>{queueItems().forEach(({q,p})=>q.copies=Math.max(1,qtyHere(p)));saveQueue();App.render()};
 ACT.tagOnes=()=>{App.ui.tagQueue.forEach(q=>q.copies=1);saveQueue();App.render()};
-const unitsForTags=p=>{const pt=App.point(),here=pt&&pt.cashWh?App.unitsOf(p.id,{wh:pt.cashWh}):[];return here.length?here:App.unitsOf(p.id)};
-const asUnit=(p,u)=>Object.assign({},p,{uattrs:u.attrs||{},serial:App.unitCode(u),batteryHealth:u.batteryHealth!=null&&u.batteryHealth!==""?u.batteryHealth:p.batteryHealth,condition:u.condition||p.condition,kit:u.kit||p.kit,price:App.unitPrice(u,p)});
-function printList(){const out=[];queueItems().forEach(({q,p})=>{if(p.trackSerial&&q.perUnit!==false){unitsForTags(p).forEach(u=>out.push({p:asUnit(p,u),copies:Math.max(1,num(q.copies)||1)}))}else out.push({p,copies:q.copies})});return out}
+const unitsForTags=(p,q)=>{if(q&&q.unitIds&&q.unitIds.length)return q.unitIds.map(id=>App.byId("units",id)).filter(Boolean);const pt=App.point(),here=pt&&pt.cashWh?App.unitsOf(p.id,{wh:pt.cashWh}):[];return here.length?here:App.unitsOf(p.id)};
+const asUnit=(p,u)=>Object.assign({},p,{uattrs:u.attrs||{},serial:App.unitCode(u),unitBarcode:App.unitCode(u),batteryHealth:u.batteryHealth!=null&&u.batteryHealth!==""?u.batteryHealth:p.batteryHealth,condition:u.condition||p.condition,kit:u.kit||p.kit,price:App.unitPrice(u,p)});
+function printList(){const out=[];queueItems().forEach(({q,p})=>{if(p.trackSerial&&q.perUnit!==false){unitsForTags(p,q).forEach(u=>out.push({p:asUnit(p,u),copies:Math.max(1,num(q.copies)||1)}))}else out.push({p,copies:q.copies})});return out}
 ACT.tagUnitMode=i=>{const q=App.ui.tagQueue[+i];if(q){q.perUnit=q.perUnit===false;saveQueue();App.render()}};
 ACT.tagPrint=()=>{const list=printList();if(!list.length)return App.toast("Добавьте товары");
   App.printHtml(App.tagsHtml(list,App.tagTemplate(App.ui.tagTpl)))};
@@ -59,7 +62,7 @@ function tags(){
       ${res.length>1?`<div class="tgap"><button class="btn sm" data-act="tagAddFound">Добавить все найденные (${res.length})</button></div>`:""}`:App.ui.tagQ?'<p class="muted">Ничего не найдено</p>':""}
     <p class="szhint">Можно отметить товары галочками в разделе «Товары» и нажать «Ценники».</p></div>
     ${items.length?`<div class="tsec"><div class="tbl-wrap"><table class="tagtbl"><thead><tr><th>Товар</th><th class="n">Цена</th><th class="n">Остаток</th><th class="n">Копий</th><th></th></tr></thead><tbody>
-      ${items.map(({q,p},i)=>`<tr><td><b>${esc(p.name)}</b><span class="sub">${esc([p.memory,p.color,p.condition].filter(Boolean).join(" · "))}</span>${p.trackSerial?`<label class="unitmode"><input type="checkbox" data-act="tagUnitMode" data-id="${i}" ${q.perUnit!==false?"checked":""}> по экземплярам: ${unitsForTags(p).length} шт.<small>свои IMEI, АКБ и цена</small></label>`:""}</td><td class="n">${money(p.price)}</td><td class="n">${qtyHere(p)}</td>
+      ${items.map(({q,p},i)=>`<tr><td><b>${esc(p.name)}</b><span class="sub">${esc([p.memory,p.color,p.condition].filter(Boolean).join(" · "))}</span>${p.trackSerial?`<label class="unitmode"><input type="checkbox" data-act="tagUnitMode" data-id="${i}" ${q.perUnit!==false?"checked":""}> ${q.unitIds&&q.unitIds.length?"принятые":"по экземплярам"}: ${unitsForTags(p,q).length} шт.<small>свои IMEI, АКБ и цена</small></label>`:""}</td><td class="n">${money(p.price)}</td><td class="n">${qtyHere(p)}</td>
         <td class="n"><input type="number" min="0" max="200" value="${num(q.copies)}" data-tagcopy="${i}" aria-label="Копий" style="width:70px"></td><td class="n"><button class="btn sm ghost" data-act="tagDel" data-id="${i}" aria-label="Убрать">${App.ico("x","sm")}</button></td></tr>`).join("")}
       </tbody></table></div>
       <div class="chips tgap"><button class="btn sm" data-act="tagByStock">Копий по остатку на точке</button><button class="btn sm" data-act="tagOnes">По одному</button><button class="btn sm danger" data-act="tagClear">Очистить</button></div></div>`

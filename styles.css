@@ -1410,3 +1410,23 @@ input.inv,select.inv,textarea.inv{border-color:var(--bad)!important;box-shadow:0
 .catbar.wide .crumbs b{font-size:15px}
 .catkids{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}
 .catkids .chip{white-space:nowrap}
+
+/* приёмка: значения для партии, оплата с нескольких счетов, черновики, параметры экземпляра */
+.rdef{border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin:4px 0 12px;background:var(--bg)}
+.rdef summary{cursor:pointer;font-weight:500;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.rdef summary .muted{font-weight:400;font-size:13px}
+.rdef-b{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end;padding-top:10px}
+.rdef-b .mini{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted)}
+.rdef-b .mini select,.rdef-b .mini input{min-width:120px}
+.rdef-b small{flex-basis:100%}
+.rpays{display:flex;flex-direction:column;gap:8px;margin:8px 0 12px;padding-top:8px;border-top:1px solid var(--line)}
+.rpays .sub-h{margin:0}
+.payrow select{flex:1;min-width:0}.payrow input{width:110px}
+.rdrafts{border-top:1px solid var(--line);margin-top:12px;padding-top:8px;display:flex;flex-direction:column;gap:4px}
+.rdrafts .sub-h{margin:0 0 4px}
+.rdrafts .linklike{flex:1;min-width:0;text-align:left;font-size:13.5px}
+.rdrafts .linklike small{color:var(--muted)}
+td.uattr{white-space:nowrap}
+td.uattr select{width:auto;max-width:130px;padding:4px 6px;font-size:13px;margin-right:4px}
+.runits{overflow-x:auto}
+.runits table.units{min-width:640px}

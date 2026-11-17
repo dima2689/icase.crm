@@ -276,7 +276,8 @@ App.TAG_PRESETS=[
   {id:"show100",name:"Витрина 100×70",w:100,h:70,media:"sheet",border:true,round:true,invert:true,priceSize:"L",note:"Принимаем ваше устройство в Trade-in",fields:F("shop","name","chips","cond","battery","kit","warranty","price","note","qr")},
   {id:"sale70",name:"Акция 70×50",w:70,h:50,media:"sheet",border:true,round:true,invert:false,priceSize:"M",note:"",fields:F("shop","name","chips","warranty","price","oldprice","discount","credit")},
   {id:"used70",name:"Б/у устройство 70×50",w:70,h:50,media:"sheet",border:true,round:true,invert:false,priceSize:"L",note:"",fields:F("name","chips","cond","battery","kit","used","warranty","price")},
-  {id:"label40",name:"Этикетка 40×30 (термопринтер)",w:40,h:30,media:"label",border:false,round:false,invert:false,priceSize:"M",note:"",fields:F("name","barcode","price")}
+  {id:"label40",name:"Этикетка 40×30 (термопринтер)",w:40,h:30,media:"label",border:false,round:false,invert:false,priceSize:"M",note:"",fields:F("name","barcode","price")},
+  {id:"unit58",name:"Этикетка устройства 58×40 (термопринтер)",w:58,h:40,media:"label",border:false,round:false,invert:false,priceSize:"M",note:"",fields:F("name","chips","barcode","price")}
 ];
 
 /** Автоматическая раскладка блоков под размер и набор полей. Блоки считаются для всех полей, выключенные просто не печатаются. */
@@ -394,9 +395,9 @@ function blockHtml(k,b,p,t,o){
     if(t.logo)inner=`<img src="${t.logo}" alt="" style="max-width:100%;max-height:100%;object-fit:contain;display:block;${t.logoBw?"filter:grayscale(1) contrast(1.4);":""}">`;
     else inner=App.logo("",esc(App.settings().shopName||"iCase")).replace("<svg ",'<svg style="width:100%;height:100%;display:block" preserveAspectRatio="xMidYMid meet" ');
   }else if(k==="qr"){const u=App.tagQrUrl(p,t);if(u)inner=App.qrSvg(u).replace("<svg",`<svg style="width:100%;height:100%;display:block"`);else empty=true}
-  else if(k==="barcode"){const code=p.barcode||p.sku||p.serial||"";if(code)inner=barcodeSvg(code,`height:100%;width:auto;max-width:100%;display:block`);else empty=true}
+  else if(k==="barcode"){const code=p.unitBarcode||p.barcode||p.sku||p.serial||"";if(code)inner=barcodeSvg(code,`height:100%;width:auto;max-width:100%;display:block`);else empty=true}
   else if(k==="pills"){
-    const cs=[f.chips&&p.memory,f.chips&&p.color,f.cond&&p.condition].filter(Boolean).map(x=>[esc(x),0]);
+    const ua=p.uattrs||{};const cs=[f.chips&&p.memory,f.chips&&p.color,f.chips&&ua.region,f.chips&&ua.sim,f.chips&&ua.plug&&"вилка "+ua.plug,f.cond&&p.condition,f.cond&&ua.grade&&"оценка "+ua.grade].filter(Boolean).map(x=>[esc(x),0]);
     if(f.battery&&p.batteryHealth!=null&&p.batteryHealth!=="")cs.push(["АКБ "+num(p.batteryHealth)+"%",0]);
     if(f.warranty&&App.tagWarranty(p))cs.push(["гарантия "+App.tagWarranty(p)+" мес.",1]);
     const ink=b.c||"#000",paper=t.bg||"#fff";
