@@ -1373,3 +1373,13 @@ input.inv,select.inv,textarea.inv{border-color:var(--bad)!important;box-shadow:0
   .hnav nav button{white-space:nowrap;border:1px solid var(--line);border-radius:99px;padding:6px 12px}
   .helpbtn span{display:none}
 }
+
+/* ремонт: быстрый шаг на карточке, повторный ремонт, прибыль */
+.rwrap{position:relative;display:flex;flex-direction:column}
+.rwrap.hasq .rcard{padding-bottom:48px}
+.rquick{position:absolute;left:12px;right:12px;bottom:10px;justify-content:center}
+.rprev{display:flex;flex-direction:column;gap:6px}
+.rprev-r{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 12px;border-radius:10px;background:var(--bg);border:1px solid var(--line);font-size:13.5px}
+.rprev-r.bad{background:var(--bad-soft);border-color:transparent}.rprev-r.ok{background:var(--ok-soft);border-color:transparent}
+.rprev-r small{display:block;color:var(--muted);margin-top:2px}
+.rprofit{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted);padding-top:4px}

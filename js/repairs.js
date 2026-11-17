@@ -15,11 +15,22 @@ const inWarranty=r=>{const e=App.repWarrantyEnd(r);return e&&e>new Date()};
 /* ---------- список ---------- */
 const FILTERS=[["active","В работе"],["late","Просрочены"],["ready","Готовы"],["stored","Не забирают"],["parts","Ждут запчасть"],["approve","Согласование"],["done","Выданы"],["cancel","Отказы"],["all","Все"]];
 const flt=(f,r)=>f==="active"?App.ACTIVE.includes(r.status):f==="late"?App.isLate(r):f==="stored"?App.isStored(r):f==="all"?true:r.status===f;
+/* с какого момента ремонт в текущем статусе */
+App.repStAt=r=>{const h=r.history||[];let at=null;for(let i=h.length-1;i>=0;i--){if(h[i].status!==r.status)break;at=h[i].at}return at||r.createdAt};
+const AGE={new:["ждёт мастера",1],diag:["на диагностике",2],approve:["ждём ответа",1],parts:["ждёт запчасть",5]};
+const ageHtml=r=>{const a=AGE[r.status];if(!a)return "";const d=App.days(App.repStAt(r));return d>=a[1]?`<span class="pill ${d>=a[1]*2?"bad":"warn"}">${a[0]} ${d} дн.</span>`:""};
+/* следующий шаг прямо с карточки, без открытия ремонта */
+const quick=r=>r.status==="new"&&App.can("repairWork")?["repNext","В диагностику"]:r.status==="work"&&App.can("repairWork")?["repReady","Ремонт готов"]:r.status==="ready"&&App.can("repair")?["repIssue","Выдать клиенту"]:null;
+/* срочные сверху: в работе — по сроку, готовые — кто дольше ждёт */
+const URGENT=["active","late","ready","stored","parts","approve"];
+const urgKey=r=>r.status==="ready"?"1"+String(r.readyAt||""):"0"+(r.dueDate||"9999-12-31")+String(r.createdAt||"");
 function card(r){
+  const q=quick(r);return `<div class="rwrap${q?" hasq":""}">${cardBtn(r)}${q?`<button type="button" class="btn sm rquick ${r.status==="ready"?"pri":""}" data-act="${q[0]}" data-id="${esc(r.id)}">${q[1]}</button>`:""}</div>`}
+function cardBtn(r){
   const c=App.cust(r.customerId)||{},late=App.isLate(r),stored=App.isStored(r),due=App.repDue(r);
   return `<button class="rcard ${late?"late":""} ${r.status==="ready"?"ready":""}" data-act="openRepair" data-id="${esc(r.id)}">
     <div class="rc-h"><b>${esc(r.num)}</b>${r.warrantyOf?'<span class="pill info">гарантия</span>':""}<span class="rc-st">${App.statusPill(r.status)}</span></div>
-    <div class="rc-dev">${esc(r.device)}</div><div class="rc-m">${esc(r.problem)}</div>
+    <div class="rc-dev">${esc(r.device)}</div>${ageHtml(r)?`<div>${ageHtml(r)}</div>`:""}<div class="rc-m">${esc(r.problem)}</div>
     <div class="rc-m">${esc(c.name||"—")}${c.phone?" · "+esc(c.phone):""}</div>
     <div class="rc-f"><span>${r.masterId||r.master?esc(App.nameOf(r.masterId)||r.master):'<span class="badc">мастер не назначен</span>'}</span>
       <span>${late?`<span class="pill bad">срок ${App.dt(r.dueDate)}</span>`:stored?`<span class="pill warn">ждёт ${App.days(r.readyAt)} дн.</span>`:r.dueDate&&App.ACTIVE.includes(r.status)?"до "+App.dt(r.dueDate):App.dt(r.createdAt)}</span></div>
@@ -31,7 +42,8 @@ VIEWS.repairs={
   render(){
     const u=App.ui,q=u.repQ.trim().toLowerCase(),pt=App.can("allPoints")?null:(App.point()||{}).id;
     const base=S.repairs.filter(r=>(!pt||r.pointId===pt)&&(!u.repMaster||(u.repMaster==="__none"?!r.masterId:u.repMaster==="__minefree"?!r.masterId||r.masterId===App.me.id:r.masterId===u.repMaster))&&(!q||[r.num,r.device,r.imei,r.problem,(App.cust(r.customerId)||{}).name,(App.cust(r.customerId)||{}).phone].join(" ").toLowerCase().includes(q)));
-    const list=App.sortDesc(base.filter(r=>flt(u.repFilter,r)));
+    const fl=base.filter(r=>flt(u.repFilter,r));
+    const list=URGENT.includes(u.repFilter)?fl.sort((a,b)=>urgKey(a).localeCompare(urgKey(b))):App.sortDesc(fl);
     const board=u.repView==="board"&&u.repFilter==="active";
     const cols=App.RSTAT.filter(s=>App.ACTIVE.includes(s[0]));
     return `<div class="cfilt rep3"><input id="repQ" type="search" placeholder="№, IMEI, клиент, телефон" value="${esc(u.repQ)}" data-filter="repQ" aria-label="Поиск ремонта">
@@ -69,7 +81,7 @@ ACT.newRepair=(arg)=>{
       <div class="full" id="rCust"></div>`)}
     ${sec(2,"Устройство",`<div class="fld"><label for="rImei">IMEI / серийный номер</label><div class="row-f">${App.inp("rImei",pre.imei||"","text","Сканируйте или введите",'autocomplete="off"')}<button type="button" class="btn" data-act="repScanImei" aria-label="Сканировать IMEI камерой">Скан</button></div></div>
       ${App.fld("rDevice","Устройство",App.inp("rDevice",pre.device||"","text","iPhone 13, синий, 128 ГБ",'list="rDevList" autocomplete="off"'))}
-      <div class="full" id="rInModel"></div>
+      <div class="full" id="rInModel"></div><div class="full" id="rPrev"></div>
       <div class="fld full"><label for="rPass">Пароль / графический ключ</label><div class="row-f">${App.inp("rPass","","text","Если клиент оставляет")}<button type="button" class="btn" data-act="patOpen">Ключ</button></div><div id="patBox" class="patbox" hidden></div></div>`,"IMEI подскажет модель")}
     ${sec(3,"Неисправность",`<div class="fld full"><label for="rProblem">Со слов клиента</label>${App.area("rProblem",pre.problem||"","Что случилось и когда")}${chips("rProblem")}</div>`)}
     ${sec(4,"Осмотр и комплектация",`<div class="fld full"><label>Проверка при клиенте <small class="muted">нажатие: ✓ в порядке → ✕ дефект → ? не проверить</small></label>${App.repIntakeCheck()}</div>
@@ -93,8 +105,21 @@ ACT.newRepair=(arg)=>{
   const sum=()=>{const e=num(App.val("rEst")),p=num(App.val("rPre")),b=$("#rSum");if(b)b.innerHTML=e||p?`${e?"Стоимость <b>"+money(e)+"</b>":""}${p?" · предоплата <b>"+money(p)+"</b>":""}`:""};
   ["rEst","rPre"].forEach(k=>{const e=document.getElementById(k);if(e)e.addEventListener("input",sum)});
   if(App.repIntakeBind)App.repIntakeBind();
+  if(!pre.warrantyOf){const prev=()=>{const box=$("#rPrev");if(box)box.innerHTML=prevHtml(App.val("rImei"),App.findCustomerByPhone(App.val("rPhone")),App.val("rDevice"))};
+    ["rImei","rDevice","rPhone"].forEach(k=>{const e=document.getElementById(k);if(e)e.addEventListener("input",prev)});prev()}
   if(!c&&ph)ph.focus();
 };
+/* то же устройство уже было у нас: в ремонте сейчас или выдано и на гарантии */
+const code=v=>String(v||"").toUpperCase().replace(/[^0-9A-Z]/g,"");
+const mkd=v=>String(v||"").toLowerCase().replace(/ё/g,"е").replace(/\s+/g," ").trim();
+function prevHtml(imei,cust,dev){
+  const k=code(imei),d=mkd(dev);if(k.length<8&&!(cust&&d))return "";
+  const hit=App.sortDesc(S.repairs.filter(r=>(k.length>=8&&code(r.imei)===k)||(cust&&d&&r.customerId===cust.id&&mkd(r.device)===d)),"createdAt").slice(0,3);
+  if(!hit.length)return "";
+  return `<div class="rprev">${hit.map(r=>{const we=App.repWarrantyEnd(r),ok=inWarranty(r);
+    const st=App.ACTIVE.includes(r.status)?`<b class="badc">сейчас в ремонте</b> · ${esc(App.RS[r.status].label)}`:r.status==="cancel"?"отказ":`выдан ${App.dt(r.closedAt)}${we?ok?` · <b class="okc">гарантия до ${App.dt(we.toISOString())}</b>`:" · гарантия истекла":""}`;
+    return `<div class="rprev-r ${App.ACTIVE.includes(r.status)?"bad":ok?"ok":""}"><span><b>${esc(r.num)}</b> · ${esc(r.device)} · ${esc(r.diagnosis||r.problem||"")}<small>${st}</small></span>${ok?`<button type="button" class="btn sm" data-act="inWarranty" data-id="${esc(r.id)}">Оформить как гарантийный</button>`:""}</div>`}).join("")}</div>`}
+ACT.inWarranty=id=>{const p=App.val("rProblem");ACT.repWarranty(id);const e=$("#rProblem");if(e&&p)e.value+=p};
 ACT.saveRepair=(warrantyOf,btn)=>run(btn,async()=>{
   const V=App.val,bad=(id,m)=>{const e=document.getElementById(id);if(e){e.focus();e.classList.add("err");setTimeout(()=>e.classList.remove("err"),2500)}throw new Error(m)};
   if(App.phoneKey(V("rPhone")).length!==10)bad("rPhone","Укажите телефон клиента — по нему он узнает статус и получит уведомление");
@@ -143,13 +168,14 @@ ACT.openRepair=id=>{
     const hasLines=(r.services||[]).length||(r.parts||[]).length;
     const RS=(f,html)=>canEdit?html:"";
     App.redrawModal(App.head(`${esc(r.num)} · ${esc(r.device)}`,App.statusPill(r.status)+(r.warrantyOf?' <span class="pill info">гарантийный</span>':""))+`
-      ${flowHtml(r)}${nextHtml(r)}
+      ${flowHtml(r)}${App.isLate(r)&&canEdit?`<div class="rnext bad"><p>Срок ${App.dt(r.dueDate)} прошёл. Перенесите срок — CRM подготовит сообщение клиенту с новой датой.</p><div class="rnext-b">${[[1,"+1 день"],[3,"+3 дня"],[7,"+7 дней"]].map(([n,l])=>nb(r.id+"|"+n,"repShift",l,"sm")).join("")}</div></div>`:""}${nextHtml(r)}
       <div class="rgrid">
         <div class="rmain">
           <section class="rblk"><h3>Диагноз и что сделано</h3>${canEdit?`<textarea id="reDiag" rows="2" aria-label="Диагноз и что сделано" data-rsave="diagnosis" placeholder="Причина неисправности, что заменили">${esc(r.diagnosis||"")}</textarea>`:`<p>${esc(r.diagnosis||"—")}</p>`}</section>
           <section class="rblk"><h3>Работы и запчасти</h3>
             <div class="rlns">${lineRows(r,open,cost)||'<div class="muted">Пока пусто. Добавьте работы из прайса — сумма для клиента посчитается сама.</div>'}</div>
             <div class="rtot"><span>${hasLines?"Сумма для клиента":num(r.approvedSum)?"Согласовано":"Предварительная оценка"}</span><b>${money(tot)}</b></div>
+            ${cost&&hasLines?(()=>{const pc=(r.parts||[]).filter(x=>!x.returned).reduce((a,x)=>a+num(x.cost)*num(x.qty),0);return `<div class="rprofit"><span>Запчасти по закупке ${money(pc)} · прибыль до зарплаты мастера</span><b class="${tot-pc<0?"badc":""}">${money(tot-pc)}</b></div>`})():""}
             ${open&&!hasLines?`<div class="fld"><label for="reEst">Оценка до диагностики, ₽</label>${App.inp("reEst",num(r.estimate)||"","number","0",'data-rsave="estimate"')}</div>`:""}
             ${open?`<div class="radd">
               ${App.repModelChips?App.repModelChips(r):""}
@@ -225,6 +251,8 @@ ACT.repAgree=(id,btn)=>run(btn,async()=>{const r=App.byId("repairs",id),t=App.re
 ACT.repReady=(id,btn)=>run(btn,async()=>{const r=App.byId("repairs",id);if(needPrice(r))throw new Error("Цена не указана — добавьте выполненные работы");
   if((r.partReqs||[]).some(q=>q.status==="ordered"))throw new Error("Есть заказанная запчасть, которая ещё не пришла — отметьте её или отмените заказ");
   await setSt(id,{status:"ready"},"Готов к выдаче");ACT.repMsg(id)});
+ACT.repShift=(arg,btn)=>run(btn,async()=>{const [id,n]=ref(arg),d=dayIso(+n);
+  await setSt(id,{due_date:d,note:"Срок перенесён на "+App.dt(d)},"Новый срок: "+App.dt(d));ACT.repMsg(id,null,null,"due")});
 ACT.repResume=(id,btn)=>run(btn,async()=>{await setSt(id,{status:"work"},"Ремонт продолжен")});
 ACT.repNote=(id,btn)=>run(btn,async()=>{const v=App.val("reNote").trim();if(!v)throw new Error("Напишите заметку");await setSt(id,{note:v},"Заметка добавлена")});
 ACT.repStatus=(arg,btn)=>run(btn,async()=>{const [id,s]=ref(arg);await setSt(id,{status:s})});
@@ -287,13 +315,14 @@ ACT.repWarranty=id=>{const r=App.byId("repairs",id);App.closeModal();ACT.newRepa
 ACT.repairFor=cid=>ACT.newRepair({customerId:cid});
 
 /* ---------- сообщение клиенту ---------- */
-ACT.repMsg=id=>{const r=App.byId("repairs",id),c=App.cust(r.customerId)||{},st=App.settings(),due=App.repDue(r);
+ACT.repMsg=(id,_b,_e,kind)=>{const r=App.byId("repairs",id),c=App.cust(r.customerId)||{},st=App.settings(),due=App.repDue(r);
   const site=String(st.siteUrl||"").replace(/\/+$/,"");
   const T={new:`Здравствуйте${c.name?", "+c.name:""}! ${st.shopName||"iCase"}: ваше устройство ${r.device} принято в ремонт, квитанция ${r.num}.${r.dueDate?" Ориентировочный срок — "+App.dt(r.dueDate)+".":""}`,
     approve:`Здравствуйте! ${st.shopName||"iCase"}: по ремонту ${r.num} (${r.device}) диагностика готова${r.diagnosis?": "+r.diagnosis:""}. Стоимость ${money(App.repairTotal(r)||r.estimate)}. Подтвердите, пожалуйста, ремонт.`,
     ready:`Здравствуйте! ${st.shopName||"iCase"}: ваш ${r.device} готов, квитанция ${r.num}.${due?" К оплате "+money(due)+".":""} Ждём вас${st.address?" по адресу "+st.address:""}.`,
     parts:`Здравствуйте! ${st.shopName||"iCase"}: для ремонта ${r.num} заказали запчасть, сообщим, как только придёт.`};
-  const txt=T[r.status]||T.ready;
+  T.due=`Здравствуйте${c.name?", "+c.name:""}! ${st.shopName||"iCase"}: ремонт ${r.num} (${r.device}) займёт немного больше времени. Новый срок — ${App.dt(r.dueDate)}. Приносим извинения за ожидание.`;
+  const txt=T[kind]||T[r.status]||T.ready;
   const tel=App.phoneKey(c.phone);
   App.openModal(App.head("Сообщение клиенту")+`${App.fld("rmT","Текст",`<textarea id="rmT" rows="5">${esc(txt+(site?` Статус ремонта: ${site}/repair?n=${encodeURIComponent(r.num)}`:""))}</textarea>`,"full")}
     <div class="acts"><button class="btn" data-act="repCopy">Скопировать</button>
