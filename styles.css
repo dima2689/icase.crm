@@ -1335,3 +1335,8 @@ button .ico{display:inline-block;vertical-align:-3px}
 .brand .logo-svg{height:19px;width:auto;color:var(--brand);display:block}
 .login-card .brand .logo-svg{height:26px}
 .brand span{line-height:1}
+
+/* проверка форм */
+.reqm{color:var(--bad);font-weight:600}
+input.inv,select.inv,textarea.inv{border-color:var(--bad)!important;box-shadow:0 0 0 3px var(--bad-soft)}
+.ferr{color:var(--bad);font-size:12px;line-height:1.3}

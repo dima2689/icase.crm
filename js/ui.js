@@ -268,6 +268,7 @@ document.addEventListener("click",e=>{
   if(!el){if(!e.target.closest(".search"))$("#gresults").hidden=true;if(e.target===$("#scrim"))App.closeModal();return}
   const fn=App.ACT[el.dataset.act];if(!fn)return;
   e.preventDefault();$("#gresults").hidden=true;
+  if(App.validateFor&&!App.validateFor(el.dataset.act))return;
   const opener=["openRepair","openClient","openProduct","openSale","openDoc","openShift"].includes(el.dataset.act);
   if(opener&&el.closest("#modal"))App.closeModal();
   Promise.resolve().then(()=>fn(el.dataset.id,el,e)).catch(err=>{console.error(err);App.toast(err&&err.message?err.message:"Ошибка")});
