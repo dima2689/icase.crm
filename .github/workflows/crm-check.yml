@@ -62,7 +62,7 @@ jobs:
           echo "== HTTPS и перенаправления"
           for u in http://crm.icase-dzr.ru https://icase-dzr.ru https://www.icase-dzr.ru $C/ $C/index.html $C/sw.js $C/js/config.js; do printf '%-36s %s → %s\n' "$u" "$(code -I "$u")" "$(curl -s -o /dev/null -w '%{redirect_url}' "$u")"; done
           echo "== сертификат"; echo | openssl s_client -connect crm.icase-dzr.ru:443 -servername crm.icase-dzr.ru 2>/dev/null | openssl x509 -noout -enddate -issuer
-          echo "== заголовки CRM"; curl -sI $C/ | grep -iE '^(strict-transport|content-security|x-frame|x-content-type|referrer-policy|permissions-policy|cache-control|server):' || true
+          echo "== заголовки CRM"; curl -s -D - -o /dev/null $C/ | tr -d '\r' | cut -c1-120
           echo "== время загрузки"; for f in / js/core.js js/pos.js styles.css js/vendor/supabase.js; do curl -s -o /dev/null -w "$f %{size_download} байт, %{time_total} с, сжатие: " $C/$f; curl -sI -H 'Accept-Encoding: gzip, br' $C/$f | grep -i '^content-encoding' | tr -d '\r' || echo нет; done
           ANON=$(curl -s $C/js/config.js | grep -o 'eyJ[A-Za-z0-9._-]*' | head -1)
           echo "== аноним к таблицам (ожидается пусто или ошибка)"
