@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       stage:
-        description: "imei или counts"
+        description: "imei, counts или live"
         required: true
         default: imei
 permissions:
@@ -22,7 +22,7 @@ jobs:
       - name: SSH
         env: { K: "${{ secrets.DEPLOY_SSH_KEY }}" }
         run: |
-          case "$STAGE" in imei|counts) ;; *) echo "stage: imei или counts"; exit 1;; esac
+          case "$STAGE" in imei|counts|live) ;; *) echo "stage: imei, counts или live"; exit 1;; esac
           install -m 700 -d ~/.ssh
           printf '%s\n' "$K" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e '/^$/d' > ~/.ssh/id_deploy; chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -T 20 -t ed25519 "$H" 2>/dev/null > ~/.ssh/known_hosts
@@ -53,3 +53,21 @@ jobs:
           docker exec supabase-db psql -U postgres -d postgres -qAt -F ' | ' </dev/null -c "select relname, n_live_tup from pg_stat_user_tables where schemaname='public' order by relname" 2>&1
           echo "== точные"; for t in apple_models categories services service_prices fin_accounts fin_categories points warehouses products units stock customers staff suppliers pay_rules settings repair_checklist; do printf '%s ' $t; docker exec supabase-db psql -U postgres -d postgres -qAt -c "select count(*) from public.$t" </dev/null 2>&1 | head -1; done
           SH
+      - name: Живой сервер снаружи (только чтение)
+        if: inputs.stage == 'live'
+        run: |
+          set -u
+          C=https://crm.icase-dzr.ru; A=https://api.icase-dzr.ru
+          code() { curl -s -o /dev/null -w '%{http_code}' "$@"; }
+          echo "== HTTPS и перенаправления"
+          for u in http://crm.icase-dzr.ru https://icase-dzr.ru https://www.icase-dzr.ru $C/ $C/index.html $C/sw.js $C/js/config.js; do printf '%-36s %s → %s\n' "$u" "$(code -I "$u")" "$(curl -s -o /dev/null -w '%{redirect_url}' "$u")"; done
+          echo "== сертификат"; echo | openssl s_client -connect crm.icase-dzr.ru:443 -servername crm.icase-dzr.ru 2>/dev/null | openssl x509 -noout -enddate -issuer
+          echo "== заголовки CRM"; curl -sI $C/ | grep -iE '^(strict-transport|content-security|x-frame|x-content-type|referrer-policy|permissions-policy|cache-control|server):' || true
+          echo "== время загрузки"; for f in / js/core.js js/pos.js styles.css js/vendor/supabase.js; do curl -s -o /dev/null -w "$f %{size_download} байт, %{time_total} с, сжатие: " $C/$f; curl -sI -H 'Accept-Encoding: gzip, br' $C/$f | grep -i '^content-encoding' | tr -d '\r' || echo нет; done
+          ANON=$(curl -s $C/js/config.js | grep -o 'eyJ[A-Za-z0-9._-]*' | head -1)
+          echo "== аноним к таблицам (ожидается пусто или ошибка)"
+          for t in customers sales repairs staff products units fin_ops settings audit_log cash_ops; do printf '%-12s ' $t; curl -s "$A/rest/v1/$t?select=*&limit=1" -H "apikey: $ANON" | cut -c1-90; echo; done
+          echo "== аноним к функциям"; for f in device_lookup bot_api_key site_api_key fin_setup claim_owner; do printf '%-14s %s\n' $f "$(code -X POST "$A/rest/v1/rpc/$f" -H "apikey: $ANON" -H 'Content-Type: application/json' -d '{}')"; done
+          echo "== edge-функции без ключа"; for f in site-api/catalog bot-api/ping staff-admin evotor; do printf '%-18s %s\n' $f "$(code "$A/functions/v1/$f")"; done
+          echo "== настройки входа"; curl -s "$A/auth/v1/settings" -H "apikey: $ANON" | cut -c1-300; echo
+          echo "== панель Supabase Studio снаружи"; for u in https://api.icase-dzr.ru/ https://api.icase-dzr.ru/project/default https://crm.icase-dzr.ru:8000/; do printf '%-45s %s\n' "$u" "$(code -m 8 "$u")"; done
