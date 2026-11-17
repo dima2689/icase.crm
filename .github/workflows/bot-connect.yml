@@ -196,6 +196,7 @@ jobs:
           echo "== панель бота: страницы и запросы про МойСклад"; grep -rnoE "[\"'](/api/[a-z0-9_/-]*(ms|sklad|moysklad|integr|setting)[a-z0-9_/-]*)[\"']" "$B/app" --include=*.py | sort -u | cut -c1-140 | head -20
           echo "== первая и последняя ошибка 401 в журнале"; journalctl -u icase-bot --no-pager -o short-iso 2>/dev/null | grep "HTTP 401" | sed -n '1p;$p' | cut -c1-60
           echo "== последняя удачная выгрузка МоегоСклада"; journalctl -u icase-bot --no-pager -o short-iso 2>/dev/null | grep -iE "МойСклад|moysklad" | grep -viE "401|error|traceback|File " | tail -3 | sed -E 's/[0-9]{6,}/<…>/g' | cut -c1-170
+          echo "== контрольные суммы кода бота"; (cd "$B" && find app -type f \( -name '*.py' -o -path 'app/web/*' \) ! -path '*__pycache__*' -print0 | sort -z | xargs -0 sha256sum | sed 's/^\(.\{16\}\)[^ ]*/\1/')
           echo "== копии (откаты)"; ls -1 /var/backups/icase-bot 2>/dev/null | tail -10
           echo "== ошибки в журнале за 6 часов"; journalctl -u icase-bot --since -6h --no-pager 2>/dev/null | grep -iE 'error|traceback|exception' | sed -E 's/[0-9]{6,}/<…>/g' | cut -c1-200 | sort | uniq -c | sort -rn | head -15
           SH
