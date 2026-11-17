@@ -14,6 +14,7 @@ function err(e,ctx){
   if(/duplicate key.*(sku|barcode|serial)/i.test(m))return new Error("Товар с таким артикулом, штрихкодом или IMEI уже есть");
   if(/duplicate key.*one_open_shift/i.test(m))return new Error("На этой точке уже открыта смена");
   if(/Failed to fetch|NetworkError|network/i.test(m))return new Error("Нет связи с базой. Проверьте интернет");
+  if(/numeric field overflow|out of range/i.test(m))return new Error("Слишком большое число");
   if(/battery_health_check/i.test(m))return new Error("Ёмкость АКБ — число от 0 до 100 %");
   if(/discount_check/i.test(m))return new Error("Скидка — от 0 до 100 %");
   if(/violates check constraint/i.test(m))return new Error("Недопустимое значение в форме — проверьте числа и даты");

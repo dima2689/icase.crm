@@ -76,8 +76,8 @@ ACT.spImport=sid=>{
   App.openModal(App.head("Загрузить прайс поставщика")+`
     <div class="form">${App.fld("spS","Поставщик",App.sel("spS",S.suppliers.map(s=>[s.id,s.name]),IMP.sid),"full")}</div>
     <p class="muted">Файл Excel (.xlsx, .xls) или CSV — первая строка с названиями колонок. Или скопируйте строки прямо из таблицы и вставьте ниже.</p>
-    <input type="file" id="spFile" accept=".xlsx,.xls,.csv,.txt">
-    <textarea id="spPaste" rows="4" placeholder="…или вставьте сюда строки из Excel / Google Таблиц (Ctrl+V)" style="width:100%;margin-top:8px"></textarea>
+    <input type="file" id="spFile" accept=".xlsx,.xls,.csv,.txt" aria-label="Файл прайса поставщика">
+    <textarea id="spPaste" aria-label="Строки прайса из таблицы" rows="4" placeholder="…или вставьте сюда строки из Excel / Google Таблиц (Ctrl+V)" style="width:100%;margin-top:8px"></textarea>
     <div id="spMap"></div>`,{wide:true});
   $("#spFile").addEventListener("change",async e=>{const f=e.target.files[0];if(!f)return;
     try{let rows;

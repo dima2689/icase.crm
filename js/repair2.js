@@ -198,8 +198,8 @@ function drawMP(){const m=App.byId("models",MP.modelId),svcs=S.services.filter(s
     ${App.fld("mpModel","Модель",App.sel("mpModel",App.models(MP.family).map(x=>[x.id,x.name]),MP.modelId),"full")}
     ${svcs.length?`<div class="tbl-wrap"><table><thead><tr><th>Работа</th><th class="n">Базовая</th><th class="n">Для модели, ₽</th><th>Запчасть со склада</th></tr></thead><tbody>
     ${svcs.map(s=>{const x=cur.get(s.id);return `<tr><td>${esc(s.name)}${s.group?`<span class="sub">${esc(s.group)}</span>`:""}</td><td class="n">${money(s.price)}</td>
-      <td class="n"><input type="number" inputmode="decimal" data-mp="${esc(s.id)}" value="${x?num(x.price):""}" placeholder="—" style="width:110px;text-align:right"></td>
-      <td>${App.sel("mpPart_"+s.id,[["","—"],...parts.map(p=>[p.id,p.name+" · "+App.qtyTotal(p)+" шт"])],x?x.partId:"",'data-mpp="'+esc(s.id)+'"')}</td></tr>`}).join("")}</tbody></table></div>
+      <td class="n"><input type="number" inputmode="decimal" data-mp="${esc(s.id)}" aria-label="Цена «${esc(s.name)}» для модели" value="${x?num(x.price):""}" placeholder="—" style="width:110px;text-align:right"></td>
+      <td>${App.sel("mpPart_"+s.id,[["","—"],...parts.map(p=>[p.id,p.name+" · "+App.qtyTotal(p)+" шт"])],x?x.partId:"",'data-mpp="'+esc(s.id)+'" aria-label="Запчасть для работы «'+esc(s.name)+'»"')}</td></tr>`}).join("")}</tbody></table></div>
     <p class="muted">Пустая цена — работа для этой модели не показывается. Запчасть: товары, в названии которых есть «${esc(m?m.name:"")}». Выбранная запчасть списывается со склада сервиса при добавлении работы в ремонт, а если её нет — создаётся заявка.</p>`:'<p class="muted">Сначала добавьте работы в прайс.</p>'}
     <div class="acts"><button class="btn" data-act="close">Закрыть</button><button class="btn pri" data-act="mpSave">Сохранить цены для модели</button></div>`;
   if($("#scrim").hidden)App.openModal(html,{wide:true});else{$("#modal").className="modal wide";$("#modal").innerHTML=html}
