@@ -77,6 +77,7 @@ const R=App.FORM_RULES={
   saveSettings:{sName:"req",sPhone:"phone",sInn:"inn",sWarr:"int",sRw:"int",sStore:"int",sDead:"int"},
   posPay:{posPhone:"phone"},
   prodReqGo:{prdNote:"req"},
+  rcvPost:{rcvInvT:"money"},
 };
 
 function holder(el){return el.closest(".fld")||el.parentElement}

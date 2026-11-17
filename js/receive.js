@@ -6,7 +6,7 @@ TITLES.receive="Приёмка";
 const LS=(k,v)=>{try{if(v===undefined)return JSON.parse(localStorage.getItem(k)||"null");localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}};
 /* склады для приёмки: продавец — только склады своей точки */
 function rcvWhOpts(){const all=App.whOpts();if(App.can("stock"))return all;const pt=(App.point()||{}).id;const mine=new Set(S.warehouses.filter(w=>w.pointId===pt).map(w=>w.id));return all.filter(o=>mine.has(o[0]))}
-const blank=()=>({wh:"",supplierId:"",invoice:"",note:"",payAcc:"",poId:"",lines:[]});
+const blank=()=>({wh:"",supplierId:"",invoice:"",invTotal:"",note:"",payAcc:"",poId:"",lines:[]});
 let R=LS("icase_recv")||blank();
 let last=null; // последняя проведённая приёмка
 const save=()=>LS("icase_recv",R);
@@ -19,6 +19,11 @@ const isSer=l=>{const p=P(l.productId);return !!(p&&p.trackSerial)};
 const lineQty=l=>isSer(l)?(l.units||[]).length:num(l.qty);
 const codeOf=u=>u.imei||u.serial_no||"";
 const allCodes=()=>R.lines.flatMap(l=>(l.units||[]).map(codeOf));
+/* закупка по прайсу выбранного поставщика (если строка прайса привязана к товару) */
+const supCost=p=>{if(!R.supplierId)return null;const x=S.sprices.find(y=>y.productId===p.id&&y.supplierId===R.supplierId&&num(y.price)>0);return x?num(x.price):null};
+function autoCost(l){const p=P(l.productId);if(!p)return;const sc=supCost(p);if(sc!=null){l.cost=sc;l.costSrc="sup"}else if(num(p.lastCost||p.cost)){l.cost=num(p.lastCost||p.cost);l.costSrc="last"}}
+/* разделить вставленный список кодов: строки, пробелы, запятые */
+const splitCodes=v=>String(v||"").split(/[\s,;]+/).map(x=>x.trim()).filter(Boolean);
 
 VIEWS.receive={
   ownSearch:true,
@@ -36,6 +41,7 @@ VIEWS.receive={
         ${App.fld("rcvWh","На склад",App.sel("rcvWh",rcvWhOpts(),R.wh,'data-rh="wh"'))}
         <div class="fld"><label for="rcvSup">Поставщик</label><div class="row-f nowrap">${App.sel("rcvSup",[["","—"],...S.suppliers.map(s=>[s.id,s.name])],R.supplierId,'data-rh="supplierId"')}${App.can("stock")?'<button class="btn sm" data-act="rcvSupNew" aria-label="Новый поставщик">+</button>':""}</div></div>
         ${App.fld("rcvInv","Накладная / основание",App.inp("rcvInv",R.invoice,"text","№ и дата",'data-rh="invoice"'))}
+        ${App.can("cost")?App.fld("rcvInvT","Сумма по накладной, ₽",App.inp("rcvInvT",R.invTotal,"number","для сверки",'data-rh="invTotal" min="0"')):""}
         ${App.can("finance")&&R.supplierId?App.fld("rcvPay","Оплата поставщику",App.sel("rcvPay",[["","В долг — оплачу позже"],...S.finaccounts.filter(a=>a.active).map(a=>[a.id,"Оплачено сразу: "+a.name])],R.payAcc||"",'data-rh="payAcc"')):""}
         ${App.fld("rcvNote","Комментарий",App.inp("rcvNote",R.note,"text","",'data-rh="note"'))}
       </div>
@@ -48,6 +54,7 @@ VIEWS.receive={
     <aside class="card rsum">
       <h2>Итого</h2>
       <div class="sumlines"><span>Позиций</span><span>${R.lines.length}</span><span>Штук</span><span id="rcvTq">${tq}</span>${cost?`<span>Закупка</span><span id="rcvTc">${money(tc)}</span>`:""}</div>
+      ${cost?`<div id="rcvDiff">${diffHtml(tc)}</div>`:""}
       <button class="btn pri big" data-act="rcvPost" ${R.lines.length?"":"disabled"}>Провести приёмку</button>
       <button class="btn" data-act="rcvClear" ${R.lines.length?"":"disabled"}>Очистить</button>
       <p class="muted">Черновик хранится в этом браузере, пока вы не проведёте приёмку.</p>
@@ -58,16 +65,20 @@ VIEWS.receive={
   after(){bind()}
 };
 
+function diffHtml(tc){if(R.invTotal===""||R.invTotal==null)return "";const d=Math.round(tc-num(R.invTotal));
+  return Math.abs(d)<1?'<p class="hint ok">Сходится с накладной ✓</p>':`<p class="hint bad">Расхождение с накладной: ${d>0?"+":"−"}${money(Math.abs(d))} — проверьте количество и закупку</p>`}
+const markup=(c,pr)=>c>0&&pr>0?Math.round((pr-c)/c*100):null;
 function lineHtml(l,i,{cost,price}){
   const p=P(l.productId),ser=p.trackSerial,q=lineQty(l);
-  const prices=`${cost?`<label class="mini">Закупка, ₽<input type="number" min="0" value="${num(l.cost)||""}" data-rl="${i}|cost" placeholder="0"></label>`:""}
-    ${price?`<label class="mini">Цена продажи, ₽<input type="number" min="0" value="${num(l.price)||""}" data-rl="${i}|price" placeholder="${num(p.price)||0}"></label>`:""}`;
+  const pr=num(l.price)||num(p.price),mk=markup(num(l.cost),pr);
+  const prices=`${cost?`<label class="mini">Закупка, ₽<input type="number" min="0" value="${num(l.cost)||""}" data-rl="${i}|cost" placeholder="0">${l.costSrc==="sup"?'<small class="muted">по прайсу поставщика</small>':l.costSrc==="last"?'<small class="muted">как в прошлый раз</small>':""}</label>`:""}
+    ${price?`<label class="mini">Цена продажи, ₽<input type="number" min="0" value="${num(l.price)||""}" data-rl="${i}|price" placeholder="${num(p.price)||0}">${cost&&mk!=null?`<small class="${mk<0?"badc":"muted"}" data-mk="${i}">${mk<0?"ниже закупки":"наценка "+mk+"%"}</small>`:!pr?'<small class="badc">цена не задана</small>':""}</label>`:""}`;
   return `<div class="rline">
     <div class="rhead"><div><b>${esc(p.name)}</b><span class="sub">${esc([App.catName(p),p.condition,p.barcode?"ШК "+p.barcode:"",App.skuShow(p.sku)?"арт. "+App.skuShow(p.sku):""].filter(Boolean).join(" · "))}</span></div>
       <div class="rq">${ser?`<span class="pill info">${App.codeLbl(p)}</span> <b>${q}</b> шт`:`<button class="btn sm" data-act="rcvQty" data-id="${i}|-1" aria-label="Меньше">−</button><input type="number" min="1" value="${q}" data-rl="${i}|qty" aria-label="Количество"><button class="btn sm" data-act="rcvQty" data-id="${i}|1" aria-label="Больше">+</button>`}</div>
       <div class="rprices">${prices}</div>
       <button class="btn sm ghost danger" data-act="rcvDel" data-id="${i}" aria-label="Убрать">${App.ico("x","sm")}</button></div>
-    ${ser?`<div class="runits"><input class="uscan" data-rscan="${i}" placeholder="Сканируйте ${App.codeName(p)} и Enter" autocomplete="off" aria-label="${App.codeName(p)}">
+    ${ser?`<div class="runits"><input class="uscan" data-rscan="${i}" placeholder="Сканируйте ${App.codeName(p)} и Enter или вставьте список" autocomplete="off" aria-label="${App.codeName(p)}">
       ${(l.units||[]).length?`<table class="units"><thead><tr><th>${App.codeLbl(p)}</th><th>Состояние</th><th>АКБ, %</th>${price?"<th>Цена экз., ₽</th>":""}<th></th></tr></thead><tbody>
       ${l.units.map((u,j)=>`<tr><td><b>${esc(codeOf(u))}</b>${u.warn?`<span class="sub warn">${esc(u.warn)}</span>`:""}${u.condition&&u.condition!=="Новый"||u.attrs?`<div class="chips usum">${App.usedChips(u.attrs)}<button class="btn sm" data-act="rcvUsed" data-id="${i}|${j}">Параметры б/у</button></div>`:""}</td>
         <td><select data-ru="${i}|${j}|condition" aria-label="Состояние">${App.CONDS.map(c=>`<option${(u.condition||p.condition)===c?" selected":""}>${c}</option>`).join("")}</select></td>
@@ -79,7 +90,7 @@ function lineHtml(l,i,{cost,price}){
 
 /* ---------- добавление ---------- */
 function ensureLine(p){let i=R.lines.findIndex(l=>l.productId===p.id);
-  if(i<0){R.lines.unshift({productId:p.id,qty:0,cost:num(p.cost)||"",price:"",units:[]});i=0}return i}
+  if(i<0){const l={productId:p.id,qty:0,cost:"",price:"",units:[]};autoCost(l);R.lines.unshift(l);i=0}return i}
 function addProduct(p,{focusScan=true}={}){
   const i=ensureLine(p);if(!p.trackSerial)R.lines[i].qty=num(R.lines[i].qty)+1;
   save();App.render();setTimeout(()=>focus(p.trackSerial&&focusScan?`[data-rscan="${i}"]`:"#rcvQ"),0);
@@ -121,17 +132,25 @@ function bind(){
   q.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();const v=q.value;q.value="";box.hidden=true;handleCode(v)}});
   box.addEventListener("click",e=>{const b=e.target.closest("[data-rpick]");if(!b)return;e.preventDefault();const id=b.dataset.rpick,s=q.value.trim();q.value="";box.hidden=true;
     if(id==="__dev")return ACT.rcvDevice("");if(id==="__item")return ACT.rcvNewItem("",s);const p=P(id);if(p)addProduct(p)});
-  document.querySelectorAll("[data-rscan]").forEach(el=>el.addEventListener("keydown",e=>{if(e.key!=="Enter")return;e.preventDefault();
-    const i=+el.dataset.rscan,p=P(R.lines[i].productId),v=el.value;el.value="";if(addUnit(p,v)){App.render();setTimeout(()=>focus(`[data-rscan="${ensureLine(p)}"]`),0)}}));
+  const addMany=(el,v)=>{const i=+el.dataset.rscan,p=P(R.lines[i].productId),codes=splitCodes(v);el.value="";if(!codes.length)return;
+    let ok=0;codes.forEach(c=>{if(addUnit(p,c))ok++});
+    if(codes.length>1)App.toast("Добавлено "+ok+" из "+codes.length+(ok<codes.length?" — остальные уже в приёмке или на складе":""));
+    if(ok){App.render();setTimeout(()=>focus(`[data-rscan="${ensureLine(p)}"]`),0)}};
+  document.querySelectorAll("[data-rscan]").forEach(el=>{
+    el.addEventListener("keydown",e=>{if(e.key!=="Enter")return;e.preventDefault();addMany(el,el.value)});
+    el.addEventListener("paste",e=>{const t=(e.clipboardData||window.clipboardData).getData("text");if(splitCodes(t).length>1){e.preventDefault();addMany(el,t)}})});
   if(!document.activeElement||document.activeElement===document.body)q.focus();
 }
 document.addEventListener("input",e=>{const t=e.target;
-  if(t.dataset.rh){R[t.dataset.rh]=t.value;save();return}
-  if(t.dataset.rl){const [i,f]=t.dataset.rl.split("|");const l=R.lines[+i];if(!l)return;l[f]=f==="qty"?Math.max(1,num(t.value)):t.value;save();totals();return}
+  if(t.dataset.rh){R[t.dataset.rh]=t.value;
+    if(t.dataset.rh==="supplierId"){R.lines.forEach(l=>{if(!l.cost||l.costSrc)autoCost(l)});save();App.render();return}
+    save();if(t.dataset.rh==="invTotal")totals();return}
+  if(t.dataset.rl){const [i,f]=t.dataset.rl.split("|");const l=R.lines[+i];if(!l)return;l[f]=f==="qty"?Math.max(1,num(t.value)):t.value;if(f==="cost")l.costSrc="";save();totals();
+    if(f==="cost"||f==="price"){const p=P(l.productId),m=document.querySelector(`[data-mk="${i}"]`),mk=markup(num(l.cost),num(l.price)||num(p.price));if(m&&mk!=null){m.textContent=mk<0?"ниже закупки":"наценка "+mk+"%";m.className=mk<0?"badc":"muted"}}return}
   if(t.dataset.ru){const [i,j,f]=t.dataset.ru.split("|");const u=(R.lines[+i]||{}).units&&R.lines[+i].units[+j];if(u){u[f]=t.value;save()}}
 });
 document.addEventListener("change",e=>{const t=e.target;if(t.dataset.rh||t.dataset.ru)t.dispatchEvent(new Event("input",{bubbles:true}));if(t.dataset.rh==="supplierId"&&App.can("finance"))App.render()});
-function totals(){const a=$("#rcvTq"),b=$("#rcvTc");if(a)a.textContent=R.lines.reduce((x,l)=>x+lineQty(l),0);if(b)b.textContent=money(R.lines.reduce((x,l)=>x+lineQty(l)*num(l.cost),0))}
+function totals(){const a=$("#rcvTq"),b=$("#rcvTc"),tc=R.lines.reduce((x,l)=>x+lineQty(l)*num(l.cost),0);if(a)a.textContent=R.lines.reduce((x,l)=>x+lineQty(l),0);if(b)b.textContent=money(tc);const d=$("#rcvDiff");if(d)d.innerHTML=diffHtml(tc)}
 ACT.rcvQty=v=>{const [i,d]=v.split("|").map(Number),l=R.lines[i];if(!l)return;l.qty=Math.max(1,num(l.qty)+d);save();App.render()};
 ACT.rcvDel=i=>{R.lines.splice(+i,1);save();App.render()};
 ACT.rcvUsed=v=>{const [i,j]=v.split("|").map(Number),u=R.lines[i]&&R.lines[i].units[j];if(!u)return;
@@ -144,6 +163,10 @@ ACT.rcvPost=async(_,btn)=>{
   if(!App.can("receive"))return App.toast("Нет права принимать товар");
   if(!R.wh)return App.toast("Выберите склад");
   for(const l of R.lines){const p=P(l.productId);if(p.trackSerial&&!(l.units||[]).length)return App.toast("Отсканируйте "+App.codeName(p)+" для «"+p.name+"»");if(!p.trackSerial&&num(l.qty)<1)return App.toast("Количество для «"+p.name+"»")}
+  {const w=[];const noCost=App.can("cost")?R.lines.filter(l=>!(num(l.cost)>0)).length:0,noPrice=R.lines.filter(l=>!(num(l.price)||num(P(l.productId).price))&&!P(l.productId).trackSerial).length;
+    if(noCost)w.push("без закупки: "+noCost);if(noPrice)w.push("без цены продажи: "+noPrice);
+    if(App.can("cost")&&R.invTotal!==""&&R.invTotal!=null){const d=Math.round(R.lines.reduce((x,l)=>x+lineQty(l)*num(l.cost),0)-num(R.invTotal));if(Math.abs(d)>=1)w.push("не сходится с накладной на "+money(Math.abs(d)))}
+    if(w.length&&!btn.dataset.sure){App.toast("Проверьте: "+w.join(", ")+". Нажмите ещё раз, чтобы провести как есть");App.confirm2(btn,"Провести как есть");return}}
   if(btn.disabled)return;btn.disabled=true;btn.textContent="Проводим…";
   let doc=null;
   try{
@@ -251,7 +274,7 @@ function drawDP(){
       ${App.can("cost")?App.fld("dpCost","Закупка, ₽",App.inp("dpCost",DP.cost,"number")):""}
       ${App.can("price")||(!ex&&App.can("receive"))?App.fld("dpPrice",DP.cond==="Новый"?"Цена продажи, ₽":"Цена этого экземпляра, ₽",App.inp("dpPrice",DP.price,"number",ex?String(num(ex.price)):"")):""}
       ${DP.cond!=="Новый"?`<div class="fld full">${App.usedForm("dpu_",DP.ua||{})}</div>`:""}
-      ${App.fld("dpCode",DP.family==="iPhone"?"IMEI":"Серийный номер",App.inp("dpCode",DP.code,"text","сканируйте",'autocomplete="off" class="mono"'))}
+      ${App.fld("dpCode",DP.family==="iPhone"?"IMEI":"Серийный номер",App.inp("dpCode",DP.code,"text","сканируйте или вставьте список",'autocomplete="off" class="mono"'))}
       ${App.fld("dpPart","Артикул с коробки",App.inp("dpPart",DP.part,"text","MTUV3ZD/A — необязательно",'autocomplete="off" class="mono"'))}
       <div class="full" id="dpInfo">${dpInfoHtml()}</div>
     </div>
@@ -267,6 +290,11 @@ function drawDP(){
   const pt=$("#dpPart");if(pt){pt.oninput=()=>{DP.part=App.normPart(pt.value);if(App.isPartNo(DP.part))dpIdentify(DP.part)};pt.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();const c2=$("#dpCode");if(c2)c2.focus()}}}
   const c=$("#dpCode");if(c){let tm=0;c.addEventListener("input",()=>{DP.code=c.value;clearTimeout(tm);const v=c.value.trim();if(App.looksLikeDeviceCode(v))tm=setTimeout(()=>dpIdentify(v),250);else{DP.info=null;const b=$("#dpInfo");if(b)b.innerHTML=""}});
     c.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();DP.code=c.value;ACT.dpAdd(null,$("[data-act=dpAdd]"))}};
+    /* вставка списка IMEI: все устройства этой модели, памяти и цвета добавляются разом */
+    c.addEventListener("paste",async e=>{const t=(e.clipboardData||window.clipboardData).getData("text"),codes=splitCodes(t);if(codes.length<2)return;e.preventDefault();
+      const m=dpModel();if(!m)return App.toast("Выберите модель");if(m.memories.length&&!DP.mem)return App.toast("Выберите память");if(!DP.color&&m.colors.length)return App.toast("Выберите цвет");
+      const before=DP.count;for(const code of codes){DP.code=code;await ACT.dpAdd(null,null)}
+      App.toast("Добавлено "+(DP.count-before)+" из "+codes.length+(DP.count-before<codes.length?" — остальные уже в приёмке или на складе":""))});
     setTimeout(()=>{const need=m&&((m.memories.length&&!DP.mem)||(m.colors.length&&!DP.color));if(!need)c.focus()},0)}
 }
 ACT.dpFamily=f=>{DP.family=f;DP.modelId=(App.models(f)[0]||{}).id||"";DP.mem="";DP.color="";DP.opts={};drawDP()};
