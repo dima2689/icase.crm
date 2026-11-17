@@ -37,7 +37,7 @@ let cache={key:null,lines:null};
 const sameRefs=(a,b)=>a&&b&&a.length===b.length&&a.every((x,i)=>x===b[i]);
 const dataRefs=()=>[S.sales,S.returns,S.products,S.categories];
 function catOf(p){if(!p)return{top:"Услуги и прочее",sub:"Услуги и прочее"};const c=App.byId("categories",p.categoryId);if(!c)return{top:"Без категории",sub:"Без категории"};
-  const par=c.parentId?App.byId("categories",c.parentId):null;return{top:par?par.name:c.name,sub:c.name}}
+  const a=App.catAnc(c.id);return{top:a[0].name,sub:a.length>1?a.slice(1).map(x=>x.name).join(" / "):c.name}}
 function allLines(){
   const key=dataRefs();
   if(sameRefs(cache.key,key))return cache.lines;

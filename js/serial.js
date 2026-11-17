@@ -9,7 +9,7 @@ App.unitCode=u=>u?(u.imei||u.serialNo||""):"";
 /* IMEI — только у телефонов; у остальной техники серийный номер */
 App.isPhone=p=>{if(typeof p==="string")p=App.byId("products",p);if(!p)return false;
   const m=p.catalogId&&App.byId("models",p.catalogId);if(m)return m.family==="iPhone";
-  const c=App.cat(p.categoryId),par=c&&App.cat(c.parentId),nm=[c&&c.name,par&&par.name].filter(Boolean).join(" ");
+  const nm=App.catPath(p.categoryId);
   if(/аксесс|чехл|стекл|плён|плен|кабел|заряд|наушн|ремешк|сервис|услуг/i.test(nm))return false;
   return /iphone|телефон|смартфон/i.test(nm)};
 App.codeLbl=p=>App.isPhone(p)?"IMEI":"S/N";
@@ -212,7 +212,7 @@ App.USED={
   source:["Trade-in","Выкуп у частного лица","Комиссия","Поставщик"]
 };
 /* категория «б/у»: сама или её родитель отмечены как б/у */
-App.isUsedCat=id=>{const c=App.cat(id);if(!c)return false;if(c.isUsed)return true;const p=App.cat(c.parentId);return !!(p&&p.isUsed)};
+App.isUsedCat=id=>App.catAnc(id).some(c=>c.isUsed);
 App.isUsedUnit=(u,p)=>!!(u&&((u.condition&&u.condition!=="Новый")||Object.keys(u.attrs||{}).length))||!!(p&&App.isUsedCat(p.categoryId));
 /* категория для б/у: «Б/у техника» → «iPhone» и т.д. */
 App.usedCategory=async function(family){

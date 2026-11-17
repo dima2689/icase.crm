@@ -113,7 +113,7 @@ App.sel = (id,opts,v="",attrs="")=>`<select id="${id}" ${attrs}>${opts.map(o=>{c
 App.area = (id,v="",ph="")=>`<textarea id="${id}" placeholder="${esc(ph)}">${esc(v)}</textarea>`;
 App.chk = (id,label,on)=>`<label class="chk"><input type="checkbox" id="${id}" ${on?"checked":""}> ${label}</label>`;
 App.whOpts = (all=false)=>App.whs().map(w=>[w.id,w.name]).concat(all?[]:[]);
-App.catOpts = (withEmpty=true)=>{const out=withEmpty?[["","Без категории"]]:[];App.catChildren("").forEach(c=>{out.push([c.id,c.name]);App.catChildren(c.id).forEach(s=>out.push([s.id,"— "+s.name]))});return out};
+App.catOpts = (withEmpty=true,skip)=>{const out=withEmpty?[["","Без категории"]]:[];const walk=(pid,lvl)=>App.catChildren(pid).forEach(c=>{if(skip&&skip.has(c.id))return;out.push([c.id,"\u00a0\u00a0".repeat(lvl*2)+(lvl?"└ ":"")+c.name]);walk(c.id,lvl+1)});walk("",0);return out};
 App.statusPill = s=>{const x=App.RS[s]||{label:s,cls:"mute"};return `<span class="pill ${x.cls}">${esc(x.label)}</span>`};
 App.payLabel = m=>App.PAYALL[m]||m||"—";
 App.paysText = pays=>(pays||[]).filter(p=>num(p.amount)).map(p=>App.payLabel(p.method)+" "+money(p.amount)).join(" + ");

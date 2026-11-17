@@ -103,18 +103,20 @@ ACT.whSave=(id,btn)=>run(btn,async()=>{
 /* ---------- категории ---------- */
 function categories(){
   const cnt=id=>S.products.filter(p=>!p.archived&&App.inCat(p,id)).length;
-  const row=(c,lvl)=>`<tr class="rowlink" data-act="catForm" data-id="${esc(c.id)}"><td style="padding-left:${10+lvl*22}px">${lvl?"— ":""}<b>${esc(c.name)}</b></td><td>${c.isDevice?'<span class="pill dark">устройство</span>':""}</td><td class="n">${cnt(c.id)}</td></tr>`;
+  const row=(c,lvl)=>`<tr class="rowlink" data-act="catForm" data-id="${esc(c.id)}"><td style="padding-left:${10+lvl*22}px">${lvl?"└ ":""}<b>${esc(c.name)}</b></td><td>${c.isDevice?'<span class="pill dark">устройство</span>':""}${c.isUsed?' <span class="pill">б/у</span>':""}</td><td class="n">${cnt(c.id)||'<span class="muted">0</span>'}</td></tr>`;
+  const tree=(pid,lvl)=>App.catChildren(pid).map(c=>row(c,lvl)+tree(c.id,lvl+1)).join("");
   return `<section class="card"><div class="card-h"><h2>Категории</h2>${App.can("settings")?'<button class="btn pri sm" data-act="catForm">+ Категория</button>':""}</div>
-  <p class="muted">Флажок «устройство» включает гарантию на устройства из настроек магазина. Подкатегории наследуют его.</p>
+  <p class="muted">Вложенность любая: Apple → iPhone → iPhone 17 Pro. Флажки «устройство» и «б/у» подкатегории наследуют. Товары удобнее раскладывать в разделе «Товары»: отметьте их галочками и нажмите «Перенести выбранные».</p>
   <div class="tbl-wrap"><table><thead><tr><th>Название</th><th>Тип</th><th class="n">Товаров</th></tr></thead><tbody>
-  ${App.catChildren("").map(c=>row(c,0)+App.catChildren(c.id).map(s=>row(s,1)).join("")).join("")||'<tr><td colspan="3" class="empty">Категорий нет</td></tr>'}
+  ${tree("",0)||'<tr><td colspan="3" class="empty">Категорий нет</td></tr>'}
   </tbody></table></div></section>`;
 }
 ACT.catForm=id=>{
   if(!App.can("settings"))return;
   const c=id?App.cat(id):{parentId:"",isDevice:false};
   App.openModal(App.head(id?"Категория":"Новая категория",id&&App.can("del")?`<button class="btn sm danger" data-act="catDel" data-id="${esc(id)}">Удалить</button>`:"")+`<div class="form">
-  ${App.fld("kName","Название",App.inp("kName",c.name))}${App.fld("kParent","Родительская",App.sel("kParent",[["","— верхний уровень —"],...App.catChildren("").filter(x=>x.id!==id).map(x=>[x.id,x.name])],c.parentId||""))}
+  ${App.fld("kName","Название",App.inp("kName",c.name))}${App.fld("kParent","Внутри категории",App.sel("kParent",[["","— верхний уровень —"],...App.catOpts(false,id?App.catDesc(id):null)],c.parentId||""))}
+  ${id?`<p class="muted full">Товаров: ${S.products.filter(p=>!p.archived&&App.inCat(p,id)).length} (с подкатегориями) · подкатегорий: ${App.catDesc(id).size-1}</p>`:""}
   <div class="fld full">${App.chk("kDev","Устройство (гарантия на устройства)",c.isDevice)}</div>
   <div class="fld full">${App.chk("kUsed","Б/у техника — у каждого экземпляра параметры б/у (АКБ, ремонт, комплект…)",c.isUsed)}</div></div>
   <div class="acts"><button class="btn pri" data-act="catSave" data-id="${esc(id||"")}">Сохранить</button></div>`);
@@ -123,13 +125,15 @@ ACT.catSave=(id,btn)=>run(btn,async()=>{
   const name=App.val("kName");if(!name)return App.toast("Укажите название");
   const parentId=App.val("kParent");
   if(S.categories.some(c=>c.id!==id&&(c.parentId||"")===parentId&&String(c.name).toLowerCase()===name.toLowerCase()))return App.toast("Такая категория уже есть");
-  if(id&&parentId&&App.catChildren(id).length)return App.toast("У категории есть подкатегории, её нельзя вложить");
+  if(id&&parentId&&App.catDesc(id).has(parentId))return App.toast("Нельзя вложить категорию саму в себя или в свою подкатегорию");
   const data={name,parent_id:parentId||null,is_device:App.checked("kDev"),is_used:App.checked("kUsed")};
-  if(id)await App.api.update("categories",id,data);else await App.api.insert("categories",data);
-  App.closeModal();App.toast("Сохранено");
+  let nid=id;if(id)await App.api.update("categories",id,data);else nid=(await App.api.insert("categories",data)).id;
+  await App.reload(["categories"]);App.closeModal();App.toast("Сохранено");
+  if(App.ui.view==="stock"&&!id&&nid&&ACT.sfCat)ACT.sfCat(nid);
 });
 ACT.catDel=(id,el)=>run(null,async()=>{
   if(S.products.some(p=>p.categoryId===id)||App.catChildren(id).length)return App.toast("В категории есть товары или подкатегории. Перенесите их сначала");
+  if(App.ui.sf&&App.ui.sf.cat===id)App.ui.sf.cat=App.cat(id).parentId||"";
   if(!App.confirm2(el,"Удалить? Нажмите ещё раз"))return;await App.api.remove("categories",id);App.closeModal();App.toast("Категория удалена");
 });
 

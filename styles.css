@@ -1383,3 +1383,30 @@ input.inv,select.inv,textarea.inv{border-color:var(--bad)!important;box-shadow:0
 .rprev-r.bad{background:var(--bad-soft);border-color:transparent}.rprev-r.ok{background:var(--ok-soft);border-color:transparent}
 .rprev-r small{display:block;color:var(--muted);margin-top:2px}
 .rprofit{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted);padding-top:4px}
+
+/* товары: дерево категорий слева, строка пути сверху */
+.sgrid{display:grid;grid-template-columns:260px minmax(0,1fr);gap:16px;align-items:start}
+.sgrid.nar{display:block}
+.sgrid>.smain{min-width:0}
+.ctree{position:sticky;top:0;max-height:calc(100vh - 120px);overflow:auto;padding:12px 8px}
+.ctree-h{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 6px 8px}
+.ctree ul{list-style:none;margin:0;padding:0}
+.ctn{display:flex;align-items:center;gap:2px;padding-left:calc(var(--l,0) * 14px);border-radius:8px}
+.ctn:hover{background:var(--bg)}
+.ctn.on{background:var(--sage-soft)}
+.ctn.on .ctl{color:var(--olive);font-weight:500}
+.ctn.cz .ctl{color:var(--faint,#94A3B8)}
+.ctt{flex:0 0 22px;height:28px;display:inline-flex;align-items:center;justify-content:center;border:0;background:none;color:var(--muted);cursor:pointer;border-radius:6px;padding:0}
+.ctt svg{transition:transform .15s}.ctt.open svg{transform:rotate(90deg)}
+.ctl{flex:1;min-width:0;text-align:left;border:0;background:none;font:inherit;font-size:14px;color:inherit;padding:5px 4px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ctl.warnc{color:var(--warn)}
+.ctn small{color:var(--muted);font-size:12px;padding-right:8px;font-variant-numeric:tabular-nums}
+.ctree-m{border-top:1px solid var(--line);margin-top:10px;padding:10px 6px 0;display:flex;flex-direction:column;gap:8px}
+.catbar{display:flex;flex-direction:column;gap:8px;margin:0 0 10px}
+.crumbs{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:14px}
+.crumbs button{border:0;background:none;font:inherit;color:var(--olive);cursor:pointer;padding:2px 0}
+.crumbs span{color:var(--faint,#94A3B8)}
+.crumbs small{color:var(--muted);margin-left:4px}
+.catbar.wide .crumbs b{font-size:15px}
+.catkids{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}
+.catkids .chip{white-space:nowrap}

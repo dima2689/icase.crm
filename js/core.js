@@ -109,10 +109,17 @@ App.cashWh = ()=>{const p=App.point();if(p&&p.cashWh&&App.byId("warehouses",p.ca
   const w=p&&App.whs().find(w=>w.pointId===p.id);return w?w.id:(App.whs()[0]||{}).id};
 App.serviceWh = ()=>{const p=App.point();return (p&&p.serviceWh&&App.byId("warehouses",p.serviceWh))?p.serviceWh:App.cashWh()};
 App.cat = id=>App.byId("categories",id);
-App.catName = p=>{const c=App.cat(p&&p.categoryId);if(!c)return "Без категории";const par=App.cat(c.parentId);return par?par.name+" / "+c.name:c.name};
-App.isDevice = p=>{const c=App.cat(p.categoryId);if(!c)return false;if(c.isDevice)return true;const par=App.cat(c.parentId);return !!(par&&par.isDevice)};
-App.catChildren = id=>S.categories.filter(c=>(c.parentId||"")===(id||"")).sort((a,b)=>String(a.name).localeCompare(b.name));
-App.inCat = (p,catId)=>{if(!catId)return true;if(p.categoryId===catId)return true;const c=App.cat(p.categoryId);return !!(c&&c.parentId===catId)};
+/* дерево категорий любой глубины: Apple / Apple Mac / MacBook / MacBook Air */
+App.catAnc = id=>{const out=[];let c=App.cat(id),g=0;while(c&&g++<12){out.unshift(c);c=App.cat(c.parentId)}return out}; // от корня до самой категории
+App.catPath = id=>App.catAnc(id).map(c=>c.name).join(" / ");
+App.catName = p=>App.catPath(p&&p.categoryId)||"Без категории";
+App.isDevice = p=>App.catAnc(p&&p.categoryId).some(c=>c.isDevice);
+App.catChildren = id=>S.categories.filter(c=>(c.parentId||"")===(id||"")).sort((a,b)=>App.coll?App.coll(a.name,b.name):String(a.name).localeCompare(b.name));
+let catIdx={src:null,desc:null};
+App.catDesc = id=>{if(catIdx.src!==S.categories){const kids=new Map();S.categories.forEach(c=>{const k=c.parentId||"";(kids.get(k)||kids.set(k,[]).get(k)).push(c.id)});
+  const memo=new Map(),walk=(x,seen)=>{if(memo.has(x))return memo.get(x);const s=new Set([x]);(kids.get(x)||[]).forEach(k=>{if(!seen.has(k)){seen.add(k);walk(k,seen).forEach(v=>s.add(v))}});memo.set(x,s);return s};
+  catIdx={src:S.categories,desc:id0=>walk(id0,new Set([id0]))}}return catIdx.desc(id)}; // сама категория и все вложенные
+App.inCat = (p,catId)=>!catId||(!!p.categoryId&&App.catDesc(catId).has(p.categoryId));
 
 /* ---------- остатки ---------- */
 App.qtyIn = (p,wh)=>p&&p.stock?num(p.stock[wh]):0;

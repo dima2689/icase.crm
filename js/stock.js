@@ -43,15 +43,35 @@ function usedRange(p){if(!p.trackSerial)return "";const us=App.unitsOf(p.id).fil
   const b=us.map(u=>num(u.batteryHealth)),mn=Math.min(...b),mx=Math.max(...b),rep=us.filter(u=>(u.attrs||{}).repair==="Был").length;
   return "АКБ "+(mn===mx?mn:mn+"–"+mx)+"%"+(rep?" · с ремонтом: "+rep:"")}
 const facet=(list,fn)=>{const m=new Map();list.forEach(p=>{const k=fn(p);if(k)m.set(k,(m.get(k)||0)+1)});return [...m.entries()].sort((a,b)=>a[0].localeCompare(b[0],"ru",{numeric:true}))};
-function catChips(){
-  const f=App.ui.sf,base=stockBase("cat"),cnt=id=>base.filter(p=>App.inCat(p,id)).length,none=base.filter(p=>!p.categoryId).length;
-  const cur=App.cat(f.cat),root=cur?(cur.parentId?App.cat(cur.parentId):cur):null,kids=root?App.catChildren(root.id):[];
+/* категории: дерево слева (компьютер) и строка пути с подкатегориями (телефон) */
+const CO_KEY="icase_catopen";
+App.ui.catOpen=(()=>{try{return new Set(JSON.parse(localStorage.getItem(CO_KEY)||"[]"))}catch(e){return new Set()}})();
+const coSave=()=>{try{localStorage.setItem(CO_KEY,JSON.stringify([...App.ui.catOpen]))}catch(e){}};
+function catCounts(){const base=stockBase("cat"),cnt=new Map();let none=0;
+  base.forEach(p=>{if(!p.categoryId||!App.cat(p.categoryId)){none++;return}App.catAnc(p.categoryId).forEach(c=>cnt.set(c.id,(cnt.get(c.id)||0)+1))});return {base,cnt,none}}
+const CAR='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
+function catTree(){
+  const f=App.ui.sf,{base,cnt,none}=catCounts(),ed=App.can("settings"),open=App.ui.catOpen,sel=new Set(App.catAnc(f.cat).map(c=>c.id));
+  const node=(c,lvl)=>{const n=cnt.get(c.id)||0;if(!n&&!ed&&!sel.has(c.id))return "";
+    const kids=App.catChildren(c.id).filter(k=>ed||cnt.get(k.id)),isOpen=open.has(c.id);
+    return `<li><div class="ctn${f.cat===c.id?" on":""}${n?"":" cz"}" style="--l:${lvl}">${kids.length?`<button type="button" class="ctt${isOpen?" open":""}" data-act="catToggle" data-id="${esc(c.id)}" aria-expanded="${isOpen}" aria-label="${isOpen?"Свернуть":"Развернуть"} «${esc(c.name)}»">${CAR}</button>`:'<i class="ctt"></i>'}<button type="button" class="ctl" data-act="sfCat" data-id="${esc(c.id)}"${f.cat===c.id?' aria-current="true"':""}>${esc(c.name)}</button><small>${n||""}</small></div>${kids.length&&isOpen?`<ul>${kids.map(k=>node(k,lvl+1)).join("")}</ul>`:""}</li>`};
+  return `<aside class="card ctree" aria-label="Категории"><div class="ctree-h"><b>Категории</b>${ed?`<button type="button" class="btn sm ghost" data-act="catForm" title="Новая категория верхнего уровня">+ Категория</button>`:""}</div>
+    <ul><li><div class="ctn${!f.cat?" on":""}" style="--l:0"><i class="ctt"></i><button type="button" class="ctl" data-act="sfCat" data-id="">Все товары</button><small>${base.length}</small></div></li>
+    ${App.catChildren("").map(c=>node(c,0)).join("")}
+    ${none?`<li><div class="ctn${f.cat==="__none"?" on":""}" style="--l:0"><i class="ctt"></i><button type="button" class="ctl warnc" data-act="sfCat" data-id="__none">Без категории</button><small>${none}</small></div></li>`:""}</ul>
+    ${catManage()}</aside>`}
+function catManage(){const f=App.ui.sf,c=App.cat(f.cat),pick=App.ui.tagPick.size;
+  if(!App.can("settings")&&!(App.can("stock")&&pick))return "";
+  return `<div class="ctree-m">${c?`<small class="muted">${esc(App.catPath(c.id))}</small>`:""}<div class="row-f wrap">
+    ${App.can("settings")&&c?`<button type="button" class="btn sm" data-act="subCatNew" data-id="${esc(c.id)}">+ Подкатегория</button><button type="button" class="btn sm ghost" data-act="catForm" data-id="${esc(c.id)}">Изменить</button>`:""}
+    ${App.can("stock")&&pick?`<button type="button" class="btn sm pri" data-act="catMoveDlg">Перенести выбранные (${pick})</button>`:""}</div></div>`}
+function catBar(){
+  const f=App.ui.sf,{base,cnt,none}=catCounts(),ed=App.can("settings"),cur=App.cat(f.cat),anc=App.catAnc(f.cat);
+  const kids=App.catChildren(cur?cur.id:"").filter(k=>ed||cnt.get(k.id));
   const chip=(id,label,n,on)=>`<button class="chip ${on?"on":""}" data-act="sfCat" data-id="${esc(id)}">${esc(label)}<b>${n}</b></button>`;
-  return `<div class="chips">${chip("","Все",base.length,!f.cat)}${App.catChildren("").map(c=>chip(c.id,c.name,cnt(c.id),root&&root.id===c.id)).join("")}
-    ${none?chip("__none","Без категории",none,f.cat==="__none"):""}${App.can("settings")?'<button class="chip add" data-act="catForm">+ категория</button>':""}</div>
-    ${root?`<div class="chips sub"><span class="subl">${esc(root.name)}:</span>${chip(root.id,"все",cnt(root.id),f.cat===root.id)}${kids.map(k=>chip(k.id,k.name,cnt(k.id),f.cat===k.id)).join("")}
-    ${App.can("settings")?`<button class="chip add" data-act="subCatNew" data-id="${esc(root.id)}">+ подкатегория</button>`:""}</div>`:""}`;
-}
+  return `<div class="catbar"><nav class="crumbs" aria-label="Категория"><button type="button" data-act="sfCat" data-id=""${!f.cat?' aria-current="true"':""}>Все товары</button>${f.cat==="__none"?'<span>›</span><b>Без категории</b>':anc.map((c,i)=>`<span>›</span>${i===anc.length-1?`<b>${esc(c.name)}</b>`:`<button type="button" data-act="sfCat" data-id="${esc(c.id)}">${esc(c.name)}</button>`}`).join("")}<small>${cur?(cnt.get(cur.id)||0):f.cat==="__none"?none:base.length} поз.</small></nav>
+    ${kids.length||(!cur&&none)||(ed&&cur)?`<div class="chips catkids">${kids.map(k=>chip(k.id,k.name,cnt.get(k.id)||0,false)).join("")}${!cur&&f.cat!=="__none"&&none?chip("__none","Без категории",none,false):""}${ed&&cur?`<button class="chip add" data-act="subCatNew" data-id="${esc(cur.id)}">+ подкатегория</button><button class="chip add" data-act="catForm" data-id="${esc(cur.id)}">изменить</button>`:""}${ed&&!cur&&f.cat!=="__none"?'<button class="chip add" data-act="catForm">+ категория</button>':""}</div>`:""}
+    ${App.can("stock")&&App.ui.tagPick.size?`<div class="row-f"><button type="button" class="btn sm pri" data-act="catMoveDlg">Перенести выбранные в категорию (${App.ui.tagPick.size})</button></div>`:""}</div>`}
 const secSum=(...a)=>a.filter(Boolean).join(", ");
 function fsec(key,title,summary,body){const open=!!(App.ui.sf.sec||{})[key];
   return `<div class="fsec ${open?"open":""}"><button class="fsh" data-act="sfSec" data-id="${key}" aria-expanded="${open}"><span class="ft">${title}</span><span class="fsum">${esc(summary||"")}</span><span class="car"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform:rotate(${open?180:0}deg);transition:transform .15s"><path d="M6 9l6 6 6-6"/></svg></span></button>${open?`<div class="fsb">${body}</div>`:""}</div>`}
@@ -65,7 +85,8 @@ VIEWS.stock={
     let whs=App.whs().filter(w=>list.some(p=>App.qtyIn(p,w.id)));if(!whs.length)whs=App.whs().slice(0,1);
     const col=App.coll,cmp={name:(a,b)=>col(a.name,b.name),new:(a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")),
       qty:(a,b)=>qty(b)-qty(a),price_asc:(a,b)=>num(a.price)-num(b.price),price_desc:(a,b)=>num(b.price)-num(a.price),markup:(a,b)=>(num(b.price)-num(b.cost))-(num(a.price)-num(a.cost))}[f.sort]||((a,b)=>0);
-    const gkey={cat:p=>App.catName(p),brand:brandOf,model:p=>p.model||"Без модели",none:()=>""}[f.group]||(()=>"");
+    const pre=f.cat&&f.cat!=="__none"?App.catPath(f.cat):"";
+    const gkey={cat:p=>{const n=App.catName(p);return pre&&n.startsWith(pre+" / ")?n.slice(pre.length+3):n},brand:brandOf,model:p=>p.model||"Без модели",none:()=>""}[f.group]||(()=>"");
     const gk=new Map(list.map(p=>[p,String(gkey(p))]));
     list.sort((a,b)=>col(gk.get(a),gk.get(b))||cmp(a,b)||col(a.name,b.name));
     const totCost=list.reduce((a,p)=>a+num(p.cost)*Math.max(0,qty(p)),0),totPrice=list.reduce((a,p)=>a+num(p.price)*Math.max(0,qty(p)),0),totQty=list.reduce((a,p)=>a+Math.max(0,qty(p)),0);
@@ -98,10 +119,9 @@ VIEWS.stock={
       ${u.stockWh?`<td class="n">${qtyCell(App.qtyIn(p,u.stockWh),p)}</td>`:`<td class="n">${qtyCell(App.qtyTotal(p),p)}</td>`}
       ${showCost?`<td class="n">${money(p.cost)}</td>`:""}<td class="n"><b>${money(p.price)}</b></td></tr>`});
     const curCat=App.cat(f.cat),catLabel=f.cat==="__none"?"Без категории":curCat?App.catName({categoryId:curCat.id}):"";
-    const nOn=(ubOn(f)?1:0)+(f.cat?1:0)+f.brands.length+(f.avail!=="all"?1:0)+f.conds.length+f.mems.length+f.colors.length+(f.track?1:0)+(f.chan?1:0)+(f.pmin!==""||f.pmax!==""?1:0)+(f.arch?1:0);
-    const allOpen=["cat","brand","avail","used","params"].every(k=>(f.sec||{})[k]);
+    const nOn=(ubOn(f)?1:0)+f.brands.length+(f.avail!=="all"?1:0)+f.conds.length+f.mems.length+f.colors.length+(f.track?1:0)+(f.chan?1:0)+(f.pmin!==""||f.pmax!==""?1:0)+(f.arch?1:0);
+    const allOpen=["brand","avail","used","params"].every(k=>(f.sec||{})[k]);
     const filtersBody=()=>`
-        ${fsec("cat","Категории",catLabel||"все",catChips())}
         ${fb.length>1||f.brands.length?fsec("brand","Бренды",f.brands.join(", ")||"все",`<div class="chips">${chipset("brands",fb,f.brands)}</div>`):""}
         ${fsec("avail","Наличие",AVAIL.find(a=>a[0]===f.avail)[1],`<div class="seg wrap">${AVAIL.map(([v,l])=>`<button class="${f.avail===v?"on":""}" data-act="sfSet" data-id="avail|${v}">${l}</button>`).join("")}</div>`)}
         ${S.units.some(x=>x.status==="in_stock"&&x.condition&&x.condition!=="Новый")||S.categories.some(c=>c.isUsed)||ubOn(f)?fsec("used","Б/у",secSum(f.ub.batt!==""&&f.ub.batt!=null?"АКБ от "+f.ub.batt+"%":"",f.ub.repair?(f.ub.repair==="Был"?"был ремонт":"без ремонта"):"",f.ub.box?"с коробкой":"",f.ub.never?"Neverlock":"",f.ub.icloud?"iCloud отвязан":"")||"любые",
@@ -119,15 +139,16 @@ VIEWS.stock={
             <label class="chk"><input type="checkbox" data-sf="arch" ${f.arch?"checked":""}> Архив</label></div></div>`)}
     `;
     const pOpen=!!(f.sec||{}).panel;
-    return `<div class="smain" data-nodirty>
+    return `<div class="sgrid${mob?" nar":""}" data-nodirty>${mob?"":catTree()}<div class="smain">
       <div class="row-f stop">
         <input id="stockQ" type="search" placeholder="Название, штрихкод, IMEI" value="${esc(u.stockQ)}" data-filter="stockQ" aria-label="Поиск товара">
         ${App.sel("stockWh",[["","Все склады"],...App.whOpts()],u.stockWh,'data-filter-sel="stockWh" aria-label="Склад"')}
         <select data-sf="sort" aria-label="Сортировка">${SORTS.map(([v,l])=>`<option value="${v}"${f.sort===v?" selected":""}>${l}</option>`).join("")}</select>
         <select data-sf="group" aria-label="Группировка">${GROUPS.map(([v,l])=>`<option value="${v}"${f.group===v?" selected":""}>${l}</option>`).join("")}</select>
       </div>
+      ${mob?catBar():`<div class="catbar wide"><nav class="crumbs" aria-label="Категория"><b>${esc(f.cat==="__none"?"Без категории":App.catPath(f.cat)||"Все товары")}</b><small>${list.length} поз.</small></nav></div>`}
       <div class="fpanel ${pOpen?"open":"closed"}">
-        <div class="fhead"><button class="fsh fmain" data-act="sfSec" data-id="panel" aria-expanded="${pOpen}"><span class="ft">Фильтры</span>${nOn?`<span class="pill dark">${nOn}</span>`:""}<span class="fsum">${esc(nOn?active.map(a=>a[2]).concat(f.cat?[catLabel]:[]).join(", "):"не выбраны")}</span><span class="car"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform:rotate(${pOpen?180:0}deg);transition:transform .15s"><path d="M6 9l6 6 6-6"/></svg></span><span class="totbtn">${pOpen?"Свернуть":"Развернуть"}</span></button>${pOpen?`<button class="btn sm ghost" data-act="sfSecAll">${allOpen?"Свернуть все":"Развернуть все"}</button>`:""}</div>
+        <div class="fhead"><button class="fsh fmain" data-act="sfSec" data-id="panel" aria-expanded="${pOpen}"><span class="ft">Фильтры</span>${nOn?`<span class="pill dark">${nOn}</span>`:""}<span class="fsum">${esc(nOn?active.map(a=>a[2]).join(", "):"не выбраны")}</span><span class="car"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform:rotate(${pOpen?180:0}deg);transition:transform .15s"><path d="M6 9l6 6 6-6"/></svg></span><span class="totbtn">${pOpen?"Свернуть":"Развернуть"}</span></button>${pOpen?`<button class="btn sm ghost" data-act="sfSecAll">${allOpen?"Свернуть все":"Развернуть все"}</button>`:""}</div>
         ${pOpen?filtersBody():""}
       </div>
       ${active.length?`<div class="chips activef">${active.map(([k,v,l])=>`<button class="chip on" data-act="sfDrop" data-id="${esc(k+"|"+v)}">${esc(l)} ${App.ico("x","sm")}</button>`).join("")}<button class="btn sm ghost" data-act="sfReset">Сбросить всё</button></div>`:""}
@@ -137,12 +158,23 @@ VIEWS.stock={
       <section class="card"><div class="tbl-wrap"><table><thead><tr><th class="tagsel"><input type="checkbox" data-act="tagPickAll" aria-label="Выбрать все для ценников" ${shown.length&&shown.every(p=>App.ui.tagPick.has(p.id))?"checked":""}></th><th>Товар</th>${u.stockWh?"<th class=\"n\">Остаток</th>":'<th class="n">Остаток</th>'}${showCost?'<th class="n">Закупка</th>':""}<th class="n">Цена</th></tr></thead><tbody>
       ${rows||`<tr><td colspan="${cols}" class="empty">${S.products.length?"Ничего не найдено — измените фильтры":"Товаров пока нет. Начните с «Приёмки» или «Из каталога Apple»"}</td></tr>`}
       </tbody></table></div>${list.length>shown.length?`<div class="acts" style="justify-content:center;margin-top:10px"><button class="btn" data-act="moreStock">Показать ещё (${list.length-shown.length})</button></div>`:""}</section>`}
-    </div>`;
+    </div></div>`;
   }
 };
-ACT.sfCat=id=>{App.ui.sf.cat=id;sfSave();App.render()};
+ACT.sfCat=id=>{App.ui.sf.cat=id;App.catAnc(id).forEach(c=>App.ui.catOpen.add(c.id));coSave();App.ui.stockLimit=0;sfSave();App.render()};
+ACT.catToggle=id=>{const o=App.ui.catOpen;o.has(id)?o.delete(id):o.add(id);coSave();App.render()};
+/* перенос выбранных товаров в категорию */
+ACT.catMoveDlg=()=>{const ids=[...App.ui.tagPick].filter(id=>App.byId("products",id));if(!ids.length)return App.toast("Отметьте товары галочками");
+  const f=App.ui.sf,cur=App.cat(f.cat);
+  App.openModal(App.head("Перенести в категорию")+`<p class="muted">Выбрано товаров: ${ids.length}.</p><div class="form">${App.fld("cmTo","Категория",App.sel("cmTo",App.catOpts(true),cur?cur.id:""),"full")}</div>
+    <div class="acts"><button class="btn" data-act="close">Отмена</button><button class="btn pri" data-act="catMoveGo">Перенести</button></div>`)};
+ACT.catMoveGo=async(_,btn)=>{if(btn.disabled)return;btn.disabled=true;const to=App.val("cmTo")||null,ids=[...App.ui.tagPick].filter(id=>App.byId("products",id));let n=0;
+  try{for(const id of ids){await App.api.update("products",id,{category_id:to});n++}
+    await App.api.audit("Перенос товаров в категорию",App.catPath(to)||"Без категории",n+" шт.");
+    App.ui.tagPick.clear();await App.reload(["products"]);App.closeModal();App.toast(`Перенесено: ${n} → ${App.catPath(to)||"Без категории"}`)}
+  catch(e){btn.disabled=false;App.toast((n?`Перенесено ${n} из ${ids.length}. `:"")+e.message)}};
 ACT.sfSec=k=>{const f=App.ui.sf;f.sec=Object.assign({},f.sec);f.sec[k]=!f.sec[k];sfSave();App.render()};
-ACT.sfSecAll=()=>{const f=App.ui.sf,v=!["cat","brand","avail","used","params"].every(k=>(f.sec||{})[k]);f.sec=Object.assign({},f.sec,{cat:v,brand:v,avail:v,used:v,params:v});sfSave();App.render()};
+ACT.sfSecAll=()=>{const f=App.ui.sf,v=!["brand","avail","used","params"].every(k=>(f.sec||{})[k]);f.sec=Object.assign({},f.sec,{brand:v,avail:v,used:v,params:v});sfSave();App.render()};
 ACT.sfToggle=v=>{const [k,val]=v.split(/\|(.*)/s),a=App.ui.sf[k];const i=a.indexOf(val);i>=0?a.splice(i,1):a.push(val);sfSave();App.render()};
 ACT.sfSet=v=>{const [k,val]=v.split("|");App.ui.sf[k]=val;sfSave();App.render()};
 ACT.sfDrop=v=>{const [k,val]=v.split(/\|(.*)/s),f=App.ui.sf;
