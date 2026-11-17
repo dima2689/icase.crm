@@ -1,0 +1,38 @@
+# Порядок в категориях товаров: plan — выполнить в транзакции, показать итог и откатить; apply — сохранить.
+# Меняются только категории. Личные данные в журнал не выводятся.
+name: Catalog fix
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: "plan или apply"
+        required: true
+        default: plan
+permissions:
+  contents: read
+concurrency: { group: server, cancel-in-progress: false }
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      H: ${{ secrets.DEPLOY_HOST }}
+      STAGE: ${{ inputs.stage }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: SSH
+        env: { K: "${{ secrets.DEPLOY_SSH_KEY }}" }
+        run: |
+          case "$STAGE" in plan|apply) ;; *) echo "stage: plan или apply"; exit 1;; esac
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$K" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e '/^$/d' > ~/.ssh/id_deploy; chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -T 20 -t ed25519 "$H" 2>/dev/null > ~/.ssh/known_hosts
+      - name: Категории
+        run: |
+          END=rollback; [ "$STAGE" = apply ] && END=commit
+          { echo "\\set ON_ERROR_STOP on"; echo "begin;"; cat db/oneoff/categories_20261117.sql
+            echo "\\echo == дерево после: уровень | путь | товаров | б/у"
+            echo "with recursive t as (select id, name::text path, 1 lvl from categories where parent_id is null union all select c.id, t.path||' / '||c.name, t.lvl+1 from categories c join t on c.parent_id=t.id) select t.lvl, t.path, (select count(*) from products p where p.category_id=t.id), c.is_used from t join categories c on c.id=t.id order by t.path;"
+            echo "\\echo == без категории"; echo "select count(*) from products where category_id is null and not is_archived;"
+            echo "$END;"; } | ssh -i ~/.ssh/id_deploy -o BatchMode=yes root@"$H" "docker exec -i supabase-db psql -U postgres -d postgres -qAt -F ' | '"
+          echo "== режим: $STAGE ($END)"
