@@ -188,6 +188,11 @@ jobs:
           echo "== откуда старый бот брал каталог (код копии)"; grep -rnE "catalog_source|BOT_API_URL|script\.google|def (sync_stock|load_catalog|fetch_items|refresh)" "$O" --include=*.py | cut -c1-170 | head -25
           echo "== то же в текущем коде"; grep -rnE "catalog_source" "$B/app" --include=*.py | cut -c1-170 | head -15
           echo "== журнал 16.11 до 15:30 UTC: источник каталога"; journalctl -u icase-bot --since "2026-11-15 00:00" --until "2026-11-16 15:20" --no-pager -o cat 2>/dev/null | grep -iE "каталог|catalog|МойСклад|moysklad|google|api" | sed -E 's/[0-9]{6,}/<…>/g' | cut -c1-180 | sort | uniq -c | sort -rn | head -15
+          echo "== настройки МоегоСклада в боте (поля, без значений)"; (cd "$B" && python3 -c "import sqlite3,sys,json; c=sqlite3.connect(sys.argv[1]); r=c.execute(\"select value from kv where key='ms_config'\").fetchone(); d=json.loads(r[0]) if r else {}; print({k:(('задан, '+str(len(str(v)))+' симв.') if any(x in k.lower() for x in ('token','pass','key','secret','login')) else v) for k,v in d.items()})" "$DB" 2>&1 | cut -c1-600)
+          echo "== код: откуда берётся ключ"; sed -n '20,60p' "$B/app/moysklad.py" | grep -nE "token|ms_config|cfg|Authorization|def " | cut -c1-170
+          echo "== панель бота: страницы и запросы про МойСклад"; grep -rnoE "[\"'](/api/[a-z0-9_/-]*(ms|sklad|moysklad|integr|setting)[a-z0-9_/-]*)[\"']" "$B/app" --include=*.py | sort -u | cut -c1-140 | head -20
+          echo "== первая и последняя ошибка 401 в журнале"; journalctl -u icase-bot --no-pager -o short-iso 2>/dev/null | grep "HTTP 401" | sed -n '1p;$p' | cut -c1-60
+          echo "== последняя удачная выгрузка МоегоСклада"; journalctl -u icase-bot --no-pager -o short-iso 2>/dev/null | grep -iE "МойСклад|moysklad" | grep -viE "401|error|traceback|File " | tail -3 | sed -E 's/[0-9]{6,}/<…>/g' | cut -c1-170
           echo "== копии (откаты)"; ls -1 /var/backups/icase-bot 2>/dev/null | tail -10
           echo "== ошибки в журнале за 6 часов"; journalctl -u icase-bot --since -6h --no-pager 2>/dev/null | grep -iE 'error|traceback|exception' | sed -E 's/[0-9]{6,}/<…>/g' | cut -c1-200 | sort | uniq -c | sort -rn | head -15
           SH
